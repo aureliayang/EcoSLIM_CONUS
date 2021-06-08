@@ -1,0 +1,1624 @@
+! Last Change:  2020-11-12 17:43:44
+!--------------------------------------------------------------------
+! **EcoSLIM** is a Lagrangian, particle-tracking that simulates advective
+! and diffusive movement of water parcels.  This code can be used to
+! simulate age, diagnosing travel times, source water composition and
+! flowpaths.  It integrates seamlessly with **ParFlow-CLM**.
+!
+! Developed by: Reed Maxwell-August 2016 (rmaxwell@mines.edu)
+!
+! Contributors: Laura Condon (lecondon@email.arizona.edu)
+!               Mohammad Danesh-Yazdi (danesh@sharif.edu)
+!               Lindsay Bearup (lbearup@usbr.gov)
+!
+! released under GNU LPGL, see LICENSE file for details
+!
+!--------------------------------------------------------------------
+! MAIN FORTRAN CODE
+!--------------------------------------------------------------------
+! EcoSLIM_main.f90: The main fortran code performing particle tracking
+!                 Use Makefile provided to build.
+!
+!
+!
+!--------------------------------------------------------------------
+! INPUTS
+!--------------------------------------------------------------------
+! slimin.txt: Includes the domain's geometric information,
+!             ParFlow timesteps and their total number, and particles
+!             initial locations.
+!
+!--------------------------------------------------------------------
+! SUBROUTINES
+!--------------------------------------------------------------------
+! pfb_read(arg1,...,arg5).f90: Reads a ParFlow .pfb output file and
+!                              stores it in a matrix. Arguments
+!                              in order are:
+!
+!                              - arg1: Name of the matrix in which
+!                                      ParFlow .pfb is stored
+!                              - arg2: Corresponding .pfb file name,
+!                                      e.g., test.out.press.00100.pfb
+!                              - arg3: Number of cells in x-direction
+!                              - arg4: Number of cells in y-direction
+!                              - arg5: Number of cells in z-direction
+!
+!--------------------------------------------------------------------
+! OUTPUTS
+!--------------------------------------------------------------------
+! XXXX_log.txt:  Reports the domain's geometric information,
+!                ParFlow's timesteps and their total number,
+!                and particles initial condition. XXXX is the name of
+!                the SLIM2 run already set in slimin.txt
+!
+! XXXX_particle.3D: Contains particles' trajectory information in
+!                   space (i.e., X, Y, Z) and time (i.e., residence
+!                   time). XXXX is the name of the SLIM2 run
+!                   already set in slimin.txt
+!
+! XXXX_endparticle.txt: Contains the final X, Y, Z location of all
+!                       particles as well as their travel time.
+!                       XXXX is the name of the SLIM2 run already set
+!                       in slimin.txt
+!
+!--------------------------------------------------------------------
+! CODE STRUCTURE
+!--------------------------------------------------------------------
+! (1) Define variables
+!
+! (2) Read inputs, set up domain, write the log file, and
+!     initialize particles,
+!
+! (3) For each timestep, loop over all particles to find and
+!     update their new locations
+!--------------------------------------------------------------------
+program EcoSLIM
+use mpi
+use cudafor
+use ran_mod
+use create_subdomain
+use particles_loop
+use mpiDeviceUtil
+
+implicit none
+!--------------------------------------------------------------------
+! (1) Define variables
+!--------------------------------------------------------------------
+real*8,allocatable,pinned::P(:,:)
+        ! P = Particle array [np,attributes]
+        ! np = Number of particles
+        ! P(np,1) = X coordinate [L]
+        ! P(np,2) = Y coordinate [L]
+        ! P(np,3) = Z coordinate [L]
+        ! P(np,4) = Particle residence time [T]
+        ! P(np,5) = Saturated particle residence time [T]
+        ! P(np,6) = Particle mass; assigned via preciptiation or snowmelt rate (Evap_Trans*density*volume*dT)
+        ! P(np,7) = Particle source (1=IC, 2=rain, 3=snowmelt, 4=irrigation...)
+        ! P(np,8) = Particle Status (1=active, 0=inactive)
+        ! P(np,9) = concentration
+        ! P(np,10) = Exit status (1=outflow, 2=ET...)
+
+        ! P(np,11) = Length of flow path [L]
+        ! P(np,12) = Length of saturated flow path [L]
+        ! P(np,13:(12+nind)) = Length of flow path in indicator i [L]
+        ! P(np,(13+nind):(12+nind*2)) = particle age in indicator i [T]
+
+        ! P(np,13+nind*2) = Particle Number (This is a unique integer identifier for the particle)
+        ! P(np,14+nind*2) = Partical Initial X coordinate [L]
+        ! P(np,15+nind*2) = Partical Initial Y coordinate [L]
+        ! P(np,16+nind*2) = Partical Initial Z coordinate [L]
+        ! P(np,17+nind*2) = Time that particle was added [T]
+
+        ! The sequence of the attributes of P has been changed. Thus the time invariant attributes
+        ! don't have to be sent to GPU.
+
+real*8,allocatable,pinned::Vx(:,:,:)
+real*8,allocatable,pinned::Vy(:,:,:)
+real*8,allocatable,pinned::Vz(:,:,:)
+        ! Vx = Velocity x-direction [nx+1,ny,nz] -- ParFlow output
+        ! Vy = Velocity y-direction [nx,ny+1,nz] -- ParFlow output
+        ! Vz = Velocity z-direction [nx,ny,nz+1] -- ParFlow output
+
+real*8,allocatable,pinned::C(:,:,:,:)
+        ! Concentration array, in i,j,k with l (first index) as consituent or
+        ! property.  These are set by user at runtime using input
+
+!real*8,allocatable::ET_grid(:,:,:,:)
+        ! ET array, in i,j,k with l (first index) as consituent or property
+
+CHARACTER*20,allocatable::conc_header(:)
+        ! name for variables written in the C array above.  Dimensioned as l above.
+real*8,allocatable::Time_Next(:)
+        ! Vector of real times at which ParFlow dumps outputs
+
+real*8,allocatable,pinned::dz(:), dz2(:)
+real*8,allocatable::Zt(:)
+        ! Delta Z values in the vertical direction
+        ! Elevations in z-direction in local coordinates
+
+real*8,allocatable,pinned::Saturation(:,:,:)    ! Saturation (read from ParFlow)
+real*8,allocatable,pinned::Porosity(:,:,:)      ! Porosity (read from ParFlow)
+real*8,allocatable,pinned::EvapTrans(:,:,:)     ! CLM EvapTrans (read from ParFlow, [1/T] units)
+real*8,allocatable::EvapTrans_da(:,:,:)
+real*8,allocatable::CLMvars(:,:,:)     ! CLM Output (read from ParFlow, following single file
+                                       ! CLM output as specified in the manual)
+real*8, allocatable::Pnts(:,:), DEM(:,:) ! DEM and grid points for concentration output
+real*8, allocatable,pinned::Ind(:,:,:)
+
+integer Ploc(3)
+        ! Particle's location whithin a cell
+
+integer nind, itemp
+
+integer nx, nnx, ny, nny, nz, nnz, nztemp
+        ! number of cells in the domain and cells+1 in x, y, and z directions
+
+integer np_ic, np, np_active, np_active2, icwrite, jj, npnts, ncell, npout
+        ! number of particles for intial pulse IC, total, and running active
+
+integer nt, n_constituents
+        ! number of timesteps ParFlow; numer of C vectors written for VTK output
+
+integer pid
+
+real*8  pfdt, advdt(3)
+        ! ParFlow timestep value, advection timestep for each direction
+        ! for each individual particle step; used to chose optimal particle timestep
+
+integer pft1, pft2, tout1, pfnt, n_cycle
+        ! parflow start and stop file numbers number of ParFlow timesteps
+        ! flag specifying the number for the first output write (0= start with pft1)
+        ! number of timestep cycles
+
+real*8  Time_first
+        ! initial timestep for Parflow ((pft1-1)*pfdt)
+
+integer kk
+        ! Loop counter for the time steps (pfnt)
+integer pfkk, outkk
+       ! Counter for the file numbers starts at pft1
+       ! Counter for the output writing
+
+integer ii
+        ! Loop counter for the number of particles (np)
+integer iflux_p_res, i_added_particles
+        ! Number of particles per cell for flux input and
+        ! number of particle added total for precip input per
+        ! timestep
+integer i, j, k, l, ik, ji, m, ij, nzclm, nCLMsoil
+
+integer*4 ir
+
+character*200 runname, filenum, filenumout, pname, fname, vtk_file, DEMname, Indname
+        ! runname = SLIM runname
+        ! filenum = ParFlow file number
+        ! filenumout = File number for Ecoslim writing
+        ! pname = ParFlow output runname
+        ! fname = Full name of a ParFlow's output
+        ! vtk_file = concentration file
+        ! DEMname = DEM file name
+
+real*8 Clocx, Clocy, Clocz, Z, maxz
+        ! The fractional location of each particle within it's grid cell
+        ! Particle Z location
+
+real*8 V_mult
+        ! Multiplier for forward/backward particle tracking
+        ! If V_mult = 1, forward tracking
+        ! If V_mult = -1, backward tracking
+
+logical clmtrans, clmfile, source1
+        ! logical for mode of operation with CLM, will add particles with P-ET > 0
+        ! will remove particles if ET > 0
+        ! clmfile governs reading of the full CLM output, not just evaptrans
+
+real*8 dtfrac
+        ! fraction of dx/Vx (as well as dy/Vy and dz/Vz) assuring
+        ! numerical stability while advecting a particle to a new
+        ! location.
+
+real*8 Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
+        ! Domain boundaries in local / grid coordinates. min values set to zero,
+        ! DEM is read in later to output to Terrain Following Grid used by ParFlow.
+
+real*8 dx, dy
+        ! Domain's number of cells in x and y directions
+
+real*8 Vpx, Vpy, Vpz
+        ! Particle velocity in x, y, and z directions
+
+real*8 particledt, delta_time
+        ! The time it takes for a particle to displace from
+        ! one location to another and the local particle from-to time
+        ! for each PF timestep
+
+real*8 mean_age, mean_comp, mean_mass, total_mass
+        ! mean age and composition and mass of all particles in domain
+
+real*8 local_flux, et_flux, water_vol, Zr, z1, z2, z3
+        ! The local cell flux convergence
+        ! The volumetric ET flux
+        ! The availble water volume in a cell
+        ! random variable
+
+real*8 Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
+        ! Particles initial locations i.e., where they are injected
+        ! into the domain.
+
+! density of water (M/L3), molecular diffusion (L2/T), fractionation
+real*8 denh2o, moldiff, Efract  !, ran1
+
+! time history of ET, time (1,:) and mass for rain (2,:), snow (3,:),
+! PET balance is water balance flux from PF accumulated over the domain at each
+! timestep
+real*8,allocatable::PET_balance_da(:,:), PET_balance(:,:)
+
+real*8 ET_dt
+! time interval for ET
+! integer counters and operators.
+! the first set are used for total run timing the latter for component timing
+real*8 Total_time1, Total_time2, t1, t2, IO_time_read, IO_time_write, parallel_time
+real*8 sort_time, redis_time, source_time
+! integers for writing C or point based output
+integer ipwrite, ibinpntswrite
+! integers for writing gridded ET outputs
+integer etwrite
+
+!! IO control
+!! ipwrite controls an ASCII, .3D particle file not recommended due to poor performance
+!! this is left as a compiler option, currently disabled
+!!!!!!!
+!! icwrite controls VTK, binary grid based output where particle masses, concentrations,
+!! ages are mapped to a grid and written every N timesteps.  This is the most effiecient output
+!! but loses some accuracy or flexbility becuase individual particle locations are aggregated
+!! to the grid
+!!!!!!!!
+!! ibinpntswrite controls VTK, binary output of particle locations and attributes.  This is much faster
+!! than the .3D ASCII output but is still much slower than grid based output.  It provides the most
+!! information as particle locations are preserved
+
+real(8),allocatable,device::P_de(:,:),C_de(:,:,:,:)
+real(8),allocatable,device::Vx_de(:,:,:),Vy_de(:,:,:),Vz_de(:,:,:),dz_de(:),Ind_de(:,:,:)
+real(8),allocatable,device::Saturation_de(:,:,:),Porosity_de(:,:,:),EvapTrans_de(:,:,:)
+integer,allocatable,device::out_np_de(:),ET_np_de(:),nump_path_de(:,:,:)
+real(8),allocatable,device::out_age_de(:),out_mass_de(:),out_comp_de(:)
+real(8),allocatable,device::ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
+
+integer,allocatable,pinned::out_np_cpu(:),ET_np_cpu(:),nump_path(:,:,:)
+real(8),allocatable,pinned::out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
+real(8),allocatable,pinned::ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
+
+integer,parameter:: block_size = 256
+integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE)
+integer:: np_ps, add_f, p_redis, path, nsub, cycle_f
+integer:: fh0, fh1, fh2, fh3, fh4
+character(len=MPI_MAX_PROCESSOR_NAME):: hostname
+character(200):: loadf, restartf, exitedf, logf, message
+integer:: deviceID, namelength, np_active_log
+integer(MPI_OFFSET_KIND):: offset
+integer,allocatable:: nump(:),PME_tot(:,:,:),subid(:)
+integer:: np_lo, np_ln, np_ro, np_rn
+
+interface
+subroutine vtk_write(time,x,conc_header,ixlim,iylim,izlim,icycle,n_constituents,pnts,vtk_file)
+    real*8                 :: time
+    real*8                 :: x(:,:,:,:)
+    character (len=20)     :: conc_header(:)
+    integer*4              :: ixlim
+    integer*4              :: iylim
+    integer*4              :: izlim
+    real*8                 :: dx
+    real*8                 :: dy
+    real*8                 :: dz(izlim)
+    real*8                 :: pnts(:,:)
+    integer                :: icycle
+    integer                :: n_constituents
+    character (len=200)    :: vtk_file
+end subroutine vtk_write
+
+subroutine vtk_write_points(p,np_active, np,icycle,vtk_file,dx,dy,nx,ny,maxz,dem)
+    real*8                 :: p(:,:)
+    integer                :: icycle
+    integer*4              :: np_active
+    integer*4              :: np
+    integer                :: n_constituents
+    real*8                 :: dx
+    real*8                 :: dy
+    integer*4              :: nx
+    integer*4              :: ny
+    real*8                 :: maxz
+    real*8                 :: dem(:,:)
+    character (len=200)    :: vtk_file
+end subroutine vtk_write_points
+end interface
+
+call MPI_INIT(ierr)
+call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
+
+! Get and set unique device
+call assignDevice(deviceID)
+call MPI_GET_PROCESSOR_NAME(hostname, namelength, ierr)
+write(message,"('[',i2.2 ,'] host: ', a, ', device: ', i2.2, a)") &
+rank, trim(hostname), deviceID, new_line(' ')
+offset = len(trim(message))*rank
+
+call MPI_FILE_OPEN(MPI_COMM_WORLD, 'Device_Utility.txt', &
+MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh0, ierr)
+call MPI_FILE_SEEK(fh0,offset,MPI_SEEK_SET,ierr)
+call MPI_FILE_WRITE(fh0,message,len(trim(message)),MPI_CHARACTER, &
+    MPI_STATUS_IGNORE, ierr)
+call MPI_FILE_CLOSE(fh0, ierr)
+
+! Set up timing
+Total_time1 = 0.d0
+Total_time2 = 0.d0
+t1 = 0.d0
+t2 = 0.d0
+IO_time_read = 0.d0
+IO_time_write = 0.d0
+parallel_time = 0.d0
+sort_time = 0.d0
+redis_time = 0.d0
+source_time = 0.d0
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+Total_time1 = MPI_Wtime()
+
+!--------------------------------------------------------------------
+! (2) Read inputs, set up domain, write the log file, and
+! initialize particles
+!--------------------------------------------------------------------
+
+! Note: The following file numbers refer to
+!
+!       - #10: slimin.txt
+!       - #11: runname_log.txt
+!       - #12: runname_particle.3D (visualizes particles in VisIT)
+!       - #13: runname_endparticle.txt
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T1 = MPI_Wtime()
+
+! open SLIM input .txt file
+open (10,file='slimin.txt')
+
+! read SLIM run name
+read(10,*) runname
+
+! read ParFlow run name
+read(10,*) pname
+
+! read DEM file name
+read(10,*) DEMname
+
+if(rank == 0) then
+    ! open/create/write the output log.txt file. If doesn't exist, it's created.
+    open(11,file=trim(runname)//'_log.txt')
+    write(11,*) '### EcoSLIM Log File'
+    write(11,*)
+    write(11,*) 'run name:',trim(runname)
+    write(11,*)
+    write(11,*) 'ParFlow run name:',trim(pname)
+    write(11,*)
+    if (DEMname /= '') then
+    write(11,*) 'ParFlow DEM name:',trim(DEMname)
+    else
+    write(11,*) 'Not reading ParFlow DEM'
+    end if
+    write(11,*)
+endif ! rank=0
+
+! read domain number of cells and number of particles to be injected
+read(10,*) nx
+read(10,*) ny
+read(10,*) nz
+read(10,*) nCLMsoil
+read(10,*) ppx
+read(10,*) qqy
+read(10,*) p_redis
+read(10,*) source1
+read(10,*) path
+read(10,*) cycle_f
+! read in number of particles for IC (if np_ic = -1 then restart from a file)
+read(10,*) np_ic
+
+! read in the number of particles total
+read(10,*) np
+
+if(rank == 0) then
+    ! check to make sure we don't assign more particles for IC than we have allocated
+    ! in total
+    if (np_ic > np) then
+    write(11,*) 'warning NP_IC greater than IC'
+    np = np_ic
+    end if
+
+    ! write nx, ny, nz, and np in the log file
+    write(11,*) 'Grid information'
+    write(11,*) 'nx:',nx
+    write(11,*) 'ny:',ny
+    write(11,*) 'nz:',nz
+    write(11,*)
+    write(11,*) 'Particle IC Information'
+    write(11,*) 'np IC:',np_ic
+    if (np_ic == -1) &
+    write(11,*) 'Reading particle restart file:',trim(runname)//'_particle_restart.bin'
+    write(11,*) 'np:',np
+endif ! rank=0
+
+! grid +1 variables
+nnx=nx+1
+nny=ny+1
+nnz=nz+1
+
+! nCLMsoil = 10 ! number of CLM soil layers over the root zone !this doesn't matter
+nzclm = 13+nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables not domain NZ,
+           !  e.g. 23 for 10 soil layers (default) and 17 for 4 soil layers (Noah soil
+           ! layer setup)
+
+n_constituents = 9
+
+call gridinfo(nx,ny,ppx,qqy,rank)
+! return the global and local info of the subdomain
+! add grid info to log file
+! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
+! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
+! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+! allocate arrays
+allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
+         nump(ppx*qqy),grid(ppx*qqy,4))
+allocate(dz(nz), dz2(nz), Zt(0:nz))
+allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+         Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+         Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1))
+allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+           Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+          EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
+allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+allocate(conc_header(n_constituents))
+allocate(PME_tot(-buff+1:nnx1+buff,-buff+1:nny1+buff,1), &
+         nump_path(-buff+1:nnx1+buff,-buff+1:nny1+buff,1))
+
+! Intialize everything to Zero
+Vx = 0.0d0
+Vy = 0.0d0
+Vz = 0.0d0
+
+Saturation = 0.0d0
+Porosity = 0.0d0
+EvapTrans = 0.0d0
+EvapTrans_da = 0.0d0
+C = 0.0d0
+
+allocate(out_np_cpu(1),ET_np_cpu(1))
+allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
+allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
+
+! read dx, dy as scalars
+read(10,*) dx
+read(10,*) dy
+! read dz as an array
+read(10,*) dz(1:nz)
+dz2 = dz
+! read in (constant for now) ParFlow dt
+read(10,*) pfdt
+! read in parflow start and stop times
+read(10,*) pft1
+read(10,*) pft2
+read(10,*) tout1
+read(10,*) n_cycle
+read(10,*) add_f
+
+pfnt=n_cycle*(pft2-pft1+1)
+
+outkk = tout1 + 1
+
+! set ET DT to ParFlow one and allocate ET arrays accordingly
+ET_dt = pfdt
+allocate(PET_balance(pfnt,2))
+allocate(PET_balance_da(pfnt,2))
+PET_balance = 0.0d0
+PET_balance_da = 0.0d0
+
+! clear out output particles
+npout = 0
+
+! IO control, each value is a timestep interval, e.g. 1= every timestep, 2=every other, 0 = no writing
+read(10,*) ipwrite        ! controls an ASCII, .3D particle file not recommended due to poor performance
+read(10,*) ibinpntswrite  !  controls VTK, binary output of particle locations and attributes
+read(10,*) etwrite        !  controls ASCII ET output
+read(10,*) icwrite        ! controls VTK, binary grid based output where particle masses, concentrations,
+                          ! ages are mapped to a grid and written every N timesteps
+
+! allocate and assign timesteps
+allocate(Time_Next(pfnt))
+Time_Next=0.d0
+do kk = outkk, pfnt
+    Time_Next(kk) = float(kk)*pfdt
+end do
+
+Time_first = float(outkk-1)*pfdt
+
+! read in velocity multiplier
+read(10,*) V_mult
+
+! do we read in clm evap trans?
+read(10,*) clmtrans
+! do we read in clm output file?
+read(10,*) clmfile
+
+! read in IC number of particles for flux
+read(10,*) iflux_p_res
+
+! read in density h2o
+read(10,*) denh2o
+
+! read in diffusivity
+! moldiff = (1.15e-9)*3600.d0
+read(10,*) moldiff
+
+! saving Efract for a later time
+! read(10,*) Efract
+
+! fraction of dx/Vx
+read(10,*) dtfrac
+
+if(rank == 0) then
+    ! wite out log file
+    write(11,*)
+    write(11,*) 'Grid Dimensions'
+    write(11,'(" dx:",e12.5)') dx
+    write(11,'(" dy:",e12.5)') dy
+    write(11,'(" dz:",*(e12.5,", "))') dz(1:nz)
+    write(11,*)
+    write(11,*) 'Timestepping Information'
+    write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt
+    write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
+    write(11,'(" ParFlow start step, pft1:",i12)') pft1
+    write(11,'(" ParFlow end step, pft2:",i12)') pft2
+    write(11,'(" Output step start:",i12)') outkk
+    write(11,'(" Time loops, cycles, n_cycle:",i12)') n_cycle
+    write(11,'(" Total time steps:",i12)') pfnt
+
+    write(11,*)
+    write(11,*) 'V mult: ',V_mult,' for forward/backward particle tracking'
+    write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
+    write(11,*)
+    write(11,*) 'Physical Constants'
+    write(11,*) 'denh2o: ',denh2o,' M/L^3'
+    write(11,*) 'Molecular Diffusivity: ',moldiff,' '
+    !write(11,*) 'Fractionation: ',Efract,' '
+    write(11,*)
+    write(11,*) 'Numerical Stability Information'
+    write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac
+endif
+
+read(10,*) nind
+read(10,*) Indname
+if(rank == 0) then
+    write(11,*)
+    write(11,*) 'Indicator File'
+    write(11,*) nind, 'Indicators'
+endif
+
+! end of SLIM input
+close(10)
+
+DEM = 0.0d0
+nztemp = 1
+! read in DEM
+if (DEMname /= '') then
+ fname = trim(adjustl(DEMname))
+ call pfb_read(DEM,fname,nx,ny,nztemp)
+ !this should not be right! now only the subdomain part
+end if ! DEM
+
+Ind = 1.0d0
+! read in Indicator file
+if (nind>0) then
+  if (Indname /= '') then
+    fname = trim(adjustl(Indname))
+    call pfb_read(Ind,fname,nx,ny,nz)
+    if(rank == 0) &
+    write(11,*) 'Read Indicator File:', fname
+  else
+    if(rank == 0) &
+    write(11,*) 'WARNING: indicator flage >0 but no indicator file provided'
+  end if ! Ind
+end if
+
+if(rank == 0) then
+    flush(11)
+    close(11)
+endif
+
+! Read porosity values from ParFlow .pfb file
+fname=trim(adjustl(pname))//'.out.porosity.pfb'
+call pfb_read(Porosity,fname,nx,ny,nz)
+
+! Read the in initial Saturation from ParFlow
+kk = 0
+pfkk=pft1-1
+write(filenum,'(i5.5)') pfkk
+fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
+call pfb_read(Saturation,fname,nx,ny,nz)
+! this should not do if restart
+
+allocate(P(np,17+nind*2))
+P = 0.d0    ! clear out all particle attributes
+P(1:np,7:9) = 1.d0  ! make all particles active to start with and original from 1 = GW/IC
+
+open(10,file='sub_info.txt')
+    do i=1,t_rank
+        if(rank == i-1) then
+            read(10,*) nsub
+            if(nsub>0) then
+                allocate(subid(nsub))
+                read(10,*) (subid(j),j=1,nsub)
+            else
+                read(10,*)
+            endif
+        else
+            read(10,*)
+            read(10,*)
+        endif
+    enddo
+close(10)
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T2 = MPI_Wtime()
+
+IO_time_read = IO_time_read + (T2-T1)
+
+! set up domain boundaries
+Xmin = 0.0d0
+Ymin = 0.0d0
+Zmin = 0.0d0
+Xmax = dble(nx)*dx
+Ymax = dble(ny)*dy
+Zmax = 0.0d0
+do k = 1, nz
+    Zmax = Zmax + dz(k)
+end do
+
+write(loadf,'(a,i3.3,a)') 'Load_info.', rank, '.txt'
+write(restartf,'(a,i3.3,a)') 'Particle_restart.',rank,'.bin'
+write(exitedf,'(a,i3.3,a)') 'Exited_particles.',rank,'.bin'
+write(logf,'(a,i3.3,a)') 'Log_particles.',rank,'.txt'
+
+call MPI_FILE_OPEN(MPI_COMM_SELF,loadf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+MPI_INFO_NULL,fh1,ierr)
+
+write(message,'(a,a)') '## Domain Info', new_line(' ')
+call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+write(message,'("Xmin:",e12.5," Xmax:",e12.5,A)') Xmin, Xmax, new_line(' ')
+call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+write(message,'("Ymin:",e12.5," Ymax:",e12.5,A)') Ymin, Ymax, new_line(' ')
+call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+write(message,'("Zmin:",e12.5," Zmax:",e12.5,A)') Zmin, Zmax, new_line(' ')
+call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+! Set up grid locations for file output
+npnts=nnx*nny*nnz
+ncell=nx*ny*nz
+
+allocate(Pnts(npnts,3))
+Pnts=0
+m=1
+
+! Need the maximum height of the model and elevation locations
+Z = 0.0d0
+Zt(0) = 0.0D0
+do ik = 1, nz
+Z = Z + dz(ik)
+Zt(ik) = Z
+! print*, Z, dz(ik), Zt(ik), ik
+end do
+maxZ=Z
+
+! candidate loops for OpenMP
+do k=1,nnz
+ do j=1,nny
+  do i=1,nnx
+   Pnts(m,1)=DBLE(i-1)*dx
+   Pnts(m,2)=DBLE(j-1)*dy
+   ! This is a simple way of handling the maximum edges
+   if (i <= nx) then
+   ii=i
+   else
+   ii=nx
+   endif
+   if (j <= ny) then
+   jj=j
+   else
+   jj=ny
+   endif
+   ! This step translates the DEM
+   ! The specified initial heights in the pfb (z1) are ignored and the
+   ! offset is computed based on the model thickness
+   Pnts(m,3)=(DEM(ii,jj)-maxZ)+Zt(k-1)
+   m=m+1
+  end do
+ end do
+end do
+
+! allocate arrays on GPU
+allocate(dz_de(nz))
+allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+         Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+         Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1), &
+        Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+           Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+          EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+allocate(out_np_de(1),ET_np_de(1),nump_path_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,1))
+allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
+allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+dz_de = dz2
+Ind_de = Ind
+Porosity_de = Porosity
+
+! Intialize random seed
+ir = -3333
+
+! Define initial particles' locations and mass
+!
+if (np_ic > 0)  then
+np_active = 0
+pid = 0
+do k = 1, nz
+do j = 1, nny1 !iy1+1,iy1+nny1 !1, ny
+do i = 1, nnx1 !ix1+1,ix1+nnx1 !1, nx
+  if (np_active < np) then   ! check if we have particles left
+  if (Saturation(i,j,k) > 0.d0) then ! check if we are in the active domain
+  do ij = 1, np_ic
+  np_active = np_active + 1
+  pid = pid + 1
+  ii = np_active
+  P(ii,13+2*nind) = float(pid) !Saving a particle ID number
+  ! assign X, Y, Z locations randomly to each cell
+  ! assign X, Y, Z locations randomly to each cell
+  P(ii,1) = float(i-1)*dx + ran1(ir)*dx
+  P(ii,14+2*nind) = P(ii,1) ! Saving the initial location
+  P(ii,2) = float(j-1)*dy + ran1(ir)*dy
+  P(ii,15+2*nind) = P(ii,2)
+  P(ii,17+2*nind) = outkk + 0.0 !setting insert time to the start time
+
+  Z = 0.0d0
+  do ik = 1, k
+  Z = Z + dz(ik)
+  end do
+
+  P(ii,3) = Z - dz(k)*ran1(ir)
+  P(ii,16+2*nind) = P(ii,3)
+
+        ! assign mass of particle by the volume of the cells
+        ! and the water contained in that cell
+        P(ii,6) = dx*dy*dz(k)*(Porosity(i,j,k) &
+                 *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
+        P(ii,7) = 1.0d0
+        P(ii,8) = 1.0d0
+        ! set up intial concentrations
+        C(1,i,j,k) = C(1,i,j,k) + P(ii,8)*P(ii,6) / &
+        (dx*dy*dz(k)*(Porosity(i,j,k)*Saturation(i,j,k)))
+        C(2,i,j,k) = C(2,i,j,k) + P(ii,8)*P(ii,4)*P(ii,6)
+        C(4,i,j,k) = C(4,i,j,k) + P(ii,8)*P(ii,7)*P(ii,6)
+        C(3,i,j,k) = C(3,i,j,k) + P(ii,8)*P(ii,6)
+end do   ! particles per cell
+end if   ! active domain
+else
+    write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+    write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+    goto 9090
+
+end if
+end do ! i
+end do ! j
+end do ! k
+
+! if np_ic = -1 then we read a restart file
+else if (np_ic == -1) then
+
+  write(message,'(a,a,i3.3,a,a)') 'Reading particle restart File:', &
+  'Particle_restart.',rank,'.bin',new_line(' ')
+  call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                      MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+  ! read in full particle array as binary restart file, should name change?,
+  ! potential overwrite confusion
+   call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_RDONLY, &
+                      MPI_INFO_NULL,fh2,ierr)
+
+   call MPI_FILE_READ(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+   call MPI_FILE_READ(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+
+  if (np_active < np) then   ! check if we have particles left
+    call MPI_FILE_READ(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
+                       MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+    call MPI_FILE_CLOSE(fh2, ierr)
+
+    write(message,'(a,i10.10,a)') 'RESTART np_active:',np_active,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a,i10.10,a)') 'RESTART pid:',pid,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+  else
+    call MPI_FILE_CLOSE(fh2, ierr)
+    write(message,'(A,A)') ' **Warning restart IC input but no paricles left',new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(A,A)') ' **Exiting code *not* (over)writing restart',new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    stop
+  end if
+end if
+
+! Define initial particles' locations by surface water
+!
+if (np_ic < -1)  then
+np_active = 0
+pid = np_active
+
+ir = -3333
+k = nz
+do j = grid(rank+1,2)+1,grid(rank+1,2)+grid(rank+1,4) !iy1+1,iy1+nny1 !1, ny
+do i = grid(rank+1,1)+1,grid(rank+1,1)+grid(rank+1,3) !ix1+1,ix1+nnx1 !1, nx
+  if (np_active < np) then   ! check if we have particles left
+  ! if (saturation(i,j,k) >= 0.95d0)  then
+  do ij = 1, abs(np_ic)
+  np_active = np_active + 1
+  pid = pid +1
+  ii = np_active
+  P(ii,13+2*nind)=float(pid) !Saving a particle ID number
+  ! assign X, Y, Z locations randomly to each cell
+  ! assign X, Y, Z locations randomly to each cell
+  P(ii,1) = float(i-1)*dx  +ran1(ir)*dx
+  P(ii,14+2*nind)=P(ii,1) ! Saving the initial location
+  P(ii,2) = float(j-1)*dy  +ran1(ir)*dy
+  P(ii,15+2*nind)=P(ii,2)
+  P(ii,17+2*nind) = outkk + 0.0 !setting insert time to the start time
+
+  Z = 0.0d0
+  do ik = 1, k
+    Z = Z + dz(ik)
+  end do
+
+  P(ii,3) = Z !-dz(k)*ran1(ir)
+  P(ii,16+2*nind)=P(ii,3)
+
+        ! assign mass of particle by the volume of the cells
+        ! and the water contained in that cell
+        P(ii,6) = dx*dy*dz(k)*(Porosity(i,j,k)  &
+                 *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
+        P(ii,7) = 1.0d0
+        P(ii,8) = 1.0d0
+        ! set up intial concentrations
+        C(1,i,j,k) = C(1,i,j,k) + P(ii,8)*P(ii,6) / &
+        (dx*dy*dz(k)*(Porosity(i,j,k)*Saturation(i,j,k)))
+        C(2,i,j,k) = C(2,i,j,k) + P(ii,8)*P(ii,4)*P(ii,6)
+        C(4,i,j,k) = C(4,i,j,k) + P(ii,8)*P(ii,7)*P(ii,6)
+        C(3,i,j,k) = C(3,i,j,k) + P(ii,8)*P(ii,6)
+end do   ! particles per cell
+!end if  !! saturated at top
+else
+
+  write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
+  call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+  MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+  write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
+  call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+  MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+  goto 9090
+
+end if
+end do ! i
+end do ! j
+
+end if ! river IC
+
+! Write out intial concentrations
+! normalize ages by mass
+call MPI_ALLReduce(MPI_IN_PLACE,C,n_constituents*nx*ny*nz,MPI_DOUBLE_PRECISION, &
+                   MPI_SUM,MPI_COMM_WORLD,ierr)
+! this may not be used for this version, we will do parallel output
+
+where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
+where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
+
+! Set up output options for VTK grid output
+! icwrite = 1
+vtk_file=trim(runname)//'_cgrid'
+conc_header(1) = 'Concentration'
+conc_header(2) = 'Age'
+conc_header(3) = 'Mass'
+conc_header(4) = 'Comp'
+conc_header(5) = 'Delta'
+conc_header(6) = 'ET_Npart'
+conc_header(7) = 'ET_Mass'
+conc_header(8) = 'ET_Age'
+conc_header(9) = 'ET_Comp'
+
+if(icwrite > 0 .and. rank == 0)  &
+call vtk_write(Time_first,C,conc_header,nx,ny,nz,0,n_constituents,Pnts,vtk_file)
+
+! clear out C arrays
+! C = 0.0D0
+
+call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                   MPI_INFO_NULL,fh4,ierr)
+    write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
+    call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
+                             ETOut NP_PrecipIn NP_ETOut NP_QOut NP_active_old NP_filtered', new_line(' ')
+    call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+! open exited partile file and write header
+call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                   MPI_INFO_NULL,fh3,ierr)
+
+if(rank == 0) then
+    if(ipwrite < 0) then
+    ! open/create/write the 3D output file which will write particles out each timestemp, very slowly in parallel
+    open(214,file=trim(runname)//'_total_particle_trace.3D')
+    write(214,*) 'X Y Z TIME'
+    end if !! ipwrite < 0
+
+    open(13,file=trim(runname)//'_ET_output.txt')
+    write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
+
+    open(15,file=trim(runname)//'_flow_output.txt')
+    write(15,*) 'TIME Out_age Out_comp1 outcomp2 outcomp3 Out_mass Out_NP'
+
+    open(16,file=trim(runname)//'_PET_balance.txt')
+    write(16,*) 'TIME P[kg] ET[kg]'
+endif
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T1 = MPI_Wtime()
+if(source1) then
+    call grid_PME(nx,ny,nz,pname,pft1,pft2,iflux_p_res,PME_tot)
+    call grid_adjust(nx,ny,1,PME_tot)
+endif
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T2 = MPI_Wtime()
+source_time = T2 - T1
+!--------------------------------------------------------------------
+! (3) For each timestep, loop over all particles to find and
+!     update their new locations
+!--------------------------------------------------------------------
+! loop over timesteps
+pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1
+do kk = outkk, pfnt
+
+! reset ParFlow counter for cycles
+        if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
+
+        if(cycle_f>0) then
+            if(mod(kk-1,cycle_f) == 0) then
+                subid(1) = subid(1) + 1
+                if(subid(1)+1>t_rank) subid(1) = mod(subid(1),t_rank)
+                write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
+                ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(subid(1)+1,1:4),new_line(' ')
+                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            endif
+        endif
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        T1 = MPI_Wtime()
+        ! adjust the file counters
+        pfkk = pfkk + 1
+
+        ! Read the velocities computed by ParFlow
+        write(filenum,'(i5.5)') pfkk
+
+        fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
+        call pfb_read(Vx,fname,nx+1,ny,nz)
+
+        fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
+        call pfb_read(Vy,fname,nx,ny+1,nz)
+
+        fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
+        call pfb_read(Vz,fname,nx,ny,nz+1)
+
+        fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
+        call pfb_read(Saturation,fname,nx,ny,nz)
+
+        if (clmtrans) then
+        ! Read in the Evap_Trans
+        fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
+        call pfb_read(EvapTrans,fname,nx,ny,nz)
+
+        if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
+        where (EvapTrans > 0.d0) EvapTrans_da = EvapTrans_da + EvapTrans
+
+        ! check if we read full CLM output file
+        if (clmfile) then
+        ! Read in CLM output file @RMM to do make this input
+        fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
+        call pfb_read(CLMvars,fname,nx,ny,nzclm)
+
+        end if
+        end if
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        T2 = MPI_Wtime()
+        IO_time_read = IO_time_read + (T2-T1)
+
+        ! Determine whether to perform forward or backward patricle tracking
+        Vx = Vx * V_mult
+        Vy = Vy * V_mult
+        Vz = Vz * V_mult
+
+        i_added_particles = 0
+        ! Add particles if P-ET > 0
+        if (clmtrans) then   !check if this is our mode of operation, read in the ParFlow evap trans file
+                             ! normally generated by CLM but not exclusively, to assign new particles to any
+                             ! additional water fluxes (rain, snow, irrigation water) with the mass of each
+                             ! particle assigned to be the mass of the NEW water
+        ! check overall if we are out of particles (we do this twice once for speed, again for array)
+        ! generally if we are out of particles the simulation isn't valid, but we just warn the user
+        if (np_active < np) then
+        ! loop over entire domain to check each cell, if the cell flux is a recharge we add particles
+        ! and sum the flux, if negative we sum ET flux
+        ! this could be parallelized but thread race concerns when summing total fluxes
+        ! and a scheme to place particles accurately in parallel makes me think serial is
+        ! still more efficient
+        !do m = 1, nsub
+        do k = 1, nz
+        do j = 1, nny1 !iy3+1,iy3+nny3 !1, ny !rank id
+        do i = 1, nnx1 !ix3+1,ix3+nnx3 !1, nx
+        if (EvapTrans(i,j,k)> 0.0d0) then
+        ! sum water inputs in PET 1 = P, 2 = ET, kk= PF timestep
+        ! units of ([T]*[1/T]*[L^3])/[M/L^3] gives Mass of water input
+        PET_balance(kk,1) = PET_balance(kk,1) + pfdt*EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o
+        else !! ET not P
+        ! sum water inputs in PET 1 = P, 2 = ET, kk= PF timestep
+        ! units of ([T]*[1/T]*[L^3])/[M/L^3] gives Mass of water input
+        PET_balance(kk,2) = PET_balance(kk,2) + pfdt*EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o
+        end if  !! end if for P-ET > 0
+
+        if(mod(kk,add_f) == 0) then
+            if(EvapTrans_da(i,j,k)> 0.0d0) then
+
+                PET_balance_da(kk,1) = PET_balance_da(kk,1) &
+                        + pfdt*EvapTrans_da(i,j,k)*dx*dy*dz(k)*denh2o
+
+                do ji = 1, iflux_p_res
+                if (np_active < np) then   ! check if we have particles left
+                np_active = np_active + 1
+                pid = pid + 1
+                ii = np_active             ! increase total number of particles
+                P(ii,13+2*nind) = float(pid)
+                i_added_particles = i_added_particles + 1   ! increase particle counter for accounting
+                ! assign X, Y locations randomly to recharge cell
+                P(ii,1) = float(i-1)*dx  +ran1(ir)*dx
+                P(ii,14+2*nind)=P(ii,1) ! Saving the initial location
+                P(ii,2) = float(j-1)*dy  +ran1(ir)*dy
+                P(ii,15+2*nind)=P(ii,2) ! Saving the initial location
+                Z = 0.0d0
+                do ik = 1, k
+                Z = Z + dz(ik)
+                end do
+                ! Z location is fixed
+                P(ii,3) = Z -dz(k)*0.5d0 !  *ran1(ir)
+                P(ii,16+2*nind)=P(ii,3) ! Saving the initial location
+
+                ! assign zero time and flux of water
+                ! time is assigned randomly over the recharge time to represent flux over the
+                ! PF DT unless we are running SS then have all particles start at the same time
+                P(ii,4) = 0.0d0
+                if (iflux_p_res >= 0) then
+                    P(ii,4) = 0.0d0 +ran1(ir)*pfdt
+
+                    !If you are using an indicator file than time according to the local indicator
+                    if (nind > 0) then
+                      Ploc(1) = floor(P(ii,1) / dx)
+                      Ploc(2) = floor(P(ii,2) / dy)
+                      Ploc(3) = nz-1
+
+                      itemp=idnint(Ind(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                      if(itemp > 0 .and. itemp <= nind) then
+                        P(ii,(12+itemp)) = P(ii,(12+itemp)) + P(ii,4)
+                        !itemp=0
+                      end  if
+                    end if
+                 end if
+
+                P(ii,5) = 0.0d0
+                P(ii,17+2*nind) = outkk + float((kk-1))*pfdt + P(ii,4) !recording particle insert time
+                ! mass of water flux into the cell divided up among the particles assigned to that cell
+                !P(ii,6) = (1.0d0/float(iflux_p_res))   &
+                  !        *P(ii,4)*EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o  !! units of ([T]*[1/T]*[L^3])/[M/L^3] gives Mass
+                P(ii,6) = (1.0d0/float(abs(iflux_p_res)))   &
+                            *pfdt*EvapTrans_da(i,j,k)*dx*dy*dz(k)*denh2o  !! units of ([T]*[1/T]*[L^3])/[M/L^3] gives Mass
+                !! check if input is rain or snowmelt
+                if(CLMvars(i,j,11) > 0.0) then !this is snowmelt
+                P(ii,7) = 3.0d0 ! Snow composition
+                else
+                P(ii,7) = 2.d0 ! Rainfall composition
+                end if
+                P(ii,8) = 1.0d0   ! make particle active
+                P(ii,9) = 1.0d0
+                P(ii,10) = 0.0d0  ! Particle hasn't exited domain
+
+                else
+                write(message,'(A,A)') ' **Warning rainfall input but no paricles left', new_line(' ')
+                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+                write(message,'(A,A)') ' **Exiting code gracefully writing restart', new_line(' ')
+                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+                goto 9090
+                end if  !! do we have particles left?
+                end do !! for flux particle resolution
+            else
+                PET_balance_da(kk,2) = PET_balance_da(kk,2) &
+                        + pfdt*EvapTrans_da(i,j,k)*dx*dy*dz(k)*denh2o
+            end if
+        end if
+
+        end do
+        end do
+        end do
+        !end do
+
+        end if  !! second particle check to avoid array loop if we are out of particles
+        end if  !! end if for clmtrans logical
+
+        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance_da(kk,:), 2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance(kk,:),    2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        T1 = MPI_Wtime()
+
+        if(path > 0 .and. mod(kk,path) == 0) then
+            allocate(P_de(np_active,15+2*nind))
+            P_de(1:np_active,1:12+2*nind) = P(1:np_active,1:12+2*nind)
+            P_de(1:np_active,13+2*nind:15+2*nind) = P(1:np_active,14+2*nind:16+2*nind)
+            nump_path = 0; nump_path_de = nump_path
+        else
+            allocate(P_de(np_active,12+2*nind))
+            P_de = P(1:np_active,1:12+2*nind)
+        endif
+        ! later, we only need to copy the new added particles to GPU.
+        ! so we have to copy back the np_active at the end of last time step.
+
+        out_age_cpu = 0.d0; out_mass_cpu = 0.d0; out_comp_cpu = 0.d0; out_np_cpu = 0
+        et_age_cpu = 0.d0; et_mass_cpu = 0.d0; et_comp_cpu = 0.d0; et_np_cpu = 0
+        !out_age_de = out_age_cpu; out_mass_de = out_mass_cpu
+        !out_comp_de = out_comp_cpu;
+        out_np_de = out_np_cpu
+        !et_age_de = et_age_cpu; et_mass_de = et_mass_cpu
+        !et_comp_de = et_comp_cpu;
+        et_np_de = et_np_cpu
+        C = 0.d0; C_de = C
+
+        Vx_de   = Vx;        Vy_de   = Vy;        Vz_de   = Vz
+        Saturation_de = Saturation;  EvapTrans_de  = EvapTrans
+
+        call particles_independent <<< ceiling(dble(np_active)/block_size),&
+            block_size >>> (&
+            P_de,C_de,dz_de,EvapTrans_de,Vx_de,Vy_de,Vz_de,nump_path_de,&
+            Saturation_de,Porosity_de,out_age_de,out_mass_de,out_comp_de,&
+            et_age_de,et_mass_de,et_comp_de,out_np_de,et_np_de,Ind_de,&
+            kk,np_active,nx,ny,nz,nind,pfdt,moldiff,dx,dy,denh2o,dtfrac,&
+            xmin,ymin,zmin,xmax,ymax,zmax,path)
+
+        P(1:np_active,1:12+2*nind) = P_de(1:np_active,1:12+2*nind)
+        deallocate(P_de)
+
+        C              = C_de
+        !out_age_cpu    = out_age_de;    out_mass_cpu   = out_mass_de
+        !out_comp_cpu   = out_comp_de
+        out_np_cpu     = out_np_de
+        !et_age_cpu     = et_age_de;     et_mass_cpu    = et_mass_de
+        !et_comp_cpu    = et_comp_de
+        et_np_cpu      = et_np_de
+
+        !call MPI_ALLReduce(MPI_IN_PLACE, ET_age_cpu,  1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        !call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_cpu, 3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        !call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, ET_np_cpu,   1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        !call MPI_ALLReduce(MPI_IN_PLACE, Out_age_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        !call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_cpu,3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        !call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_cpu,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, Out_np_cpu,  1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        call MPI_ALLReduce(MPI_IN_PLACE,C,n_constituents*nx*ny*nz,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+        if(path > 0 .and. mod(kk,path) == 0) then
+            nump_path = nump_path_de
+            call MPI_ALLReduce(MPI_IN_PLACE,nump_path,nx*ny,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+            !nump_path = nump_path/1000
+            call grid_adjust(nx,ny,1,nump_path)
+            write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
+            ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        endif
+
+        call MPI_Reduce(np_active, np_active_log, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        T2 = MPI_Wtime()
+        parallel_time = parallel_time + (T2-T1)
+
+    if(rank == 0) then
+        write(12,*) np_active_log, T2-T1, redis_time
+        if(path > 0 .and. mod(kk,path) == 0) then
+        write(12,'(5(20i10,/))') ((nump_path(i,j,1),i=1,nx),j=1,ny)
+        endif
+        flush(12)
+
+        if (ET_mass_cpu(1) > 0 ) then
+        ET_age_cpu(1) = ET_age_cpu(1)/ET_mass_cpu(1)
+        ET_comp_cpu(1) = ET_comp_cpu(1)/ET_mass_cpu(1)
+        ET_comp_cpu(2) = ET_comp_cpu(2)/ET_mass_cpu(1)
+        ET_comp_cpu(3) = ET_comp_cpu(3)/ET_mass_cpu(1)
+        end if
+        write(13,'(6(e12.5),i12)') float(kk)*ET_dt, ET_age_cpu(1), ET_comp_cpu(1), &
+                                   ET_comp_cpu(2), ET_comp_cpu(3), ET_mass_cpu(1), &
+                                   ET_np_cpu(1)
+        flush(13)
+
+        if (Out_mass_cpu(1) > 0 ) then
+        Out_age_cpu(1) = Out_age_cpu(1)/Out_mass_cpu(1)
+        Out_comp_cpu(1) = Out_comp_cpu(1)/Out_mass_cpu(1)
+        Out_comp_cpu(2) = Out_comp_cpu(2)/Out_mass_cpu(1)
+        Out_comp_cpu(3) = Out_comp_cpu(3)/Out_mass_cpu(1)
+        end if
+        write(15,64) float(kk)*ET_dt, Out_age_cpu(1), Out_comp_cpu(1), &
+                     Out_comp_cpu(2), Out_comp_cpu(3), Out_mass_cpu(1), &
+                     Out_np_cpu(1)
+        flush(15)
+
+        write(16,'(5(e12.5,2x))') float(kk)*ET_dt, PET_balance(kk,1), PET_balance(kk,2), &
+                                  PET_balance_da(kk,1), PET_balance_da(kk,2)
+        flush(16)
+    endif
+
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    T1 = MPI_Wtime()
+
+write(filenumout,'(i10.10)') kk
+
+! write all active particles at concentration in ASCII VisIT 3D file format
+! as noted above, this option is very slow compared to VTK binary output
+if(ipwrite > 0) then
+if(mod(kk,ipwrite) == 0)  then
+! open/create/write the 3D output file
+open(14,file=trim(runname)//'_transient_particle.'//trim(adjustl(filenumout))//'.3D')
+write(14,*) 'X Y Z TIME ID'
+do ii = 1, np_active
+if (P(ii,8) == 1) write(14,61) P(ii,1), P(ii,2), P(ii,3), P(ii,4), P(ii,13+2*nind)
+end do
+close(14)
+end if
+end if
+
+! normalize ages by mass
+!where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
+!where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
+!where (C(3,:,:,:)>0.0)  C(5,:,:,:) = C(5,:,:,:) / C(3,:,:,:)
+
+! normalize ET ages by mass
+!where (C(7,:,:,:)>0.0)  C(8,:,:,:) = C(8,:,:,:) / C(7,:,:,:)
+!where (C(7,:,:,:)>0.0)  C(9,:,:,:) = C(9,:,:,:) / C(7,:,:,:)
+
+! Write gridded ET outputs to text files
+if(etwrite > 0) then
+if (mod(kk,etwrite) == 0) then
+! open/create/write the 3D output file
+open(14,file=trim(runname)//'_ET_summary.'//trim(adjustl(filenumout))//'.txt')
+write(14,*) 'X Y Z ET_npart, ET_mass, ET_age, ET_comp, EvapTrans_Rate, Saturation, Porosity'
+do i = 1, nx
+do j = 1, ny
+do k = 1, nz
+  if (EvapTrans(i,j,k) < 0.0d0)   &
+  write(14,'(3(i6), 7(e13.5))')  i, j, k, C(6,i,j,k), C(7,i,j,k), C(8,i,j,k), &
+       C(9,i,j,k), EvapTrans(i,j,k), Saturation(i,j,k), Porosity(i,j,k)
+end do
+end do
+end do
+close(14)
+end if
+end if
+
+! write grid based values ("concentrations")
+vtk_file=trim(runname)//'_cgrid'
+if(icwrite > 0)  then
+    !if(mod(kk,icwrite) == 0)  &
+    !call vtk_write(Time_Next(kk),C,conc_header,nx,ny,nz,kk,n_constituents,Pnts,vtk_file)
+    if(mod(kk,icwrite) == 0 .and. rank == 0)  then
+        fname=trim(runname)//'.out.C1.'//trim(adjustl(filenumout))//'.pfb'
+        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,1)
+        fname=trim(runname)//'.out.C2.'//trim(adjustl(filenumout))//'.pfb'
+        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,2)
+        fname=trim(runname)//'.out.C3.'//trim(adjustl(filenumout))//'.pfb'
+        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,3)
+        fname=trim(runname)//'.out.C4.'//trim(adjustl(filenumout))//'.pfb'
+        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,4)
+        fname=trim(runname)//'.out.C5.'//trim(adjustl(filenumout))//'.pfb'
+        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,5)
+        !fname=trim(runname)//'.out.C6.'//trim(adjustl(filenumout))//'.pfb'
+        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,6)
+        !fname=trim(runname)//'.out.C7.'//trim(adjustl(filenumout))//'.pfb'
+        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,7)
+        !fname=trim(runname)//'.out.C8.'//trim(adjustl(filenumout))//'.pfb'
+        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,8)
+        !fname=trim(runname)//'.out.C9.'//trim(adjustl(filenumout))//'.pfb'
+        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,9)
+    end if
+end if
+
+! write binary particle locations and attributes
+vtk_file=trim(runname)//'_pnts'
+if(ibinpntswrite > 0)  then
+if(mod(kk,ibinpntswrite) == 0)  &
+call vtk_write_points(P,np_active,np,kk,vtk_file, dx, dy,nx,ny, maxZ,dem)
+end if
+! reset C
+! C = 0.0D0
+! reset ET_grid
+! ET_grid = 0.0D0
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T2 = MPI_Wtime()
+IO_time_write = IO_time_write + (T2-T1)
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T1 = MPI_Wtime()
+
+np_active2 = np_active
+
+mean_age = 0.0d0
+mean_comp = 0.0d0
+total_mass = 0.0D0
+mean_mass = 0.0d0
+
+do ii = 1, np_active
+  !! check if particle is inactive
+if (P(ii,8) == 0.0) then
+    do while(P(ii,8) == 0.0)
+        call MPI_FILE_WRITE(fh3,Time_Next(kk),1,MPI_DOUBLE_PRECISION, &
+        MPI_STATUS_IGNORE,ierr)
+        call MPI_FILE_WRITE(fh3,P(ii,1:7),7,MPI_DOUBLE_PRECISION, &
+        MPI_STATUS_IGNORE,ierr)
+        call MPI_FILE_WRITE(fh3,P(ii,10:nind*2+17),nind*2+8, &
+        MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+        npout = npout + 1
+        P(ii,:) = P(np_active2,:)
+        np_active2 = np_active2 -1
+    enddo
+else
+! increment mean age, composition and mass
+    mean_age = mean_age + P(ii,4)*P(ii,6)
+    mean_comp = mean_comp + P(ii,7)*P(ii,6)
+    total_mass = total_mass + P(ii,6)
+end if
+! if we have looped all the way through our active particles exit
+if (ii > np_active2) exit
+end do ! particles
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T2 = MPI_Wtime()
+sort_time = sort_time + (T2-T1)
+
+! check if we have any active particles
+if (total_mass > 0.0d0)  then
+    mean_age =  mean_age / total_mass
+    mean_comp = mean_comp / total_mass
+    mean_mass = total_mass / float(np_active2)
+end if
+
+write(message,'(3(i10),7(1x,e12.5,1x),3(i8),2(i12),a)') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
+                                                      mean_mass,total_mass,PET_balance(kk,1), &
+                                                      PET_balance(kk,2),i_added_particles,ET_np_cpu(1), &
+                                                      Out_np_cpu(1),np_active,np_active2,new_line(' ')
+call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+
+np_active = np_active2
+
+!------------------------------------------------------------------
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T1 = MPI_Wtime()
+
+if(p_redis>0 .and. mod(kk,p_redis)==0) then
+
+    call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
+    np_lo = sum(nump(1:rank)); np_ro = sum(nump(1:rank+1))
+    np_ps = (sum(nump)+t_rank-mod(sum(nump),t_rank))/t_rank
+    np_ln = rank*np_ps; np_rn = (rank+1)*np_ps
+
+    if(np_lo<np_ln .and. rank>0) then
+        !P(1:np_ln-np_lo,:), Send to rank-1
+        !  ___|___|___|___......
+        !    old     new
+        call MPI_SEND(P(1:np_ln-np_lo,:), &
+            (np_ln-np_lo)*(17+nind*2),MPI_DOUBLE_PRECISION, &
+            rank-1,40,MPI_COMM_WORLD,ierr)
+        P(1:np_active-(np_ln-np_lo),:) = P(np_ln-np_lo+1:np_active,:)
+        np_active = np_active - (np_ln-np_lo)
+
+        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_ln-np_lo, &
+        'particles sent from rank',rank,'to rank',rank-1,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    endif
+
+    if(np_ro<np_rn .and. rank<t_rank-1) then
+        !P(np_active+1:np_active+np_rn-np_ro,:), Receive from rank+1
+        !  ......___|___|___|___
+        !          old     new
+        !warnings/stop if np_active+np_rn-np_ro > np
+        call MPI_RECV(P(np_active+1:np_active+np_rn-np_ro,:), &
+            (np_rn-np_ro)*(17+nind*2),MPI_DOUBLE_PRECISION, &
+            rank+1,40,MPI_COMM_WORLD,status,ierr)
+        np_active = np_active + np_rn-np_ro
+
+        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_rn-np_ro, &
+        'particles received on rank',rank,'from rank',rank+1,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    endif
+
+    if(np_ro>np_rn .and. rank<t_rank-1) then
+        !P(np_active-(np_ro-np_rn)+1:np_active,:), Send to rank+1
+        !  ......___|___|___|___
+        !          new     old
+        call MPI_SEND(P(np_active-(np_ro-np_rn)+1:np_active,:), &
+            (np_ro-np_rn)*(17+nind*2),MPI_DOUBLE_PRECISION, &
+            rank+1,45,MPI_COMM_WORLD,ierr)
+        !P(np_active-(np_ro-np_rn)+1:np_active,8) = 0.d0 !May not necessary
+        np_active = np_active - (np_ro-np_rn)
+
+        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_ro-np_rn, &
+        'particles sent from rank',rank,'to rank',rank+1,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    endif
+
+    if(np_lo>np_ln .and. rank>0) then
+        !P(1:np_lo-np_ln,:), Receive from rank-1
+        !  ___|___|___|___......
+        !    new     old
+        !warnings/stop if np_active+np_lo-np_ln > np
+        P(1+np_lo-np_ln:np_active+np_lo-np_ln,:) = P(1:np_active,:)
+        np_active = np_active + np_lo-np_ln
+        call MPI_RECV(P(1:np_lo-np_ln,:), &
+            (np_lo-np_ln)*(17+nind*2),MPI_DOUBLE_PRECISION, &
+            rank-1,45,MPI_COMM_WORLD,status,ierr)
+
+        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_lo-np_ln, &
+        'particles received on rank',rank,'from rank',rank-1,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    endif
+endif
+
+call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+T2 = MPI_Wtime()
+redis_time = redis_time + (T2-T1)
+!------------------------------------------------------------------
+if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
+    call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                       MPI_INFO_NULL,fh2,ierr)
+    call MPI_FILE_WRITE(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+    call MPI_FILE_WRITE(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+    call MPI_FILE_WRITE(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
+                        MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+    call MPI_FILE_CLOSE(fh2, ierr)
+end if
+
+end do !! timesteps and cycles
+
+9090 continue  !! continue statement for running out of particles when assigning precip flux.
+               !!  code exits gracefully (writes files and possibly a restart file so the user can
+               !!  re-run the simulation)
+
+! close output file
+call MPI_FILE_CLOSE(fh3, ierr)
+call MPI_FILE_CLOSE(fh4, ierr)
+
+! format statements for particle output
+61  FORMAT(4(e12.5))
+64  FORMAT(6(e12.5),i12)
+
+if(rank == 0) then
+    flush(13)
+    close(13)
+
+    if(ipwrite < 0) close(214)
+
+    flush(15)
+    close(15)
+
+    flush(16)
+    close(16)
+endif
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        Total_time2 = MPI_Wtime()
+
+        write(message,'(a)') new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(a,a)') '###  Execution Finished', new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(a)') new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(i10,a,a)') npout,' particles exited the domain via outflow or ET.',new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(a)') new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(a,a)') 'Simulation Timing and Profiling:', new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("Total Execution Time (s):",e12.5,a)') Total_time2-Total_time1,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("File IO Time Read (s):",e12.5,a)') IO_time_read,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("File IO Time Write (s):",e12.5,a)') IO_time_write,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("Time Sorting (s):",e12.5,a)') sort_time,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("Parallel Particle Time (s):",e12.5,a)') parallel_time,new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(a)') new_line(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        call MPI_FILE_CLOSE(fh1, ierr)
+        call MPI_FINALIZE(ierr)
+
+   end program EcoSLIM
+

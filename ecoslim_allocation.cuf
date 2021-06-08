@@ -1,0 +1,21 @@
+module array_allocation
+    !use cudafor
+    use create_subdomain, only: nnx1,nny1,buff
+    !implicit none
+
+    real(8),allocatable,device::P_de(:,:),C_de(:,:,:,:)
+    real(8),allocatable,device::Vx_de(:,:,:),Vy_de(:,:,:),Vz_de(:,:,:),dz_de(:),Ind_de(:,:,:)
+    real(8),allocatable,device::Saturation_de(:,:,:),Porosity_de(:,:,:),EvapTrans_de(:,:,:)
+    integer,allocatable,device::out_np_de(:),ET_np_de(:),nump_path_de(:,:,:)
+    real(8),allocatable,device::out_age_de(:),out_mass_de(:),out_comp_de(:)
+    real(8),allocatable,device::ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
+
+contains
+    subroutine allocate_array(nz)
+        implicit none
+        integer:: nz
+
+        allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz))
+
+    end subroutine allocate_array
+end module array_allocation

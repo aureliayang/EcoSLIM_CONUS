@@ -1,0 +1,385 @@
+module particles_loop
+
+contains
+ attributes(global) subroutine particles_independent(&
+ P,C,dz,EvapTrans,Vx,Vy,Vz,nump_path,Saturation,Porosity,&
+ out_age,out_mass,out_comp,et_age,et_mass,et_comp,&
+ out_np,et_np,Ind,kk,np_active,nx,ny,nz,nind,&
+ pfdt,moldiff,dx,dy,denh2o,dtfrac,xmin,ymin,zmin,&
+ xmax,ymax,zmax,path)
+
+ !zone
+ !xmin,ymin,zmin,xmax,ymax,zmax have to be updated to subdomain's
+ !reflect
+
+  implicit none
+
+  integer,parameter::block_size = 256
+  real*8,intent(inout)::P(:,:),C(:,:,:,:)
+  real*8,intent(in)::dz(:),EvapTrans(:,:,:),Vx(:,:,:),Vy(:,:,:)
+  real*8,intent(in)::Vz(:,:,:),Saturation(:,:,:),Porosity(:,:,:),Ind(:,:,:)
+
+  integer,value::kk,np_active,nx,ny,nz,nind,path
+  real*8,value::pfdt,moldiff,dx,dy,denh2o,dtfrac
+  real*8,value::xmin,ymin,zmin,xmax,ymax,zmax
+
+  integer::ii,k,Ploc(3),ir,itemp
+  real*8::Clocx,Clocy,Clocz,Vpx,Z,Vpy,Vpz,&
+  particledt,delta_time,et_flux,water_vol,advdt(3),&
+  z1,z2,z3,Zr,temp,lock,Ltemp
+
+  ! global
+  real*8,intent(inout)::out_age(:),out_mass(:),out_comp(:),&
+  et_age(:),et_mass(:),et_comp(:)
+  integer,intent(inout)::out_np(:),et_np(:),nump_path(:,:,:)
+
+  ! for random number, waiting for tests
+  ! change memory type or use the prebuild function
+  real*8 r(97),rm1,rm2
+  integer j
+  integer iff,ix1,ix2,ix3
+  iff = 0
+
+  lock = 1.d0
+!=============================================================================
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    !if(ii==1) out_age = 0.d0
+    !if(ii==2) out_mass = 0.d0
+    !if(ii==3) out_comp = 0.d0
+    !if(ii==4) out_np = 0
+    !if(ii==5) et_age = 0.d0
+    !if(ii==6) et_mass = 0.d0
+    !if(ii==7) et_comp = 0.d0
+    !if(ii==8) et_np = 0
+    !if(ii==9) C = 0.d0
+    !if(path > 0 .and. mod(kk,path) == 0) then
+    !    if(ii==10) nump_path = 0
+    !endif
+    !
+    !call syncthreads()
+!=============================================================================
+    ir = -(932117 + ii + 100*kk)
+
+    delta_time = 0.d0
+
+    if(P(ii,8) == 1. .and. ii <= np_active) then
+
+        delta_time = P(ii,4) + pfdt
+
+        ! Find the "adjacent" cell corresponding to the particle's location
+        Ploc(1) = floor(P(ii,1) / dx)
+        Ploc(2) = floor(P(ii,2) / dy)
+        ! the right side is not included. hence if a particle is on the right
+        ! boundary, there will be problem.
+
+        Z = 0.d0
+        do k = 1, nz
+            Z = Z + dz(k)
+            if (Z >= P(ii,3)) then
+                Ploc(3) = k - 1
+                exit
+            end if
+        end do
+        ! the upper is inculded, no over-bound problem.
+
+        do while (P(ii,4) < delta_time)
+
+            ! check to make sure particles are in central part of the domain and if not
+            ! apply some boundary condition to them
+            ! check if particles are in domain, need to expand this to include better treatment of BC's
+            if ((P(ii,1) < Xmin).or.(P(ii,2) < Ymin).or.(P(ii,3) < Zmin).or. &
+            (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= (Zmax-dz(nz)))) then
+
+            if ((P(ii,3) >= Zmax-(dz(nz)*0.5d0)).and. &
+            (Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.).and. &
+             (Vz(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) > 0.d0)) then
+
+            temp = atomicAdd(Out_age(1), P(ii,4)*P(ii,6))
+            temp = atomicAdd(Out_mass(1), P(ii,6))
+
+            if (P(ii,7) == 1.) then
+            temp = atomicAdd(Out_comp(1), P(ii,6))
+            end if
+
+            if (P(ii,7) == 2.) then
+            temp = atomicAdd(Out_comp(2), P(ii,6))
+            end if
+
+            if (P(ii,7) == 3.) then
+            temp = atomicAdd(Out_comp(3), P(ii,6))
+            end if
+
+            temp = atomicAdd(Out_np(1), idnint(lock))
+
+            ! flag particle as inactive
+            P(ii,8) = 0.d0
+            ! flag as exiting via Outflow
+            P(ii,10) = 1.d0
+            goto 999
+
+            end if
+            ! otherwise we just leave it in the domain to reflect
+            end if
+
+            ! Find each particle's factional cell location
+            Clocx = (P(ii,1) - float(Ploc(1))*dx)  / dx
+            Clocy = (P(ii,2) - float(Ploc(2))*dy)  / dy
+
+            Z = 0.d0
+            do k = 1, Ploc(3)
+                Z = Z + dz(k)
+            end do
+            Clocz = (P(ii,3) - Z) / dz(Ploc(3) + 1)
+
+            ! Calculate local particle velocity using linear interpolation,
+            ! converting darcy flux to average linear velocity
+
+            Vpx = ((1.-Clocx)*Vx(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                  + Vx(Ploc(1)+2,Ploc(2)+1,Ploc(3)+1)*Clocx)   &
+                  /(Porosity(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                  *Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+
+            Vpy = ((1.-Clocy)*Vy(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                    + Vy(Ploc(1)+1,Ploc(2)+2,Ploc(3)+1)*Clocy) &
+                    /(Porosity(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                    *Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+
+            Vpz = ((1.-Clocz)*Vz(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                      + Vz(Ploc(1)+1,Ploc(2)+1,Ploc(3)+2)*Clocz)  &
+                        /(Porosity(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                      *Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+
+            ! calculate particle dt
+            ! check each direction independently
+            advdt = pfdt
+            if (Vpx /= 0.) advdt(1) = abs(dtfrac*(dx/Vpx))
+            if (Vpy /= 0.) advdt(2) = abs(dtfrac*(dy/Vpy))
+            if (Vpz /= 0.) advdt(3) = dtfrac*(dz(Ploc(3)+1)/abs(Vpz))
+
+            particledt = min(advdt(1), advdt(2), advdt(3), &
+                      pfdt*dtfrac, delta_time-P(ii,4))
+
+            ! calculate Flux in cell and compare it with the ET flux out of the cell
+            if (EvapTrans(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0)then
+            ! calculate ET flux volumetrically and compare to
+            et_flux = abs(EvapTrans(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz(Ploc(3)+1)
+
+            ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
+            ! probability of being captured by roots
+            ! water volume in cell
+            water_vol = dx*dy*dz(Ploc(3)+1)*(Porosity(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+            *Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+
+            Zr = ran1_gpu(ir,iff,ix1,ix2,ix3,j,r,rm1,rm2)
+            if (Zr < ((et_flux*particledt)/water_vol)) then   ! check if particle is 'captured' by the roots
+            !  this section made atomic since it could inovlve a data race
+            !  that is, each thread can only update the ET arrays one at a time
+
+            temp = atomicAdd(ET_age(1), P(ii,4)*P(ii,6))
+
+            temp = atomicAdd(ET_mass(1), P(ii,6))
+
+            if (P(ii,7) == 1.) then
+            temp = atomicAdd(ET_comp(1), P(ii,6))
+            end if
+
+            if (P(ii,7) == 2.) then
+            temp = atomicAdd(ET_comp(2), P(ii,6))
+            end if
+
+            if (P(ii,7) == 3.) then
+            temp = atomicAdd(ET_comp(3), P(ii,6))
+            end if
+
+            temp = atomicAdd(ET_np(1), idnint(lock))
+
+            ! outputting spatially distributed ET information
+            temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+
+            temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
+
+            temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
+
+            temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
+
+            ! now remove particle from domain
+            P(ii,8) = 0.d0
+            ! flag as exiting via ET
+            P(ii,10) = 2.d0
+
+            goto 999
+            end if
+            end if
+
+            ! Advect particle to new location using Euler advection until next time
+            P(ii,1) = P(ii,1) + particledt * Vpx
+            P(ii,2) = P(ii,2) + particledt * Vpy
+            P(ii,3) = P(ii,3) + particledt * Vpz
+            P(ii,4) = P(ii,4) + particledt
+
+            Ltemp = SQRT((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
+                         (particledt*Vpz)**2)
+
+            ! Molecular Diffusion
+            if (moldiff > 0.d0) then
+            z1 = 2.d0*SQRT(3.d0)*(ran1_gpu(ir,iff,ix1,ix2,ix3,j,r,rm1,rm2)-0.5d0)
+            z2 = 2.d0*SQRT(3.d0)*(ran1_gpu(ir,iff,ix1,ix2,ix3,j,r,rm1,rm2)-0.5d0)
+            z3 = 2.d0*SQRT(3.d0)*(ran1_gpu(ir,iff,ix1,ix2,ix3,j,r,rm1,rm2)-0.5d0)
+
+            P(ii,1) = P(ii,1) + z1 * SQRT(moldiff*2.d0*particledt)
+            P(ii,2) = P(ii,2) + z2 * SQRT(moldiff*2.d0*particledt)
+            P(ii,3) = P(ii,3) + z3 * SQRT(moldiff*2.d0*particledt)
+
+            Ltemp = Ltemp + &
+                         SQRT((z1*SQRT(moldiff*2.d0*particledt))**2 + &
+                              (z2*SQRT(moldiff*2.d0*particledt))**2 + &
+                              (z3*SQRT(moldiff*2.d0*particledt))**2)
+            end if
+            P(ii,11) = P(ii,11) + Ltemp
+            ! placeholder for other interactions; potentially added later
+            !
+            ! place to track saturated / groundwater time if needed
+            if(Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.) then
+              P(ii,5) = P(ii,5) + particledt
+              P(ii,12) = P(ii,12) + Ltemp
+            end if
+
+            if (nind > 0) then
+              itemp=idnint(Ind(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+              if(itemp > 0 .and. itemp <= nind) then
+
+                P(ii,12+itemp) = P(ii,12+itemp) + particledt
+
+                P(ii,12+nind+itemp) = P(ii,12+nind+itemp) + Ltemp
+              end  if
+            end if
+
+            ! Find the "adjacent" cell corresponding to the particle's location
+            Ploc(1) = floor(P(ii,1) / dx)
+            Ploc(2) = floor(P(ii,2) / dy)
+            ! the right side is not included. hence if a particle is on the right
+            ! boundary, there will be problem.
+
+            Z = 0.d0
+            do k = 1, nz
+                Z = Z + dz(k)
+                if (Z >= P(ii,3)) then
+                    Ploc(3) = k - 1
+                    exit
+                end if
+            end do
+            ! the upper is inculded, no over-bound problem.
+
+            if (reflect) then
+                if(zone(Ploc(1)+1,Ploc(2)+1) == -1)
+                ! simple reflection boundary
+                if (P(ii,3) >=Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
+                if (P(ii,1) >=Xgmax) P(ii,1) = Xgmax- (P(ii,1) - Xgmax)
+                if (P(ii,2) >=Ygmax) P(ii,2) = Ygmax- (P(ii,2) - Ygmax)
+                if (P(ii,2) <=Ygmin) P(ii,2) = Ygmin+ (Ygmin - P(ii,2))
+                if (P(ii,3) <=Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
+                if (P(ii,1) <=Xgmin) P(ii,1) = Xgmin+ (Xgmin - P(ii,1))
+            end if
+
+            if ((P(ii,1) < Xmin).or.(P(ii,2) < Ymin).or.(P(ii,3) < Zmin).or. &
+            (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= Zmax)) then
+                ! unavoidable particle loss
+                ! flag particle as inactive
+                P(ii,8) = 0.d0
+                ! flag as exiting via Outflow
+                P(ii,10) = 4.d0
+                goto 999
+            end if
+
+        end do  ! end of do-while loop for particle time to next time
+        999 continue   ! where we go if the particle is out of bounds
+
+        !if(path > 0 .and. mod(kk,path) == 0) then
+        !
+        !    Z = 0.d0
+        !    do k = 1, nz
+        !        Z = Z + dz(k)
+        !        if (Z >= P(ii,15+2*nind)) then
+        !            Ploc(3) = k - 1
+        !            exit
+        !        end if
+        !    end do
+        !
+        !    if(Ploc(3)+1 == nz) then
+        !        Ploc(1) = floor(P(ii,13+2*nind) / dx)
+        !        Ploc(2) = floor(P(ii,14+2*nind) / dy)
+        !        temp = atomicAdd(nump_path(Ploc(1)+1,Ploc(2)+1,1),idnint(lock*P(ii,8)))
+        !    endif
+        !
+        !endif
+
+        ! concentration routine
+        ! Find the "adjacent" "cell corresponding to the particle's location
+        Ploc(1) = floor(P(ii,1) / dx)
+        Ploc(2) = floor(P(ii,2) / dy)
+        Z = 0.d0
+        do k = 1, nz
+            Z = Z + dz(k)
+            if (Z >= P(ii,3)) then
+                Ploc(3) = k - 1
+                exit
+            end if
+        end do
+
+        temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
+        temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
+        temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
+        temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
+        temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
+
+        !!!zone(xxx) cuda-aware transfer.
+
+    end if
+
+ end subroutine particles_independent
+!=============================================================================
+      attributes(device) function ran1_gpu(idum,iff,ix1,ix2,ix3,j,r,rm1,rm2)
+        implicit none  !note after use statement
+        real*8 ran1_gpu
+        integer, intent(inout), optional :: idum
+        real*8 r(97),rm1,rm2
+        integer, parameter :: m1=259200,ia1=7141,ic1=54773
+        integer, parameter :: m2=134456,ia2=8121,ic2=28411
+        integer, parameter :: m3=243000,ia3=4561,ic3=51349
+        integer j
+        integer iff,ix1,ix2,ix3
+        !data iff /0/
+        !iff = 0
+!        save iff,ix1,ix2,ix3,j,r,rm1,rm2
+        if(present(idum))then
+          if (idum<0.or.iff.eq.0)then
+            rm1=1.0/m1
+            rm2=1.0/m2
+            iff=1
+            ix1=mod(ic1-idum,m1)
+            ix1=mod(ia1*ix1+ic1,m1)
+            ix2=mod(ix1,m2)
+            ix1=mod(ia1*ix1+ic1,m1)
+            ix3=mod(ix1,m3)
+            do j=1,97
+                ix1=mod(ia1*ix1+ic1,m1)
+                ix2=mod(ia2*ix2+ic2,m2)
+                r(j)=(real(ix1)+real(ix2)*rm2)*rm1
+            enddo
+            idum=1
+          endif
+        endif
+        ix1=mod(ia1*ix1+ic1,m1)
+        ix2=mod(ia2*ix2+ic2,m2)
+        ix3=mod(ia3*ix3+ic3,m3)
+        j=1+(97*ix3)/m3
+        !if(j>97.or.j<1)then
+        !    write(*,*)' error in ran1_gpu j=',j
+        !    stop
+        !endif
+        ran1_gpu=r(j)
+        r(j)=(real(ix1)+real(ix2)*rm2)*rm1
+        return
+     end function ran1_gpu
+end module particles_loop
