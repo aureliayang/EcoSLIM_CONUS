@@ -1224,6 +1224,7 @@ do kk = outkk, pfnt
         Vx_de   = Vx;        Vy_de   = Vy;        Vz_de   = Vz
         Saturation_de = Saturation;  EvapTrans_de  = EvapTrans
 
+!-------------------------------------
         call particles_independent <<< ceiling(dble(np_active)/block_size),&
             block_size >>> (&
             P_de,C_de,dz_de,EvapTrans_de,Vx_de,Vy_de,Vz_de,nump_path_de,&
@@ -1231,7 +1232,136 @@ do kk = outkk, pfnt
             et_age_de,et_mass_de,et_comp_de,out_np_de,et_np_de,Ind_de,&
             kk,np_active,nx,ny,nz,nind,pfdt,moldiff,dx,dy,denh2o,dtfrac,&
             xmin,ymin,zmin,xmax,ymax,zmax,path)
+!-------------------------------------
+        integer,allocatable,device::d_isValid(:)
+        integer,allocatable,device::d_indices(:)
+        integer,allocatable::neigh_list(:)
+        !t_rank, and should be initilized at the very beginning
+        integer,allocatable::N_recv_all(:) !sum(neigh_list)
+        integer,allocatable,device::holes(:)
+        real(8),allocatable,device::P_send(:,:)
+        real(8),allocatable,device::P_recv(:,:)
+        integer::N_send,N_recv,ncount !single host value
 
+!-------------------------------------
+        ! Build neighbor list first. Sometimes, even if you have this neighbor
+        ! in the zone array, probably there is no particle to be sent at this time
+        ! step. So it needs the scan to get the neighbor list. 1 means this is neighbor,
+        ! while 0 means this is not neighbor.
+        do i = 0, t_rank-1
+
+            call prepare_neighbor<<<ceiling(dble(np_active)/block_size),&
+            block_size>>>(P_de(:,8),d_isValid,np_active,i)
+            ! P_de(:,8) has been updated in the particle loop kernel, and it
+            ! should be updated again after connecting with the received particles.
+            ! label particles which will be transferred to rank i as 0 while others as 1
+
+            call thrustscan(d_isValid,np_active,d_indices)
+            neigh_list(i+1) = d_indices(np_active)
+            ! rank starts from 0 while fortran array starts from 1
+
+            if(neigh_list(i+1) /= np_active) then
+            ! it means there is holes, so this is neighbor.
+                neigh_list(i+1) = 1
+            else
+                neigh_list(i+1) = 0
+            endif
+
+        end do
+
+        do i = 0, t_rank-1
+
+            if(neigh_list(i+1) == 1) then
+
+                call prepare_neighbor<<<ceiling(dble(np_active)/block_size),&
+                block_size>>>(P_de(:,8),d_isValid,np_active,i)
+
+                call thrustscan(d_isValid,np_active,d_indices)
+                N_send = np_active - d_indices(np_active) ! this should be legal
+                allocate(holes(N_send),P_send(N_send,n_attri))
+                !n_attri should be updated using the true number
+
+                call prepare_holes<<<ceiling(dble(np_active)/block_size),&
+                block_size>>>(holes,d_indices,d_isValid,np_active)
+                ! block size cannot be reduced
+
+                call compaction_inplcae<<<ceiling(dble(np_active)/block_size),&
+                block_size>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,n_attri)
+
+                np_active = d_indices(np_active); deallocate(holes)
+
+                !send the size first
+                call MPI_SEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,ierr)
+                ! cpu send
+                call MPI_SEND(P_send,N_send*n_attri,MPI_DOUBLE_PRECISION,i,41,&
+                              MPI_COMM_WORLD,ierr)
+                ! gpu send since it is a gpu buffer?
+                ! probably we can use unblocked send?
+                deallocate(P_send)
+                np_active = np_active - N_send
+
+            end if
+
+            ! Rank by rank. For a rank, other ranks send particles to it while it must
+            ! not send particles to itself. So the following actions must be reached.
+            if(i == rank) then
+
+                allocate(N_recv_all(sum(neigh_list)))
+                ! used for each rank to know how many particles it will receive
+
+                ncount = 0
+                do j = 0, t_rank-1
+                    if(neigh_list(j+1) == 1) then
+                        ncount = ncount + 1
+                        call MPI_RECV(N_recv,1,MPI_INTEGER,j,40,MPI_COMM_WORLD,status,ierr)
+                        N_recv_all(ncount) = N_recv ! put N_recv in an array
+                    end if
+                end do
+
+                ! do sum of N_recv and allocate P_recv
+                allocate(P_recv(sum(N_recv_all),n_attri))
+
+                ncount = 0
+                do j = 0, t_rank-1
+                    if(neigh_list(j+1) == 1) then
+                        ncount = ncount + 1
+                        call MPI_RECV(P_recv(sum(N_recv_all(1:ncount-1))+1:sum(N_recv_all(1:ncount)),:), &
+                        N_recv_all(ncount)*n_attri,MPI_DOUBLE_PRECISION,j,41,MPI_COMM_WORLD,status,ierr)
+                    end if
+                end do
+
+            end if
+
+        end do
+
+        ! then separate inactive particles
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        ! I think this barrier is necessary if we use unblock send and recv
+
+        call prepare_exit<<<ceiling(dble(np_active)/block_size),&
+        block_size>>>(P_de(:,8),d_isValid,np_active)
+
+        call thrustscan(d_isValid,np_active,d_indices)
+        N_send = np_active - d_indices(np_active)
+        allocate(holes(N_send),P_send(N_send,n_attri))
+        ! P_send also be used for P_exit
+
+        call prepare_holes<<<ceiling(dble(np_active)/block_size),&
+        block_size>>>(holes,d_indices,d_isValid,np_active)
+
+        call compaction_inplcae<<<ceiling(dble(np_active)/block_size),&
+        block_size>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,n_attri)
+        !after transfer exited particles back to host, please deallocate P_send
+
+        np_active = d_indices(np_active); deallocate(holes)
+
+        call connect_recv<<<ceiling(dble(sum(N_recv_all))/block_size),&
+        block_size>>>(P_de,P_recv,np_active,sum(N_recv_all),n_attri)
+        np_active = np_active + sum(N_recv_all)
+
+        deallocate(N_recv_all,P_recv)
+
+!-------------------------------------
         P(1:np_active,1:12+2*nind) = P_de(1:np_active,1:12+2*nind)
         deallocate(P_de)
 

@@ -11,6 +11,7 @@ contains
  !zone
  !xmin,ymin,zmin,xmax,ymax,zmax have to be updated to subdomain's
  !reflect
+ !ix1, iy1 buff
 
   implicit none
 
@@ -35,31 +36,22 @@ contains
 
   ! for random number, waiting for tests
   ! change memory type or use the prebuild function
-  real*8 r(97),rm1,rm2
-  integer j
-  integer iff,ix1,ix2,ix3
-  iff = 0
+  !real*8 r(97),rm1,rm2
+  !integer j
+  !integer iff,ix1,ix2,ix3
+  !iff = 0
 
   lock = 1.d0
 !=============================================================================
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-    !if(ii==1) out_age = 0.d0
-    !if(ii==2) out_mass = 0.d0
-    !if(ii==3) out_comp = 0.d0
-    !if(ii==4) out_np = 0
-    !if(ii==5) et_age = 0.d0
-    !if(ii==6) et_mass = 0.d0
-    !if(ii==7) et_comp = 0.d0
-    !if(ii==8) et_np = 0
-    !if(ii==9) C = 0.d0
-    !if(path > 0 .and. mod(kk,path) == 0) then
-    !    if(ii==10) nump_path = 0
-    !endif
-    !
-    !call syncthreads()
-!=============================================================================
-    ir = -(932117 + ii + 100*kk)
+!--------------------------------------
+    ! Transfer the global coordinates to local
+    P(ii,1) = P(ii,1) - ix1*dx
+    P(ii,2) = P(ii,2) - iy1*dy
+
+!--------------------------------------
+    !ir = -(932117 + ii + 100*kk)
 
     delta_time = 0.d0
 
@@ -67,56 +59,59 @@ contains
 
         delta_time = P(ii,4) + pfdt
 
-        ! Find the "adjacent" cell corresponding to the particle's location
-        Ploc(1) = floor(P(ii,1) / dx)
-        Ploc(2) = floor(P(ii,2) / dy)
-        ! the right side is not included. hence if a particle is on the right
-        ! boundary, there will be problem.
-
-        Z = 0.d0
-        do k = 1, nz
-            Z = Z + dz(k)
-            if (Z >= P(ii,3)) then
-                Ploc(3) = k - 1
-                exit
-            end if
-        end do
-        ! the upper is inculded, no over-bound problem.
-
         do while (P(ii,4) < delta_time)
+
+            ! Find the "adjacent" cell corresponding to the particle's location
+            ! FLOOR(A) returns the greatest integer less than or equal to X.
+            Ploc(1) = floor(P(ii,1) / dx)
+            Ploc(2) = floor(P(ii,2) / dy)
+            ! The right side is not included. Hence if a particle is on the right
+            ! boundary, there will be problem. Particularly, after the decomposition.
+            if(Ploc(1) >= nnx1+buff) Ploc(1) = nnx1+buff-1
+            if(Ploc(2) >= nny1+buff) Ploc(2) = nny1+buff-1
+
+            Z = 0.d0
+            do k = 1, nz
+                Z = Z + dz(k)
+                if (Z >= P(ii,3)) then
+                    Ploc(3) = k - 1
+                    exit
+                end if
+            end do
+            ! The upper is inculded, no over-bound problem.
 
             ! check to make sure particles are in central part of the domain and if not
             ! apply some boundary condition to them
             ! check if particles are in domain, need to expand this to include better treatment of BC's
             if ((P(ii,1) < Xmin).or.(P(ii,2) < Ymin).or.(P(ii,3) < Zmin).or. &
-            (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= (Zmax-dz(nz)))) then
+                (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= (Zmax-dz(nz)))) then
 
             if ((P(ii,3) >= Zmax-(dz(nz)*0.5d0)).and. &
-            (Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.).and. &
-             (Vz(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) > 0.d0)) then
+                (Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.).and. &
+                (Vz(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) > 0.d0)) then
 
-            temp = atomicAdd(Out_age(1), P(ii,4)*P(ii,6))
-            temp = atomicAdd(Out_mass(1), P(ii,6))
+                temp = atomicAdd(Out_age(1), P(ii,4)*P(ii,6))
+                temp = atomicAdd(Out_mass(1), P(ii,6))
 
-            if (P(ii,7) == 1.) then
-            temp = atomicAdd(Out_comp(1), P(ii,6))
-            end if
+                if (P(ii,7) == 1.) then
+                temp = atomicAdd(Out_comp(1), P(ii,6))
+                end if
 
-            if (P(ii,7) == 2.) then
-            temp = atomicAdd(Out_comp(2), P(ii,6))
-            end if
+                if (P(ii,7) == 2.) then
+                temp = atomicAdd(Out_comp(2), P(ii,6))
+                end if
 
-            if (P(ii,7) == 3.) then
-            temp = atomicAdd(Out_comp(3), P(ii,6))
-            end if
+                if (P(ii,7) == 3.) then
+                temp = atomicAdd(Out_comp(3), P(ii,6))
+                end if
 
-            temp = atomicAdd(Out_np(1), idnint(lock))
+                temp = atomicAdd(Out_np(1), idnint(lock))
 
-            ! flag particle as inactive
-            P(ii,8) = 0.d0
-            ! flag as exiting via Outflow
-            P(ii,10) = 1.d0
-            goto 999
+                ! flag particle as inactive
+                P(ii,8) = 0.d0
+                ! flag as exiting via Outflow
+                P(ii,10) = 1.d0
+                goto 999
 
             end if
             ! otherwise we just leave it in the domain to reflect
@@ -158,10 +153,10 @@ contains
             if (Vpz /= 0.) advdt(3) = dtfrac*(dz(Ploc(3)+1)/abs(Vpz))
 
             particledt = min(advdt(1), advdt(2), advdt(3), &
-                      pfdt*dtfrac, delta_time-P(ii,4))
+                             pfdt*dtfrac, delta_time-P(ii,4))
 
             ! calculate Flux in cell and compare it with the ET flux out of the cell
-            if (EvapTrans(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0)then
+            if (EvapTrans(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
             ! calculate ET flux volumetrically and compare to
             et_flux = abs(EvapTrans(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz(Ploc(3)+1)
 
@@ -169,46 +164,47 @@ contains
             ! probability of being captured by roots
             ! water volume in cell
             water_vol = dx*dy*dz(Ploc(3)+1)*(Porosity(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-            *Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                        *Saturation(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
 
             Zr = ran1_gpu(ir,iff,ix1,ix2,ix3,j,r,rm1,rm2)
+
             if (Zr < ((et_flux*particledt)/water_vol)) then   ! check if particle is 'captured' by the roots
             !  this section made atomic since it could inovlve a data race
             !  that is, each thread can only update the ET arrays one at a time
 
-            temp = atomicAdd(ET_age(1), P(ii,4)*P(ii,6))
+                temp = atomicAdd(ET_age(1), P(ii,4)*P(ii,6))
 
-            temp = atomicAdd(ET_mass(1), P(ii,6))
+                temp = atomicAdd(ET_mass(1), P(ii,6))
 
-            if (P(ii,7) == 1.) then
-            temp = atomicAdd(ET_comp(1), P(ii,6))
-            end if
+                if (P(ii,7) == 1.) then
+                temp = atomicAdd(ET_comp(1), P(ii,6))
+                end if
 
-            if (P(ii,7) == 2.) then
-            temp = atomicAdd(ET_comp(2), P(ii,6))
-            end if
+                if (P(ii,7) == 2.) then
+                temp = atomicAdd(ET_comp(2), P(ii,6))
+                end if
 
-            if (P(ii,7) == 3.) then
-            temp = atomicAdd(ET_comp(3), P(ii,6))
-            end if
+                if (P(ii,7) == 3.) then
+                temp = atomicAdd(ET_comp(3), P(ii,6))
+                end if
 
-            temp = atomicAdd(ET_np(1), idnint(lock))
+                temp = atomicAdd(ET_np(1), idnint(lock))
 
-            ! outputting spatially distributed ET information
-            temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+                ! outputting spatially distributed ET information
+                temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
 
-            temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
+                temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
 
-            temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
+                temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
 
-            temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
+                temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
 
-            ! now remove particle from domain
-            P(ii,8) = 0.d0
-            ! flag as exiting via ET
-            P(ii,10) = 2.d0
+                ! now remove particle from domain
+                P(ii,8) = 0.d0
+                ! flag as exiting via ET
+                P(ii,10) = 2.d0
+                goto 999
 
-            goto 999
             end if
             end if
 
@@ -255,64 +251,36 @@ contains
               end  if
             end if
 
-            ! Find the "adjacent" cell corresponding to the particle's location
-            Ploc(1) = floor(P(ii,1) / dx)
-            Ploc(2) = floor(P(ii,2) / dy)
-            ! the right side is not included. hence if a particle is on the right
-            ! boundary, there will be problem.
-
-            Z = 0.d0
-            do k = 1, nz
-                Z = Z + dz(k)
-                if (Z >= P(ii,3)) then
-                    Ploc(3) = k - 1
-                    exit
-                end if
-            end do
-            ! the upper is inculded, no over-bound problem.
-
             if (reflect) then
-                if(zone(Ploc(1)+1,Ploc(2)+1) == -1)
+            ! we can choose to reflect the particle or not if it is out of
+            ! the whole modeling domain. g means the golbal boundary.
+            ! I think just saving the global boundary in global memory.
+                !Ploc(1) = floor(P(ii,1) / dx)
+                !Ploc(2) = floor(P(ii,2) / dy)
+                !if(zone(Ploc(1)+1,Ploc(2)+1) == -1) then
                 ! simple reflection boundary
-                if (P(ii,3) >=Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
-                if (P(ii,1) >=Xgmax) P(ii,1) = Xgmax- (P(ii,1) - Xgmax)
-                if (P(ii,2) >=Ygmax) P(ii,2) = Ygmax- (P(ii,2) - Ygmax)
-                if (P(ii,2) <=Ygmin) P(ii,2) = Ygmin+ (Ygmin - P(ii,2))
-                if (P(ii,3) <=Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
-                if (P(ii,1) <=Xgmin) P(ii,1) = Xgmin+ (Xgmin - P(ii,1))
+                    if (P(ii,3)          >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
+                    if (P(ii,1) + ix1*dx >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) + ix1*dx - Xgmax) - ix1*dx
+                    if (P(ii,2) + iy1*dy >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) + iy1*dy - Ygmax) - iy1*dy
+                    if (P(ii,2) + iy1*dy <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - P(ii,2) + iy1*dy) - iy1*dy
+                    if (P(ii,3)          <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
+                    if (P(ii,1) + ix1*dx <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - P(ii,1) + ix1*dx) - ix1*dx
+                !end if
             end if
 
             if ((P(ii,1) < Xmin).or.(P(ii,2) < Ymin).or.(P(ii,3) < Zmin).or. &
-            (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= Zmax)) then
+                (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= Zmax)) then
                 ! unavoidable particle loss
+
                 ! flag particle as inactive
                 P(ii,8) = 0.d0
                 ! flag as exiting via Outflow
-                P(ii,10) = 4.d0
+                P(ii,10) = 3.d0
                 goto 999
             end if
 
-        end do  ! end of do-while loop for particle time to next time
-        999 continue   ! where we go if the particle is out of bounds
-
-        !if(path > 0 .and. mod(kk,path) == 0) then
-        !
-        !    Z = 0.d0
-        !    do k = 1, nz
-        !        Z = Z + dz(k)
-        !        if (Z >= P(ii,15+2*nind)) then
-        !            Ploc(3) = k - 1
-        !            exit
-        !        end if
-        !    end do
-        !
-        !    if(Ploc(3)+1 == nz) then
-        !        Ploc(1) = floor(P(ii,13+2*nind) / dx)
-        !        Ploc(2) = floor(P(ii,14+2*nind) / dy)
-        !        temp = atomicAdd(nump_path(Ploc(1)+1,Ploc(2)+1,1),idnint(lock*P(ii,8)))
-        !    endif
-        !
-        !endif
+        end do ! end of do-while loop for particle time to next time
+        999 continue ! where we go if the particle is out of bounds
 
         ! concentration routine
         ! Find the "adjacent" "cell corresponding to the particle's location
@@ -333,7 +301,16 @@ contains
         temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
         temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
 
-        !!!zone(xxx) cuda-aware transfer.
+        ! zone/neighbor identification for cuda-aware transfer.
+        ! since 0 and 1 are reserved for active and inactive particles,
+        ! we add 10 to ranks. Otherwise, 0 and 1 are hard to be distinguished.
+        if(zone(Ploc(1)+1,Ploc(2)+1) /= rank) &
+        P(ii,8) = (zone(Ploc(1)+1,Ploc(2)+1) + 10) * P(ii,8)
+        ! Hence, the active particles which will be sent to neighbors has been labeled
+
+        ! Transfer local coordinates to global
+        P(ii,1) = P(ii,1) + ix1*dx
+        P(ii,2) = P(ii,2) + iy1*dy
 
     end if
 

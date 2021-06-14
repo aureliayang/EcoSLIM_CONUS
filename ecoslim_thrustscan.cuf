@@ -1,0 +1,26 @@
+module thrust
+interface thrustscan
+
+subroutine scan_int(input,N,output) bind(C,name="scan_int_wrapper")
+use iso_c_binding
+integer(c_int),device:: input(*)
+integer(c_int),device:: output(*)
+integer(c_int),value:: N
+end subroutine
+
+subroutine scan_float(input,N,output) bind(C,name="scan_float_wrapper")
+use iso_c_binding
+real(c_float),device:: input(*)
+real(c_float),device:: output(*)
+integer(c_int),value:: N
+end subroutine
+
+subroutine scan_double(input,N,output) bind(C,name="scan_double_wrapper")
+use iso_c_binding
+real(c_double),device:: input(*)
+real(c_double),device:: output(*)
+integer(c_int),value:: N
+end subroutine
+
+end interface
+end module thrust
