@@ -1241,7 +1241,8 @@ do kk = outkk, pfnt
         integer,allocatable,device::holes(:)
         real(8),allocatable,device::P_send(:,:)
         real(8),allocatable,device::P_recv(:,:)
-        integer::N_send,N_recv,ncount !single host value
+        integer::N_send,N_recv,ncount,ncount2 !single host value
+        integer::request1,request2,request3,request4
 
 !-------------------------------------
         ! Build neighbor list first. Sometimes, even if you have this neighbor
@@ -1269,9 +1270,47 @@ do kk = outkk, pfnt
 
         end do
 
+        ncount2 = 0
         do i = 0, t_rank-1
 
+            ! Rank by rank. For a rank, other ranks send particles to it while it must
+            ! not send particles to itself. So the following actions must be reached.
+            if(i == rank) then
+
+                allocate(N_recv_all(sum(neigh_list)))
+                ! used for each rank to know how many particles it will receive
+
+                ! do sum of N_recv and allocate P_recv
+                allocate(P_recv(sum(N_recv_all),n_attri))
+
+                ncount = 0
+                do j = 0, t_rank-1
+                    if(neigh_list(j+1) == 1) then
+                        ncount = ncount + 1
+                        call MPI_IRECV(N_recv_all(ncount),1,MPI_INTEGER,j,40,MPI_COMM_WORLD,request1,ierr)
+                        ! N_recv_all(ncount) = N_recv ! put N_recv in an array
+                        call MPI_IRECV(P_recv(sum(N_recv_all(1:ncount-1))+1:sum(N_recv_all(1:ncount)),:), &
+                        N_recv_all(ncount)*n_attri,MPI_DOUBLE_PRECISION,j,41,MPI_COMM_WORLD,request2,ierr)
+                    end if
+                end do
+
+                !! do sum of N_recv and allocate P_recv
+                !allocate(P_recv(sum(N_recv_all),n_attri))
+
+                !ncount = 0
+                !do j = 0, t_rank-1
+                !    if(neigh_list(j+1) == 1) then
+                !        ncount = ncount + 1
+                !        call MPI_IRECV(P_recv(sum(N_recv_all(1:ncount-1))+1:sum(N_recv_all(1:ncount)),:), &
+                !        N_recv_all(ncount)*n_attri,MPI_DOUBLE_PRECISION,j,41,MPI_COMM_WORLD,request2,ierr)
+                !    end if
+                !end do
+
+            end if
+
             if(neigh_list(i+1) == 1) then
+
+                ncount2 = ncount2 + 1
 
                 call prepare_neighbor<<<ceiling(dble(np_active)/block_size),&
                 block_size>>>(P_de(:,8),d_isValid,np_active,i)
@@ -1291,44 +1330,16 @@ do kk = outkk, pfnt
                 np_active = d_indices(np_active); deallocate(holes)
 
                 !send the size first
-                call MPI_SEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,ierr)
+                if(ncount2 /= 1) MPI_WAIT(request3,status) !ncount should be changed
+                call MPI_ISEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,request3,ierr)
                 ! cpu send
-                call MPI_SEND(P_send,N_send*n_attri,MPI_DOUBLE_PRECISION,i,41,&
-                              MPI_COMM_WORLD,ierr)
+                if(ncount2 /= 1) MPI_WAIT(request4,status)
+                call MPI_ISEND(P_send,N_send*n_attri,MPI_DOUBLE_PRECISION,i,41,&
+                              MPI_COMM_WORLD,request4,ierr)
                 ! gpu send since it is a gpu buffer?
                 ! probably we can use unblocked send?
                 deallocate(P_send)
                 np_active = np_active - N_send
-
-            end if
-
-            ! Rank by rank. For a rank, other ranks send particles to it while it must
-            ! not send particles to itself. So the following actions must be reached.
-            if(i == rank) then
-
-                allocate(N_recv_all(sum(neigh_list)))
-                ! used for each rank to know how many particles it will receive
-
-                ncount = 0
-                do j = 0, t_rank-1
-                    if(neigh_list(j+1) == 1) then
-                        ncount = ncount + 1
-                        call MPI_RECV(N_recv,1,MPI_INTEGER,j,40,MPI_COMM_WORLD,status,ierr)
-                        N_recv_all(ncount) = N_recv ! put N_recv in an array
-                    end if
-                end do
-
-                ! do sum of N_recv and allocate P_recv
-                allocate(P_recv(sum(N_recv_all),n_attri))
-
-                ncount = 0
-                do j = 0, t_rank-1
-                    if(neigh_list(j+1) == 1) then
-                        ncount = ncount + 1
-                        call MPI_RECV(P_recv(sum(N_recv_all(1:ncount-1))+1:sum(N_recv_all(1:ncount)),:), &
-                        N_recv_all(ncount)*n_attri,MPI_DOUBLE_PRECISION,j,41,MPI_COMM_WORLD,status,ierr)
-                    end if
-                end do
 
             end if
 
