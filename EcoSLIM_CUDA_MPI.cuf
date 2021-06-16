@@ -773,7 +773,7 @@ Ind_de = Ind
 Porosity_de = Porosity
 
 ! Intialize random seed
-call createRand()
+allocate(h(np)); call createRand()
 
 ! Define initial particles' locations and mass
 if (np_ic > 0)  then
@@ -1108,108 +1108,7 @@ do kk = outkk, pfnt
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin,ymin,zmin,xmax,ymax,zmax)
 !-------------------------------------
-        ! Build neighbor list first.
-        call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB),tPB>>>( &
-        zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
-        neigh_list = d_isValid(1:t_rank)
-
-        ncount2 = 0
-        do i = 0, t_rank-1
-
-            ! Rank by rank. For a rank, other ranks send particles to it while it must
-            ! not send particles to itself. So the following actions must be reached.
-            if(i == rank .and. sum(neigh_list) > 0) then
-
-                allocate(N_recv_all(sum(neigh_list)))
-                ! used for each rank to know how many particles it will receive
-
-                ncount = 0
-                do j = 0, t_rank-1
-                    if(neigh_list(j+1) == 1) then
-                        ncount = ncount + 1
-                        call MPI_IRECV(N_recv_all(ncount),1,MPI_INTEGER,j,40,MPI_COMM_WORLD,request1(ncount),ierr)
-                    end if
-                end do
-
-                call MPI_WAITALL(ncount,request1,status,ierr)
-                ! do sum of N_recv and allocate P_recv
-                allocate(P_recv(sum(N_recv_all),17+nind*2))
-
-                ncount = 0
-                do j = 0, t_rank-1
-                    if(neigh_list(j+1) == 1) then
-                        ncount = ncount + 1
-                        call MPI_IRECV(P_recv(sum(N_recv_all(1:ncount-1))+1:sum(N_recv_all(1:ncount)),:), &
-                        N_recv_all(ncount)*n_attri,MPI_DOUBLE_PRECISION,j,41,MPI_COMM_WORLD,request2(ncount),ierr)
-                    end if
-                end do
-
-            end if
-
-            if(neigh_list(i+1) == 1) then
-
-                ncount2 = ncount2 + 1
-
-                call prepare_neighbor<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(P_de(:,8),d_isValid,np_active,i)
-
-                call thrustscan(d_isValid,np_active,d_indices)
-                N_send = np_active - d_indices(np_active) ! this should be legal
-                allocate(holes(N_send),P_send(N_send,n_attri))
-                !n_attri should be updated using the true number
-
-                call prepare_holes<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(holes,d_indices,d_isValid,np_active)
-                ! block size cannot be reduced
-
-                call compaction_inplcae<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,n_attri)
-
-                np_active = d_indices(np_active); deallocate(holes)
-
-                !send the size first
-                if(ncount2 /= 1) call MPI_WAIT(request3,status) !ncount should be changed
-                call MPI_ISEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,request3,ierr)
-                ! cpu send
-                if(ncount2 /= 1) call MPI_WAIT(request4,status)
-                call MPI_ISEND(P_send,N_send*n_attri,MPI_DOUBLE_PRECISION,i,41,&
-                              MPI_COMM_WORLD,request4,ierr)
-                ! gpu send since it is a gpu buffer?
-                ! probably we can use unblocked send?
-                deallocate(P_send)
-                np_active = np_active - N_send
-
-            end if
-
-        end do
-
-        ! then separate inactive particles
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        ! I think this barrier is necessary if we use unblock send and recv
-
-        call prepare_exit<<<ceiling(dble(np_active)/tPB),&
-        tPB>>>(P_de(:,8),d_isValid,np_active)
-
-        call thrustscan(d_isValid,np_active,d_indices)
-        N_send = np_active - d_indices(np_active)
-        allocate(holes(N_send),P_send(N_send,n_attri))
-        ! P_send also be used for P_exit
-
-        call prepare_holes<<<ceiling(dble(np_active)/tPB),&
-        tPB>>>(holes,d_indices,d_isValid,np_active)
-
-        call compaction_inplcae<<<ceiling(dble(np_active)/tPB),&
-        tPB>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,n_attri)
-        !after transfer exited particles back to host, please deallocate P_send
-
-        np_active = d_indices(np_active); deallocate(holes)
-
-        call connect_recv<<<ceiling(dble(sum(N_recv_all))/tPB),&
-        tPB>>>(P_de,P_recv,np_active,sum(N_recv_all),n_attri)
-        np_active = np_active + sum(N_recv_all)
-
-        deallocate(N_recv_all,P_recv)
-
+        ! particle exchange
 !-------------------------------------
         P(1:np_active,1:12+2*nind) = P_de(1:np_active,1:12+2*nind)
         deallocate(P_de)
