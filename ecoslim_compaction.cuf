@@ -1,8 +1,15 @@
 module compact_array
+    ! 1 attributes(global) subroutine compaction_copy
+    ! 2 attributes(global) subroutine prepare_holes
+    ! 3 attributes(global) subroutine compaction_inplace
+    ! 4 attributes(global) subroutine prepare_neighbor
+    ! 5 attributes(global) subroutine prepare_exit
+    ! 6 attributes(global) subroutine connect_recv
+    ! 7 attributes(global) subroutine scan_zone
 
 
 contains
-!-------------------------------------
+!1--------------------------------------------------------------------
     attributes(global) subroutine compaction_copy(d_out,d_indices,d_isValid,&
                                                   d_in,numElements,n_attri)
     !For particle transfer between neighbours
@@ -32,7 +39,7 @@ contains
     end if
 
     end subroutine compaction_copy
-!-------------------------------------
+!2--------------------------------------------------------------------
     attributes(global) subroutine prepare_holes(holes,d_indices,d_isValid,&
                                                 numElements)
     !original:        1 0 1 1 0 0 1 0  d_isValid
@@ -60,7 +67,7 @@ contains
     end if
 
     end subroutine prepare_holes
-!-------------------------------------
+!3--------------------------------------------------------------------
     attributes(global) subroutine compaction_inplace(holes,d_indices,d_isValid,&
                                                      d_in,d_out,numElements,n_attri)
     !original:        1 0 1 1 0 0 1 0  d_isValid
@@ -102,7 +109,7 @@ contains
     end if
 
     end subroutine compaction_inplace
-!-------------------------------------
+!4--------------------------------------------------------------------
     attributes(global) subroutine prepare_neighbor(d_in,d_isValid,&
                                                    numElements,neighbor)
     !numElements is the current number of elements left in P, i.e., updated np_active
@@ -127,7 +134,7 @@ contains
     end if
 
     end subroutine prepare_neighbor
-
+!5--------------------------------------------------------------------
     attributes(global) subroutine prepare_exit(d_in,d_isValid,numElements)
     implicit none
     real(8),intent(in):: d_in(:)
@@ -146,7 +153,7 @@ contains
     end if
 
     end subroutine prepare_exit
-
+!6--------------------------------------------------------------------
     attributes(global) subroutine connect_recv(d_in,d_recv,&
                                         numElements,N_recv,n_attri)
     ! connect the received particles to the bottom of P and
@@ -168,7 +175,7 @@ contains
     end if
 
     end subroutine connect_recv
-
+!7--------------------------------------------------------------------
     attributes(global) subroutine scan_zone(zone,nnx1,nny1,buff, &
                                             d_isValid,rank,t_rank)
 
