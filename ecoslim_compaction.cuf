@@ -169,4 +169,39 @@ contains
 
     end subroutine connect_recv
 
+    attributes(global) subroutine scan_zone(zone,nnx1,nny1,buff, &
+                                            d_isValid,rank,t_rank)
+
+    implicit none
+    integer,intent(in):: zone(:,:)
+    integer,intent(out):: d_isValid(:)
+    integer,value:: nnx1,nny1,buff,rank,t_rank
+    integer:: ii,i,j,temp,lock,length   !global index in the array
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    lock = 1
+    length = (nnx1+2*buff)*(nny1+2*buff)
+
+    if(ii <= length) then
+        if(mod(ii, nnx1 + 2*buff) == 0) then
+            j = ii/(nnx1 + 2*buff) - buff
+            i = nnx1 + buff
+        else
+            j = ii/(nnx1 + 2*buff) - buff + 1
+            i = mod(ii,nnx1 + 2*buff) - buff
+        end if
+    end if
+
+    if(ii <= t_rank) d_isValid(ii) = 0
+
+    if(ii <= length) then
+        if(zone(i,j) >= 0 .and. zone(i,j) /= rank) then
+            temp = atomicAdd(d_isValid(zone(i,j)+1),lock)
+        end if
+    end if
+
+    if(ii <= length .and. d_isValid(ii) > 0) d_isValid(ii) = 1
+
+    end subroutine scan_zone
+
 end module compact_array
