@@ -43,8 +43,8 @@ module array_allocation
     integer,allocatable,device::holes(:)
     real(8),allocatable,device::P_send(:,:)
     real(8),allocatable,device::P_recv(:,:)
-    integer::N_send,N_recv,ncount,ncount2 !single host value
-    integer::request1,request2,request3,request4
+    integer::N_send,ncount,ncount2,ncount3 !single host value
+    integer::request1(:),request2(:),request3(:),request4(:) ! 1:t_rank
     integer,allocatable,device::zone_de(:,:)
 
     real(8),allocatable,device:: CLMvars_de(:,:)
