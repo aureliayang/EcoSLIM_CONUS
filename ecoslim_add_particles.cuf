@@ -1,5 +1,5 @@
 module add_particles
-
+    use mrand, only: h
 contains
 attributes(global) subroutine add_init_particles( &
     P,C,Saturation,Porosity,np_ic,np_active,pid, &
@@ -39,8 +39,8 @@ attributes(global) subroutine add_init_particles( &
 
             index = ii*np_ic - (ij - 1)
 
-            P(index,1) = float(i-1)*dx + ran1(ir)*dx
-            P(index,2) = float(j-1)*dy + ran1(ir)*dy ! update that for random number
+            P(index,1) = float(i-1)*dx + curand_uniform(h(index))*dx
+            P(index,2) = float(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
             P(index,13+2*nind) = float(index)
             P(index,14+2*nind) = P(index,1)
             P(index,15+2*nind) = P(index,2)
@@ -50,7 +50,7 @@ attributes(global) subroutine add_init_particles( &
             do ik = 1, nz
                 Z = Z + dz(ik)
             end do
-            P(index,3) = Z - dz(k)*ran1(ir)
+            P(index,3) = Z - dz(k)*curand_uniform(h(index))
             P(index,16+2*nind) = P(index,3)
 
             P(index,6) = dx*dy*dz(k)*(Porosity(i,j,k) &
@@ -150,8 +150,8 @@ attributes(global) subroutine add_new_particles( &
 
             index = np_active + d_indices(ii)*iflux_p_res - (ij - 1)
 
-            P(index,1) = float(i-1)*dx + ran1(ir)*dx
-            P(index,2) = float(j-1)*dy + ran1(ir)*dy ! update that for random number
+            P(index,1) = float(i-1)*dx + curand_uniform(h(index))*dx
+            P(index,2) = float(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
             P(index,13+2*nind) = float(pid + d_indices(ii)*iflux_p_res - (ij - 1))
             P(index,14+2*nind) = P(index,1)
             P(index,15+2*nind) = P(index,2)
@@ -163,7 +163,7 @@ attributes(global) subroutine add_new_particles( &
             P(index,3) = sum(dz) - dz(nz)*0.5d0
             P(index,16+2*nind) = P(index,3)
 
-            P(index,4) = 0.0d0 + ran1(ir)*pfdt
+            P(index,4) = 0.0d0 + curand_uniform(h(index))*pfdt
 
             if (nind > 0) then
                 Ploc(1) = floor(P(index,1) / dx)

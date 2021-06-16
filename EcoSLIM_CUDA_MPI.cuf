@@ -75,7 +75,7 @@
 program EcoSLIM
 use mpi
 use cudafor
-use ran_mod
+use mrand
 use create_subdomain
 use particles_loop
 use mpiDeviceUtil
@@ -773,10 +773,9 @@ Ind_de = Ind
 Porosity_de = Porosity
 
 ! Intialize random seed
-! ir = -3333
+call createRand()
 
 ! Define initial particles' locations and mass
-!
 if (np_ic > 0)  then
     np_active = 0
     pid = 0
