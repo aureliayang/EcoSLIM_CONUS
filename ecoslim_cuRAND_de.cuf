@@ -1,15 +1,14 @@
 module mrand
-       use curand_device
-       integer, parameter :: n = 500
-       type(curandStateXORWOW),device,allocatable,dimension(:,:) :: h
-       contains
-           attributes(global) subroutine createRand()
-              integer(8) :: seed,seq,offset,i,j
-              !type(curandStateXORWOW),dimension(:,:) :: h
-              j = blockIdx%x; i = threadIdx%x
-              seed = 12345_8 + j*n*n + i*2
-              seq = 0_8
-              offset = 0_8
-              call curand_init(seed, seq, offset, h(i,j))
-           end subroutine createRand
+    use curand_device
+    type(curandStateXORWOW),allocatable,device:: h(:)
+    contains
+        attributes(global) subroutine createRand(np)
+            integer,value:: np
+            integer(8):: seed,seq,offset,i
+            i = threadIdx%x
+            seed = 12345_8 + i*np*np + i*2
+            seq = 0_8
+            offset = 0_8
+            call curand_init(seed, seq, offset, h(i))
+        end subroutine createRand
 end module
