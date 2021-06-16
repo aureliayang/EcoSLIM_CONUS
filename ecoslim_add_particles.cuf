@@ -1,0 +1,123 @@
+module add_particles
+
+contains
+attributes(global) subroutine scan_new_particles( &
+    EvapTrans,PET_balance,d_isValid,nnx1,nny1,nz,dx,dy,dz, &
+    pfdt,denh2o)
+
+    implicit none
+    real(8),intent(in)::EvapTrans(:,:,:)
+    real(8),intent(out)::PET_balance(:)
+    integer,intent(out)::d_isValid(:)
+    integer,value:: nnx1, nny1, nz
+    real(8),value:: dx,dy,dz,pfdt,denh2o
+    integer:: i, j, k, ii
+    real(8):: temp
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    ! get i, j, k from ii
+    if(mod(ii,nnx1*nny1) == 0) then
+        k = ii/(nnx1*nny1)
+        j = nny1
+        i = nnx1
+    else
+        k = ii/(nnx1*nny1) + 1
+        if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
+            j = mod(ii,nnx1*nny1)/nnx1
+            i = nnx1
+        else
+            j = mod(ii,nnx1*nny1)/nnx1 + 1
+            i = mod(mod(ii,nnx1*nny1),nnx1)
+        end if
+    end if
+
+    if(EvapTrans(i,j,k) > 0.d0) then
+        temp = atomicAdd(PET_balance(1),pfdt*EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o)
+        if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 1
+        ! only the top layer (k = nz) will introduce new particles
+    else
+        temp = atomicAdd(PET_balance(2),pfdt*EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o)
+        if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 0
+    endif
+
+end subroutine scan_new_particles
+
+attributes(global) subroutine add_new_particles( &
+    d_indices,P,EvapTrans,CLMvars,Ind,iflux_p_res,np_active,pid, &
+    nind,nnx1,nny1,nz,dx,dy,dz,pfdt,denh2o,kk,outkk)
+    ! CLMvars is only CLMvars(i,j,11)
+
+    implicit none
+    real(8),intent(inout):: P(:,:)
+    real(8),intent(in):: EvapTrans(:,:,:), CLMvars(:,:), Ind(:,:,:), dz(:)
+    integer,intent(in):: d_indices(:)
+    integer,value:: iflux_p_res, np_active, nind
+    integer,value:: kk, outkk, nnx1, nny1, nz
+    real(8),value:: dx, dy, pfdt, denh2o
+    integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
+    real(8):: Z
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    ! get i, j from ii
+    if(mod(ii,nnx1) == 0) then
+        j = ii/nnx1
+        i = nnx1
+    else
+        j = ii/nnx1 + 1
+        i = mod(ii,nnx1)
+    end if
+    k = nz
+
+    if(EvapTrans(i,j,nz) > 0.d0) then
+        do ij = 1, iflux_p_res
+
+            index = np_active + d_indices(ii)*iflux_p_res - (ij - 1)
+
+            P(index,1) = float(i-1)*dx + ran1(ir)*dx
+            P(index,2) = float(j-1)*dy + ran1(ir)*dy ! update that for random number
+            P(index,13+2*nind) = float(pid + d_indices(ii)*iflux_p_res - (ij - 1))
+            P(index,14+2*nind) = P(index,1)
+            P(index,15+2*nind) = P(index,2)
+
+            !Z = 0.0d0
+            !do ik = 1, nz
+            !    Z = Z + dz(ik)
+            !end do
+            P(index,3) = sum(dz) - dz(nz)*0.5d0
+            P(index,16+2*nind) = P(index,3)
+
+            P(index,4) = 0.0d0 + ran1(ir)*pfdt
+
+            if (nind > 0) then
+                Ploc(1) = floor(P(index,1) / dx)
+                Ploc(2) = floor(P(index,2) / dy)
+                Ploc(3) = nz-1
+
+                itemp=idnint(Ind(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                if(itemp > 0 .and. itemp <= nind) then
+                  P(index,(12+itemp)) = P(index,(12+itemp)) + P(index,4)
+                end if
+            end if
+
+            P(index,5) = 0.0d0
+            P(index,17+2*nind) = outkk + float((kk-1))*pfdt + P(index,4)
+            P(index,6) = (1.0d0/float(abs(iflux_p_res)))*pfdt* &
+                          EvapTrans(i,j,nz)*dx*dy*dz(k)*denh2o
+
+            if(CLMvars(i,j) > 0.d0) then !this is snowmelt
+                P(index,7) = 3.d0 ! Snow composition
+            else
+                P(index,7) = 2.d0 ! Rainfall composition
+            end if
+
+            P(index,8)  = 1.0d0  ! make particle active
+            P(index,9)  = 1.0d0
+            P(index,10) = 0.0d0  ! Particle hasn't exited domain
+        enddo
+    endif
+
+end subroutine add_new_particles
+
+end module add_particles
