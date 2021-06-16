@@ -1,6 +1,81 @@
 module add_particles
 
 contains
+attributes(global) subroutine add_init_particles( &
+    P,C,Saturation,Porosity,np_ic,np_active,pid, &
+    nind,nnx1,nny1,nz,dx,dy,dz,pfdt,denh2o,outkk)
+
+    implicit none
+    real(8),intent(inout):: P(:,:), C(:,:,:,:)
+    real(8),intent(in):: Saturation(:,:,:), Porosity(:,:,:), dz(:)
+    integer,value:: np_ic, np_active, nind
+    integer,value:: outkk, nnx1, nny1, nz
+    real(8),value:: dx, dy, pfdt, denh2o
+    integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
+    real(8):: Z
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    ! get i, j, k from ii
+    if(ii <= nnx1*nny1*nz) then
+        if(mod(ii,nnx1*nny1) == 0) then
+            k = ii/(nnx1*nny1)
+            j = nny1
+            i = nnx1
+        else
+            k = ii/(nnx1*nny1) + 1
+            if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
+                j = mod(ii,nnx1*nny1)/nnx1
+                i = nnx1
+            else
+                j = mod(ii,nnx1*nny1)/nnx1 + 1
+                i = mod(mod(ii,nnx1*nny1),nnx1)
+            end if
+        end if
+    end if
+
+    if(Saturation(i,j,k) > 0.d0) then
+        do ij = 1, np_ic
+
+            index = ii*np_ic - (ij - 1)
+
+            P(index,1) = float(i-1)*dx + ran1(ir)*dx
+            P(index,2) = float(j-1)*dy + ran1(ir)*dy ! update that for random number
+            P(index,13+2*nind) = float(index)
+            P(index,14+2*nind) = P(index,1)
+            P(index,15+2*nind) = P(index,2)
+            P(index,17+2*nind) = outkk
+
+            Z = 0.0d0
+            do ik = 1, nz
+                Z = Z + dz(ik)
+            end do
+            P(index,3) = Z - dz(k)*ran1(ir)
+            P(index,16+2*nind) = P(index,3)
+
+            P(index,6) = dx*dy*dz(k)*(Porosity(i,j,k) &
+                         *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
+            P(index,7) = 1.d0
+            P(index,8)  = 1.0d0  ! make particle active
+
+            C(1,i,j,k) = 0.d0
+            C(1,i,j,k) = C(1,i,j,k) + P(ii,8)*P(index,6) / &
+            (dx*dy*dz(k)*(Porosity(i,j,k)*Saturation(i,j,k)))
+
+            C(2,i,j,k) = 0.d0
+            C(2,i,j,k) = C(2,i,j,k) + P(index,8)*P(index,4)*P(index,6)
+
+            C(4,i,j,k) = 0.d0
+            C(4,i,j,k) = C(4,i,j,k) + P(index,8)*P(index,7)*P(index,6)
+
+            C(3,i,j,k) = 0.d0
+            C(3,i,j,k) = C(3,i,j,k) + P(index,8)*P(index,6)
+
+        enddo
+    endif
+
+end subroutine add_init_particles
+
 attributes(global) subroutine scan_new_particles( &
     EvapTrans,PET_balance,d_isValid,nnx1,nny1,nz,dx,dy,dz, &
     pfdt,denh2o)
