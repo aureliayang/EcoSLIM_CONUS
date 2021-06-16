@@ -1,58 +1,48 @@
-module particles_loop
+module particle_loop
 
 contains
- attributes(global) subroutine particles_independent(&
- P,C,dz,EvapTrans,Vx,Vy,Vz,nump_path,Saturation,Porosity,&
- out_age,out_mass,out_comp,et_age,et_mass,et_comp,&
- out_np,et_np,Ind,kk,np_active,nx,ny,nz,nind,&
- pfdt,moldiff,dx,dy,denh2o,dtfrac,xmin,ymin,zmin,&
- xmax,ymax,zmax,path)
-
- !zone
- !xmin,ymin,zmin,xmax,ymax,zmax have to be updated to subdomain's
- !reflect
- !ix1, iy1 buff
+ attributes(global) subroutine particles_independent( &
+ P,C,dz,EvapTrans,Vx,Vy,Vz,Saturation,Porosity,Ind,zone, &
+ out_age,out_mass,out_comp,et_age,et_mass,et_comp,out_np,et_np, &
+ kk,np_active,nz,nind,pfdt,moldiff,dx,dy,denh2o,dtfrac, &
+ ix1,iy1,buff,reflect,nnx1,nny1,rank, &
+ xgmin,ygmin,zgmin,xgmax,ygmax,zgmax,xmin,ymin,zmin,xmax,ymax,zmax)
+ ! zmin and zmax are the same to zgmin and zgmax
+ ! xmin,ymin,xmax,ymax are those with buffer zone
 
   implicit none
 
-  integer,parameter::block_size = 256
-  real*8,intent(inout)::P(:,:),C(:,:,:,:)
-  real*8,intent(in)::dz(:),EvapTrans(:,:,:),Vx(:,:,:),Vy(:,:,:)
-  real*8,intent(in)::Vz(:,:,:),Saturation(:,:,:),Porosity(:,:,:),Ind(:,:,:)
+  ! integer,parameter::tPB = 256
+  real(8),intent(inout)::P(:,:),C(:,:,:,:)
+  real(8),intent(in)::dz(:),EvapTrans(:,:,:),Vx(:,:,:),Vy(:,:,:),Vz(:,:,:)
+  real(8),intent(in)::Saturation(:,:,:),Porosity(:,:,:),Ind(:,:,:)
+  integer,intent(in)::zone(:,:)
 
-  integer,value::kk,np_active,nx,ny,nz,nind,path
-  real*8,value::pfdt,moldiff,dx,dy,denh2o,dtfrac
-  real*8,value::xmin,ymin,zmin,xmax,ymax,zmax
+  integer,value::kk,np_active,nz,nind,ix1,iy1,buff,nnx1,nny1,rank
+  real(8),value::pfdt,moldiff,dx,dy,denh2o,dtfrac
+  real(8),value::xmin,ymin,zmin,xmax,ymax,zmax
+  real(8),value::xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
+  logical,value::reflect
 
   integer::ii,k,Ploc(3),ir,itemp
-  real*8::Clocx,Clocy,Clocz,Vpx,Z,Vpy,Vpz,&
-  particledt,delta_time,et_flux,water_vol,advdt(3),&
+  real(8)::Clocx,Clocy,Clocz,Vpx,Z,Vpy,Vpz, &
+  particledt,delta_time,et_flux,water_vol,advdt(3), &
   z1,z2,z3,Zr,temp,lock,Ltemp
 
   ! global
-  real*8,intent(inout)::out_age(:),out_mass(:),out_comp(:),&
-  et_age(:),et_mass(:),et_comp(:)
-  integer,intent(inout)::out_np(:),et_np(:),nump_path(:,:,:)
-
-  ! for random number, waiting for tests
-  ! change memory type or use the prebuild function
-  !real*8 r(97),rm1,rm2
-  !integer j
-  !integer iff,ix1,ix2,ix3
-  !iff = 0
-
-  lock = 1.d0
-!=============================================================================
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+  real(8),intent(inout)::out_age(:),out_mass(:),out_comp(:), &
+                         et_age(:),et_mass(:),et_comp(:)
+  integer,intent(inout)::out_np(:),et_np(:)
 
 !--------------------------------------
-    ! Transfer the global coordinates to local
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    lock = 1.d0
+!--------------------------------------
+    ! Transfer global to local
     P(ii,1) = P(ii,1) - ix1*dx
     P(ii,2) = P(ii,2) - iy1*dy
 
 !--------------------------------------
-    !ir = -(932117 + ii + 100*kk)
-
     delta_time = 0.d0
 
     if(P(ii,8) == 1. .and. ii <= np_active) then
@@ -67,8 +57,8 @@ contains
             Ploc(2) = floor(P(ii,2) / dy)
             ! The right side is not included. Hence if a particle is on the right
             ! boundary, there will be problem. Particularly, after the decomposition.
-            if(Ploc(1) >= nnx1+buff) Ploc(1) = nnx1+buff-1
-            if(Ploc(2) >= nny1+buff) Ploc(2) = nny1+buff-1
+            if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
+            if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
 
             Z = 0.d0
             do k = 1, nz
@@ -244,9 +234,7 @@ contains
             if (nind > 0) then
               itemp=idnint(Ind(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
               if(itemp > 0 .and. itemp <= nind) then
-
                 P(ii,12+itemp) = P(ii,12+itemp) + particledt
-
                 P(ii,12+nind+itemp) = P(ii,12+nind+itemp) + Ltemp
               end  if
             end if
@@ -255,26 +243,21 @@ contains
             ! we can choose to reflect the particle or not if it is out of
             ! the whole modeling domain. g means the golbal boundary.
             ! I think just saving the global boundary in global memory.
-                !Ploc(1) = floor(P(ii,1) / dx)
-                !Ploc(2) = floor(P(ii,2) / dy)
-                !if(zone(Ploc(1)+1,Ploc(2)+1) == -1) then
-                ! simple reflection boundary
-                    if (P(ii,3)          >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
-                    if (P(ii,1) + ix1*dx >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) + ix1*dx - Xgmax) - ix1*dx
-                    if (P(ii,2) + iy1*dy >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) + iy1*dy - Ygmax) - iy1*dy
-                    if (P(ii,2) + iy1*dy <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - P(ii,2) + iy1*dy) - iy1*dy
-                    if (P(ii,3)          <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
-                    if (P(ii,1) + ix1*dx <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - P(ii,1) + ix1*dx) - ix1*dx
-                !end if
+            ! simple reflection boundary
+                if (P(ii,3)          >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
+                if (P(ii,1) + ix1*dx >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) + ix1*dx - Xgmax) - ix1*dx
+                if (P(ii,2) + iy1*dy >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) + iy1*dy - Ygmax) - iy1*dy
+                if (P(ii,2) + iy1*dy <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - (P(ii,2) + iy1*dy)) - iy1*dy
+                if (P(ii,3)          <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
+                if (P(ii,1) + ix1*dx <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - (P(ii,1) + ix1*dx)) - ix1*dx
             end if
 
             if ((P(ii,1) < Xmin).or.(P(ii,2) < Ymin).or.(P(ii,3) < Zmin).or. &
                 (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) >= Zmax)) then
                 ! unavoidable particle loss
-
                 ! flag particle as inactive
                 P(ii,8) = 0.d0
-                ! flag as exiting via Outflow
+                ! flag as exiting via loss
                 P(ii,10) = 3.d0
                 goto 999
             end if
@@ -359,4 +342,4 @@ contains
         r(j)=(real(ix1)+real(ix2)*rm2)*rm1
         return
      end function ran1_gpu
-end module particles_loop
+end module particle_loop
