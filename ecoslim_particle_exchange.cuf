@@ -34,11 +34,11 @@
                 call MPI_WAITALL(ncount,request1(1:ncount),status,ierr)
                 ! next step it needs the sum of N_recv_all, so we have to wait here.
 
+                ncount = 0; ncount3 = 0
                 if(sum(N_recv_all) > 0) then
                     ! at least one neighbor sent. if not, no need to do receive
                     allocate(P_recv(sum(N_recv_all),17+nind*2))
                     ! do sum of N_recv_all and allocate P_recv
-                    ncount = 0; ncount3 = 0
                     do j = 0, t_rank-1
                         if(neigh_list(j+1) == 1) then
                             ncount = ncount + 1
@@ -63,7 +63,7 @@
                 ncount2 = ncount2 + 1
 
                 call prepare_neighbor<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(P_de(:,8),d_isValid,np_active,i)
+                tPB>>>(P_de(:,8),d_isValid,np_active,i) ! get d_isValid
                 call thrustscan(d_isValid,np_active,d_indices)
 
                 if(ncount2 /= 1) call MPI_WAIT(request3(ncount2-1),status,ierr)
@@ -97,11 +97,10 @@
         end do
 
         ! then separate inactive particles
-        call prepare_exit<<<ceiling(dble(np_active)/tPB),&
-        tPB>>>(P_de(:,8),d_isValid,np_active)
+        call prepare_exit<<<ceiling(dble(np_active)/tPB),tPB>>>(P_de(:,8),d_isValid,np_active)
         call thrustscan(d_isValid,np_active,d_indices)
 
-        call MPI_WAIT(request3(ncount2),status,ierr)
+        call MPI_WAIT(request3(ncount2),status,ierr) ! no if condition since send anyway
         N_send = np_active - d_indices(np_active)
 
         if(ncount4 > 0)then
