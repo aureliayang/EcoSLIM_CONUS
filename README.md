@@ -1,2 +1,2 @@
 # EcoSLIM_CONUS
-Under development
+We are doing super cool stuff.
