@@ -181,6 +181,8 @@ contains
                 temp = atomicAdd(ET_np(1), idnint(lock))
 
                 ! outputting spatially distributed ET information
+                ! here it is a problem, probably have to be done after transfer.
+                ! can keep it here but only for the area except overlap zone
                 temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
 
                 temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
@@ -278,6 +280,7 @@ contains
             end if
         end do
 
+        ! this shoule be done after particle transfer together with ET particles using a new kernel
         temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
         temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
         temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
@@ -287,6 +290,7 @@ contains
         ! zone/neighbor identification for cuda-aware transfer.
         ! since 0 and 1 are reserved for active and inactive particles,
         ! we add 10 to ranks. Otherwise, 0 and 1 are hard to be distinguished.
+        ! keep an eye for ET particles
         if(zone(Ploc(1)+1,Ploc(2)+1) /= rank) &
         P(ii,8) = (zone(Ploc(1)+1,Ploc(2)+1) + 10) * P(ii,8)
         ! Hence, the active particles which will be sent to neighbors has been labeled

@@ -77,8 +77,11 @@ use mpi
 use cudafor
 use mrand
 use create_subdomain
-use particles_loop
+use particle_loop
 use mpiDeviceUtil
+use variable_list
+use exchange_particles
+use thrust
 
 implicit none
 !--------------------------------------------------------------------
@@ -1108,10 +1111,12 @@ do kk = outkk, pfnt
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin,ymin,zmin,xmax,ymax,zmax)
 !-------------------------------------
-        ! particle exchange
+        ! particle exchange here
+        call MPI_particle_exchange()
 !-------------------------------------
-        P(1:np_active,1:12+2*nind) = P_de(1:np_active,1:12+2*nind)
-        deallocate(P_de)
+        allocate(P_exit(N_send,17+2*nind)); P_exit = P_send; deallocate(P_send)
+        ! copy exited particles back and output later.
+        ! considering asyn data copy.
 
         C              = C_de
         out_age_cpu    = out_age_de;    out_mass_cpu   = out_mass_de
@@ -1119,68 +1124,62 @@ do kk = outkk, pfnt
         et_age_cpu     = et_age_de;     et_mass_cpu    = et_mass_de
         et_comp_cpu    = et_comp_de;    et_np_cpu      = et_np_de
 
-        !call MPI_ALLReduce(MPI_IN_PLACE, ET_age_cpu,  1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        !call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_cpu, 3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        !call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, ET_np_cpu,   1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        !call MPI_ALLReduce(MPI_IN_PLACE, Out_age_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        !call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_cpu,3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        !call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_cpu,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, Out_np_cpu,  1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        call MPI_ALLReduce(MPI_IN_PLACE,C,n_constituents*nx*ny*nz,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        if(path > 0 .and. mod(kk,path) == 0) then
-            nump_path = nump_path_de
-            call MPI_ALLReduce(MPI_IN_PLACE,nump_path,nx*ny,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
-            !nump_path = nump_path/1000
-            call grid_adjust(nx,ny,1,nump_path)
-            write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
-            ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
-            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-        endif
-
-        call MPI_Reduce(np_active, np_active_log, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         T2 = MPI_Wtime()
         parallel_time = parallel_time + (T2-T1)
 
-    if(rank == 0) then
-        write(12,*) np_active_log, T2-T1, redis_time
-        if(path > 0 .and. mod(kk,path) == 0) then
-        write(12,'(5(20i10,/))') ((nump_path(i,j,1),i=1,nx),j=1,ny)
+!-------------------------------------
+        ! read files using hdf5.
+
+!-------------------------------------
+
+
+        if(rank == n_proc) then
+            ! for such reduce, we can use a specific MPI process to do.
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_age_cpu,  1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_cpu, 3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_np_cpu,   1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
+
+
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_age_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_cpu,3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_cpu,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_np_cpu,  1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
+
+            call MPI_ALLReduce(MPI_IN_PLACE,C,n_constituents*nx*ny*nz,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+            call MPI_Reduce(np_active, np_active_log, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+            write(12,*) np_active_log, T2-T1, redis_time
+            flush(12)
+
+            if (ET_mass_cpu(1) > 0 ) then
+                ET_age_cpu(1) = ET_age_cpu(1)/ET_mass_cpu(1)
+                ET_comp_cpu(1) = ET_comp_cpu(1)/ET_mass_cpu(1)
+                ET_comp_cpu(2) = ET_comp_cpu(2)/ET_mass_cpu(1)
+                ET_comp_cpu(3) = ET_comp_cpu(3)/ET_mass_cpu(1)
+            end if
+            write(13,'(6(e12.5),i12)') float(kk)*ET_dt, ET_age_cpu(1), ET_comp_cpu(1), &
+                                    ET_comp_cpu(2), ET_comp_cpu(3), ET_mass_cpu(1), &
+                                    ET_np_cpu(1)
+            flush(13)
+
+            if (Out_mass_cpu(1) > 0 ) then
+                Out_age_cpu(1) = Out_age_cpu(1)/Out_mass_cpu(1)
+                Out_comp_cpu(1) = Out_comp_cpu(1)/Out_mass_cpu(1)
+                Out_comp_cpu(2) = Out_comp_cpu(2)/Out_mass_cpu(1)
+                Out_comp_cpu(3) = Out_comp_cpu(3)/Out_mass_cpu(1)
+            end if
+            write(15,64) float(kk)*ET_dt, Out_age_cpu(1), Out_comp_cpu(1), &
+                        Out_comp_cpu(2), Out_comp_cpu(3), Out_mass_cpu(1), &
+                        Out_np_cpu(1)
+            flush(15)
+
+            write(16,'(5(e12.5,2x))') float(kk)*ET_dt, PET_balance(kk,1), PET_balance(kk,2), &
+                                    PET_balance_da(kk,1), PET_balance_da(kk,2)
+            flush(16)
         endif
-        flush(12)
-
-        if (ET_mass_cpu(1) > 0 ) then
-        ET_age_cpu(1) = ET_age_cpu(1)/ET_mass_cpu(1)
-        ET_comp_cpu(1) = ET_comp_cpu(1)/ET_mass_cpu(1)
-        ET_comp_cpu(2) = ET_comp_cpu(2)/ET_mass_cpu(1)
-        ET_comp_cpu(3) = ET_comp_cpu(3)/ET_mass_cpu(1)
-        end if
-        write(13,'(6(e12.5),i12)') float(kk)*ET_dt, ET_age_cpu(1), ET_comp_cpu(1), &
-                                   ET_comp_cpu(2), ET_comp_cpu(3), ET_mass_cpu(1), &
-                                   ET_np_cpu(1)
-        flush(13)
-
-        if (Out_mass_cpu(1) > 0 ) then
-        Out_age_cpu(1) = Out_age_cpu(1)/Out_mass_cpu(1)
-        Out_comp_cpu(1) = Out_comp_cpu(1)/Out_mass_cpu(1)
-        Out_comp_cpu(2) = Out_comp_cpu(2)/Out_mass_cpu(1)
-        Out_comp_cpu(3) = Out_comp_cpu(3)/Out_mass_cpu(1)
-        end if
-        write(15,64) float(kk)*ET_dt, Out_age_cpu(1), Out_comp_cpu(1), &
-                     Out_comp_cpu(2), Out_comp_cpu(3), Out_mass_cpu(1), &
-                     Out_np_cpu(1)
-        flush(15)
-
-        write(16,'(5(e12.5,2x))') float(kk)*ET_dt, PET_balance(kk,1), PET_balance(kk,2), &
-                                  PET_balance_da(kk,1), PET_balance_da(kk,2)
-        flush(16)
-    endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
     T1 = MPI_Wtime()
@@ -1262,10 +1261,6 @@ if(ibinpntswrite > 0)  then
 if(mod(kk,ibinpntswrite) == 0)  &
 call vtk_write_points(P,np_active,np,kk,vtk_file, dx, dy,nx,ny, maxZ,dem)
 end if
-! reset C
-! C = 0.0D0
-! reset ET_grid
-! ET_grid = 0.0D0
 
 call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 T2 = MPI_Wtime()
@@ -1324,87 +1319,6 @@ call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATU
 
 np_active = np_active2
 
-!------------------------------------------------------------------
-call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-T1 = MPI_Wtime()
-
-if(p_redis>0 .and. mod(kk,p_redis)==0) then
-
-    call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
-    np_lo = sum(nump(1:rank)); np_ro = sum(nump(1:rank+1))
-    np_ps = (sum(nump)+t_rank-mod(sum(nump),t_rank))/t_rank
-    np_ln = rank*np_ps; np_rn = (rank+1)*np_ps
-
-    if(np_lo<np_ln .and. rank>0) then
-        !P(1:np_ln-np_lo,:), Send to rank-1
-        !  ___|___|___|___......
-        !    old     new
-        call MPI_SEND(P(1:np_ln-np_lo,:), &
-            (np_ln-np_lo)*(17+nind*2),MPI_DOUBLE_PRECISION, &
-            rank-1,40,MPI_COMM_WORLD,ierr)
-        P(1:np_active-(np_ln-np_lo),:) = P(np_ln-np_lo+1:np_active,:)
-        np_active = np_active - (np_ln-np_lo)
-
-        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_ln-np_lo, &
-        'particles sent from rank',rank,'to rank',rank-1,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-    endif
-
-    if(np_ro<np_rn .and. rank<t_rank-1) then
-        !P(np_active+1:np_active+np_rn-np_ro,:), Receive from rank+1
-        !  ......___|___|___|___
-        !          old     new
-        !warnings/stop if np_active+np_rn-np_ro > np
-        call MPI_RECV(P(np_active+1:np_active+np_rn-np_ro,:), &
-            (np_rn-np_ro)*(17+nind*2),MPI_DOUBLE_PRECISION, &
-            rank+1,40,MPI_COMM_WORLD,status,ierr)
-        np_active = np_active + np_rn-np_ro
-
-        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_rn-np_ro, &
-        'particles received on rank',rank,'from rank',rank+1,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-    endif
-
-    if(np_ro>np_rn .and. rank<t_rank-1) then
-        !P(np_active-(np_ro-np_rn)+1:np_active,:), Send to rank+1
-        !  ......___|___|___|___
-        !          new     old
-        call MPI_SEND(P(np_active-(np_ro-np_rn)+1:np_active,:), &
-            (np_ro-np_rn)*(17+nind*2),MPI_DOUBLE_PRECISION, &
-            rank+1,45,MPI_COMM_WORLD,ierr)
-        !P(np_active-(np_ro-np_rn)+1:np_active,8) = 0.d0 !May not necessary
-        np_active = np_active - (np_ro-np_rn)
-
-        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_ro-np_rn, &
-        'particles sent from rank',rank,'to rank',rank+1,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-    endif
-
-    if(np_lo>np_ln .and. rank>0) then
-        !P(1:np_lo-np_ln,:), Receive from rank-1
-        !  ___|___|___|___......
-        !    new     old
-        !warnings/stop if np_active+np_lo-np_ln > np
-        P(1+np_lo-np_ln:np_active+np_lo-np_ln,:) = P(1:np_active,:)
-        np_active = np_active + np_lo-np_ln
-        call MPI_RECV(P(1:np_lo-np_ln,:), &
-            (np_lo-np_ln)*(17+nind*2),MPI_DOUBLE_PRECISION, &
-            rank-1,45,MPI_COMM_WORLD,status,ierr)
-
-        write(message,'(i10,1x,a,i3,1x,a,i3,1x,a)') np_lo-np_ln, &
-        'particles received on rank',rank,'from rank',rank-1,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-    endif
-endif
-
-call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-T2 = MPI_Wtime()
-redis_time = redis_time + (T2-T1)
-!------------------------------------------------------------------
 if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
     call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
                        MPI_INFO_NULL,fh2,ierr)
@@ -1414,6 +1328,20 @@ if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
                         MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
     call MPI_FILE_CLOSE(fh2, ierr)
 end if
+
+        ! LB criteria: if the difference between max- and min-number of particles over some limitation
+        ! call decomposition
+        ! Build neighbor list. do this after a particle loop
+        call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+        tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
+        neigh_list = d_isValid(1:t_rank)
+        ! don't need to do this every timestep. Only after update of decomposition
+        if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
+        ! notice: make sure N_recv_all is deallocated before new allocation
+        ! used to know how many particles this rank will receive
+        ! N_recv_all should be set after update of decomposition.
+        ! its size is the number of its neighbors. it will have elements of value 0,
+        ! this means that neighbor will not send particles to this rank this time step.
 
 end do !! timesteps and cycles
 
