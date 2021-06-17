@@ -1,13 +1,17 @@
-        ! Build neighbor list.
-        call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-        tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
-        neigh_list = d_isValid(1:t_rank)
-        ! don't need to do this every timestep. Only after update of decomposition
-        if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
-        ! used to know how many particles this rank will receive
-        ! N_recv_all should be set after update of decomposition.
-        ! its size is the number of its neighbors. it will have elements of value 0,
-        ! this means that neighbor will not send particles to this rank this time step.
+module exchange_particles
+
+    use variable_list, only: ncount, ncount2, ncount3, ncount4, &
+    request1, request2, request3, request4, N_recv_all, N_send, &
+    rank, t_rank, neigh_list, np_active
+
+    use variable_list, only: P_exit, P_de, C_de, d_isValid, d_indices, &
+    P_send, P_recv, Zone_de, holes
+
+contains
+    subroutine MPI_particle_exchange()
+        use cudafor
+        use mpi
+        implicit none
 
         ncount2 = 0; ncount4 = 0
         do i = 0, t_rank-1
@@ -126,6 +130,8 @@
         tPB>>>(P_de,P_recv,np_active,sum(N_recv_all),17+nind*2)
         np_active = np_active + sum(N_recv_all)
 
-        deallocate(P_send,P_recv)
+        deallocate(P_recv) ! deallocate P_send after transfer back
         ! this should be considered. size of N_recv_all should not change
         ! if decomposition is not changed.
+    end subroutine MPI_particle_exchange
+end module exchange_particles

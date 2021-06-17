@@ -1,0 +1,58 @@
+module variable_list
+        ! P = Particle array [np,attributes]
+        ! np = Number of particles
+        ! P(np,1) = X coordinate [L]
+        ! P(np,2) = Y coordinate [L]
+        ! P(np,3) = Z coordinate [L]
+        ! P(np,4) = Particle residence time [T]
+        ! P(np,5) = Saturated particle residence time [T]
+        ! P(np,6) = Particle mass; assigned via preciptiation or snowmelt rate (Evap_Trans*density*volume*dT)
+        ! P(np,7) = Particle source (1=IC, 2=rain, 3=snowmelt, 4=irrigation...)
+        ! P(np,8) = Particle Status (1=active, 0=inactive)
+        ! P(np,9) = concentration
+        ! P(np,10) = Exit status (1=outflow, 2=ET...)
+
+        ! P(np,11) = Length of flow path [L]
+        ! P(np,12) = Length of saturated flow path [L]
+        ! P(np,13:(12+nind)) = Length of flow path in indicator i [L]
+        ! P(np,(13+nind):(12+nind*2)) = particle age in indicator i [T]
+
+        ! P(np,13+nind*2) = Particle Number (This is a unique integer identifier for the particle)
+        ! P(np,14+nind*2) = Partical Initial X coordinate [L]
+        ! P(np,15+nind*2) = Partical Initial Y coordinate [L]
+        ! P(np,16+nind*2) = Partical Initial Z coordinate [L]
+        ! P(np,17+nind*2) = Time that particle was added [T]
+
+    ! use create_subdomain, only: nnx1,nny1,buff
+    use cudafor
+    ! CPU variables
+    integer,allocatable:: N_recv_all(:) !sum(neigh_list)
+    integer:: N_send,ncount,ncount2,ncount3,ncount4 !single host value
+    integer:: request1(:),request2(:),request3(:),request4(:) ! 1:t_rank
+    real(8),allocatable,pinned:: P_exit(:,:)
+    integer,allocatable,pinned:: neigh_list(:)
+    ! t_rank, and should be initilized at the very beginning
+    integer:: n_proc ! this is the total MPI processes and t_rank = n_proc - 1
+
+    !-------------------------------------
+    !GPU variables
+    real(8),allocatable,device:: P_de(:,:),C_de(:,:,:,:)
+    real(8),allocatable,device:: Vx_de(:,:,:),Vy_de(:,:,:),Vz_de(:,:,:),dz_de(:),Ind_de(:,:,:)
+    real(8),allocatable,device:: Saturation_de(:,:,:),Porosity_de(:,:,:),EvapTrans_de(:,:,:)
+    integer,allocatable,device:: out_np_de(:),ET_np_de(:)
+    real(8),allocatable,device:: out_age_de(:),out_mass_de(:),out_comp_de(:)
+    real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
+    real(8),allocatable,device:: CLMvars_de(:,:),PET_balance_de(:),PET_balance_da_de(:)
+    integer,allocatable,device:: d_isValid(:),d_indices(:)
+    real(8),allocatable,device:: P_send(:,:),P_recv(:,:)
+    integer,allocatable,device:: Zone_de(:,:), holes(:)
+
+contains
+    !subroutine allocate_array(nz)
+    !    implicit none
+    !    integer:: nz
+!
+    !    allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz))
+!
+    !end subroutine allocate_array
+end module variable_list
