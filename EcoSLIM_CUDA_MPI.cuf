@@ -979,22 +979,12 @@ source_time = T2 - T1
 !     update their new locations
 !--------------------------------------------------------------------
 ! loop over timesteps
+!
 pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1
 do kk = outkk, pfnt
 
 ! reset ParFlow counter for cycles
         if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
-
-        if(cycle_f>0) then
-            if(mod(kk-1,cycle_f) == 0) then
-                subid(1) = subid(1) + 1
-                if(subid(1)+1>t_rank) subid(1) = mod(subid(1),t_rank)
-                write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
-                ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(subid(1)+1,1:4),new_line(' ')
-                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-            endif
-        endif
 
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         T1 = MPI_Wtime()
