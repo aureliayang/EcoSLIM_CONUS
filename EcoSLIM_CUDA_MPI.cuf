@@ -280,16 +280,6 @@ integer etwrite
 !! than the .3D ASCII output but is still much slower than grid based output.  It provides the most
 !! information as particle locations are preserved
 
-real(8),allocatable,device::P_de(:,:),C_de(:,:,:,:)
-real(8),allocatable,device::Vx_de(:,:,:),Vy_de(:,:,:),Vz_de(:,:,:),dz_de(:),Ind_de(:,:,:)
-real(8),allocatable,device::Saturation_de(:,:,:),Porosity_de(:,:,:),EvapTrans_de(:,:,:)
-integer,allocatable,device::out_np_de(:),ET_np_de(:),nump_path_de(:,:,:)
-real(8),allocatable,device::out_age_de(:),out_mass_de(:),out_comp_de(:)
-real(8),allocatable,device::ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
-
-integer,allocatable,pinned::out_np_cpu(:),ET_np_cpu(:),nump_path(:,:,:)
-real(8),allocatable,pinned::out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
-real(8),allocatable,pinned::ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
 
 integer,parameter:: tPB = 256
 integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE)
@@ -339,6 +329,8 @@ call MPI_INIT(ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
 
+!----------------------------------------
+! This part has to be thought again for extra processes to do I/O
 ! Get and set unique device
 call assignDevice(deviceID)
 call MPI_GET_PROCESSOR_NAME(hostname, namelength, ierr)
@@ -352,7 +344,8 @@ call MPI_FILE_SEEK(fh0,offset,MPI_SEEK_SET,ierr)
 call MPI_FILE_WRITE(fh0,message,len(trim(message)),MPI_CHARACTER, &
     MPI_STATUS_IGNORE, ierr)
 call MPI_FILE_CLOSE(fh0, ierr)
-
+!----------------------------------------
+! I think how to do timing is also a new question due to asyn.
 ! Set up timing
 Total_time1 = 0.d0
 Total_time2 = 0.d0
@@ -657,23 +650,6 @@ allocate(P(np,17+nind*2))
 P = 0.d0    ! clear out all particle attributes
 P(1:np,7:9) = 1.d0  ! make all particles active to start with and original from 1 = GW/IC
 
-open(10,file='sub_info.txt')
-    do i=1,t_rank
-        if(rank == i-1) then
-            read(10,*) nsub
-            if(nsub>0) then
-                allocate(subid(nsub))
-                read(10,*) (subid(j),j=1,nsub)
-            else
-                read(10,*)
-            endif
-        else
-            read(10,*)
-            read(10,*)
-        endif
-    enddo
-close(10)
-
 call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 T2 = MPI_Wtime()
 
@@ -771,11 +747,11 @@ allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
 allocate(out_np_de(1),ET_np_de(1),nump_path_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,1))
 allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
 allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
-dz_de = dz2
+dz_de = dz2 ! can't understand why dz doesn't work.
 Ind_de = Ind
 Porosity_de = Porosity
 
-! Intialize random seed
+! Intialize cuRand device API and this part need to check through again.
 allocate(h(np)); call createRand()
 
 ! Define initial particles' locations and mass
@@ -965,15 +941,6 @@ if(rank == 0) then
     write(16,*) 'TIME P[kg] ET[kg]'
 endif
 
-call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-T1 = MPI_Wtime()
-if(source1) then
-    call grid_PME(nx,ny,nz,pname,pft1,pft2,iflux_p_res,PME_tot)
-    call grid_adjust(nx,ny,1,PME_tot)
-endif
-call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-T2 = MPI_Wtime()
-source_time = T2 - T1
 !--------------------------------------------------------------------
 ! (3) For each timestep, loop over all particles to find and
 !     update their new locations
@@ -986,14 +953,13 @@ do kk = outkk, pfnt
 ! reset ParFlow counter for cycles
         if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
 
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        T1 = MPI_Wtime()
         ! adjust the file counters
         pfkk = pfkk + 1
 
         ! Read the velocities computed by ParFlow
         write(filenum,'(i5.5)') pfkk
-
+!----------------------------------------
+        ! wait for hdf5 ready
         fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
         call pfb_read(Vx,fname,nx+1,ny,nz)
 
@@ -1022,21 +988,30 @@ do kk = outkk, pfnt
 
         end if
         end if
-
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        T2 = MPI_Wtime()
-        IO_time_read = IO_time_read + (T2-T1)
-
+!----------------------------------------
         ! Determine whether to perform forward or backward patricle tracking
         Vx = Vx * V_mult
         Vy = Vy * V_mult
         Vz = Vz * V_mult
 
+        out_age_cpu = 0.d0; out_mass_cpu = 0.d0; out_comp_cpu = 0.d0; out_np_cpu = 0
+        et_age_cpu  = 0.d0; et_mass_cpu  = 0.d0; et_comp_cpu  = 0.d0; et_np_cpu  = 0
+
         Vx_de = Vx; Vy_de = Vy; Vz_de = Vz
         Saturation_de = Saturation; EvapTrans_de = EvapTrans
-        CLMvars_de = CLMvars(:,:,11)
-        ! if decomposition of the domain is updated, the matrix on GPU should be
-        ! deallocated and then allocated.
+        CLMvars_de = CLMvars(:,:,11) !probably this can be deallocated after add of particles
+        ! If decomposition of the domain is updated, the matrix on GPU should be
+        ! deallocated and then allocated after the dynamic DDC.
+        ! Though hdf5 is not ready, at least we can assume the shape of each
+        ! variable in the following parts.
+        ! Now just think about the hourly add of particles.
+        out_age_de = out_age_cpu; out_mass_de = out_mass_cpu
+        out_comp_de = out_comp_cpu; out_np_de = out_np_cpu
+        et_age_de = et_age_cpu; et_mass_de = et_mass_cpu
+        et_comp_de = et_comp_cpu; et_np_de = et_np_cpu
+        C = 0.d0; C_de = C
+        ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
+        ! the following add of particles.
 
         if (clmtrans) then
             if (np_active < np) then
@@ -1044,16 +1019,19 @@ do kk = outkk, pfnt
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
                 tPB >>> (EvapTrans_de,PET_balance_de,d_isValid,nnx1,nny1,nz, &
                 dx,dy,dz,pfdt,denh2o)
-                ! add PET_balance_de(2) in global memory
-                ! d_isValid has the length as P or of np which is assigned in input
+                ! d_isValid has the length as P or of np which is assigned in input script
                 ! so nnx1**nny1*nz should be smaller than np
+                ! we don't care about the buffer zone for add of particles
+                ! nnx1, nnx2 etc. subdomain info can be put in its own module. Then use module
+                ! in main program and pass arguments to other subroutines.
+
                 PET_balance = PET_balance_de
                 ! print to log file, or PET_balance can be a long array and do print at last
 
                 ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
                 call thrustscan(d_isValid,nnx1*nny1,d_indices)
 
-                i_added_particles = d_indices(nnx1*nny1) * iflux_p_res
+                i_added_particles = d_indices(nnx1*nny1) * iflux_p_res ! should be legal?
                 if(np_active + i_added_particles >= np) then
                     write(message,'(A,A)') ' **Warning rainfall input but no paricles left', new_line(' ')
                     call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
@@ -1076,22 +1054,12 @@ do kk = outkk, pfnt
             end if
         end if
 
-        !this has to be checked later.
-        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance_da(kk,:), 2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        ! this has to be checked later.
+        ! call MPI_ALLReduce(MPI_IN_PLACE, PET_balance_da(kk,:), 2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
         call MPI_ALLReduce(MPI_IN_PLACE, PET_balance(kk,:),    2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
 
 !-------------------------------------
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        T1 = MPI_Wtime()
-
-        out_age_cpu = 0.d0; out_mass_cpu = 0.d0; out_comp_cpu = 0.d0; out_np_cpu = 0
-        et_age_cpu = 0.d0; et_mass_cpu = 0.d0; et_comp_cpu = 0.d0; et_np_cpu = 0
-        out_age_de = out_age_cpu; out_mass_de = out_mass_cpu
-        out_comp_de = out_comp_cpu; out_np_de = out_np_cpu
-        et_age_de = et_age_cpu; et_mass_de = et_mass_cpu
-        et_comp_de = et_comp_cpu; et_np_de = et_np_cpu
-        C = 0.d0; C_de = C
-
+        ! particle loop here
         call particles_independent <<< ceiling(dble(np_active)/tPB),tPB >>> ( &
             P_de,C_de,dz_de,EvapTrans_de,Vx_de,Vy_de,Vz_de,Saturation_de, &
             Porosity_de,Ind_de,zone_de,out_age_de,out_mass_de,out_comp_de, &
@@ -1113,13 +1081,6 @@ do kk = outkk, pfnt
         out_comp_cpu   = out_comp_de;   out_np_cpu     = out_np_de
         et_age_cpu     = et_age_de;     et_mass_cpu    = et_mass_de
         et_comp_cpu    = et_comp_de;    et_np_cpu      = et_np_de
-
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        T2 = MPI_Wtime()
-        parallel_time = parallel_time + (T2-T1)
-
-!-------------------------------------
-        ! read files using hdf5.
 
 !-------------------------------------
 
