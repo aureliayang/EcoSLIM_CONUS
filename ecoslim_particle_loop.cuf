@@ -183,13 +183,13 @@ contains
                 ! outputting spatially distributed ET information
                 ! here it is a problem, probably have to be done after transfer.
                 ! can keep it here but only for the area except overlap zone
-                temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+                ! temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
 
-                temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
+                ! temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
 
-                temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
+                ! temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
 
-                temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
+                ! temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
 
                 ! now remove particle from domain
                 P(ii,8) = 0.d0
@@ -271,6 +271,9 @@ contains
         ! Find the "adjacent" "cell corresponding to the particle's location
         Ploc(1) = floor(P(ii,1) / dx)
         Ploc(2) = floor(P(ii,2) / dy)
+        if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
+        if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
+
         Z = 0.d0
         do k = 1, nz
             Z = Z + dz(k)
@@ -280,19 +283,15 @@ contains
             end if
         end do
 
-        ! this shoule be done after particle transfer together with ET particles using a new kernel
-        temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
-        temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
-        temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
-        temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
-        temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
-
         ! zone/neighbor identification for cuda-aware transfer.
         ! since 0 and 1 are reserved for active and inactive particles,
         ! we add 10 to ranks. Otherwise, 0 and 1 are hard to be distinguished.
         ! keep an eye for ET particles
-        if(zone(Ploc(1)+1,Ploc(2)+1) /= rank) &
-        P(ii,8) = (zone(Ploc(1)+1,Ploc(2)+1) + 10) * P(ii,8)
+        P(ii,13+2*nind) = P(ii,8)
+        if(zone(Ploc(1)+1,Ploc(2)+1) /= rank) then
+            if(P(ii,8) == 1. .or. (P(ii,8) == 0. .and. P(ii,10) == 2.)) &
+            P(ii,13+2*nind) = zone(Ploc(1)+1,Ploc(2)+1) + 10
+        end if
         ! Hence, the active particles which will be sent to neighbors has been labeled
 
         ! Transfer local coordinates to global
@@ -302,5 +301,53 @@ contains
     end if
 
  end subroutine particles_independent
+
+
+ attributes(global) subroutine Update_C_Array(P,C,dx,dy,dz,nz,ix1,iy1)
+    implicit none
+    real(8),intent(in):: P(:,:)
+    real(8),intent(inout):: C(:,:,:,:)
+    integer:: Ploc(3), ii, k
+    real(8):: lock, Z
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    lock = 1.d0
+
+    ! Transfer global to local
+    P(ii,1) = P(ii,1) - ix1*dx
+    P(ii,2) = P(ii,2) - iy1*dy
+
+    ! Find the "adjacent" "cell corresponding to the particle's location
+    Ploc(1) = floor(P(ii,1) / dx)
+    Ploc(2) = floor(P(ii,2) / dy)
+    if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
+    if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
+
+    Z = 0.d0
+    do k = 1, nz
+        Z = Z + dz(k)
+        if (Z >= P(ii,3)) then
+            Ploc(3) = k - 1
+            exit
+        end if
+    end do
+
+    if(P(ii,8) == 0. .and. P(ii,10) == 2.) then
+        temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+        temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6))  ! particle mass added to ET
+        temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
+        temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
+    end if
+
+    temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
+    temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
+    temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
+    temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
+    temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
+
+    P(ii,1) = P(ii,1) + ix1*dx
+    P(ii,2) = P(ii,2) + iy1*dy
+
+ end subroutine Update_C_Array
 
 end module particle_loop

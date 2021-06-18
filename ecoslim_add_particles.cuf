@@ -92,18 +92,20 @@ attributes(global) subroutine scan_new_particles( &
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
     ! get i, j, k from ii
-    if(mod(ii,nnx1*nny1) == 0) then
-        k = ii/(nnx1*nny1)
-        j = nny1
-        i = nnx1
-    else
-        k = ii/(nnx1*nny1) + 1
-        if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
-            j = mod(ii,nnx1*nny1)/nnx1
+    if(ii <= nnx1*nny1*nz) then
+        if(mod(ii,nnx1*nny1) == 0) then
+            k = ii/(nnx1*nny1)
+            j = nny1
             i = nnx1
         else
-            j = mod(ii,nnx1*nny1)/nnx1 + 1
-            i = mod(mod(ii,nnx1*nny1),nnx1)
+            k = ii/(nnx1*nny1) + 1
+            if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
+                j = mod(ii,nnx1*nny1)/nnx1
+                i = nnx1
+            else
+                j = mod(ii,nnx1*nny1)/nnx1 + 1
+                i = mod(mod(ii,nnx1*nny1),nnx1)
+            end if
         end if
     end if
 

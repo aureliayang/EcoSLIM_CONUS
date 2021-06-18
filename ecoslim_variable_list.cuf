@@ -23,16 +23,18 @@ module variable_list
         ! P(np,16+nind*2) = Partical Initial Z coordinate [L]
         ! P(np,17+nind*2) = Time that particle was added [T]
 
-    ! use create_subdomain, only: nnx1,nny1,buff
     use cudafor
     ! CPU variables
     integer:: N_send,ncount,ncount2,ncount3,ncount4 !single host value
     integer:: request1(:),request2(:),request3(:),request4(:) ! 1:t_rank
-    integer,allocatable,pinned:: N_recv_all(:) !sum(neigh_list)
-    real(8),allocatable,pinned:: P_exit(:,:)
-    integer,allocatable,pinned:: neigh_list(:)
-    ! t_rank, and should be initilized at the very beginning
     integer:: n_proc ! this is the total MPI processes and t_rank = n_proc - 1
+    integer,allocatable,pinned:: N_recv_all(:) !sum(neigh_list) ??? pinned
+    real(8),allocatable,pinned:: P_exit(:,:)
+    integer,allocatable,pinned:: neigh_list(:) ! t_rank, and should be initilized at the very beginning
+    integer,allocatable,pinned:: out_np_cpu(:),ET_np_cpu(:)
+    real(8),allocatable,pinned:: out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
+    real(8),allocatable,pinned:: ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
+    real(8),allocatable,pinned:: CLMvars(:,:,:),PET_balance(:),PET_balance_da(:)
 
     !-------------------------------------
     !GPU variables
@@ -45,7 +47,7 @@ module variable_list
     real(8),allocatable,device:: CLMvars_de(:,:),PET_balance_de(:),PET_balance_da_de(:)
     integer,allocatable,device:: d_isValid(:),d_indices(:)
     real(8),allocatable,device:: P_send(:,:),P_recv(:,:)
-    integer,allocatable,device:: Zone_de(:,:), holes(:)
+    integer,allocatable,device:: Zone_de(:,:),holes(:)
 
 contains
     !subroutine allocate_array(nz)
