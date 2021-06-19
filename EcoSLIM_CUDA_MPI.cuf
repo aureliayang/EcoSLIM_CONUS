@@ -272,7 +272,6 @@ read(10,*) n_cycle
 read(10,*) add_f
 
 pfnt=n_cycle*(pft2-pft1+1)
-
 outkk = tout1 + 1
 
 ! set ET DT to ParFlow one and allocate ET arrays accordingly
