@@ -1,15 +1,67 @@
 module subgrid_bound
-    real*8 Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
-        ! Domain boundaries in local / grid coordinates. min values set to zero,
-        ! DEM is read in later to output to Terrain Following Grid used by ParFlow.
+
     contains
-    subroutine subgrid_max_xyz(nnx1,nny1,nz,dx,dy,dz,buff,fhandle1)
+    subroutine global_xyz(nx,ny,nz,dx,dy,dz, &
+        Xmin, Xmax, Ymin, Ymax, Zmin, Zmax)
+
         use mpi
         implicit none
-        integer:: nnx1, nny1, nz, buff, fhandle1
+
+        integer:: nx, ny, nz
         real(8):: dx, dy, dz(:)
+        real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
         character(len=MPI_MAX_PROCESSOR_NAME):: message
-        integer:: k, ierr
+        integer:: k, ierr, fh1
+
+        ! set up domain boundaries
+        Xmin = 0.0d0
+        Ymin = 0.0d0
+        Zmin = 0.0d0
+        Xmax = float(nx)*dx
+        Ymax = float(ny)*dy
+        Zmax = 0.0d0
+        do k = 1, nz
+            Zmax = Zmax + dz(k)
+        end do
+
+        write(loadf,'(a,i3.3,a)') 'Load_info.', rank, '.txt'
+        write(restartf,'(a,i3.3,a)') 'Particle_restart.',rank,'.bin'
+        write(exitedf,'(a,i3.3,a)') 'Exited_particles.',rank,'.bin'
+        write(logf,'(a,i3.3,a)') 'Log_particles.',rank,'.txt'
+
+        call MPI_FILE_OPEN(MPI_COMM_SELF,loadf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+        MPI_INFO_NULL,fh1,ierr)
+
+        write(message,'(A)') NEW_LINE(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'(A,A)') '## Domain Info', NEW_LINE(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("Xmin:",e12.5," Xmax:",e12.5,A)') Xmin, Xmax, NEW_LINE(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("Ymin:",e12.5," Ymax:",e12.5,A)') Ymin, Ymax, NEW_LINE(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+        write(message,'("Zmin:",e12.5," Zmax:",e12.5,A)') Zmin, Zmax, NEW_LINE(' ')
+        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+    end subroutine global_xyz
+
+    subroutine local_xyz(nnx1,nny1,nz,dx,dy,dz,buff &
+        Xmin, Xmax, Ymin, Ymax, Zmin, Zmax)
+
+        implicit none
+
+        integer:: nx, ny, nz
+        real(8):: dx, dy, dz(:), buff
+        real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
 
         !set up domain boundaries
         Xmin = -dble(buff)*dx
@@ -22,25 +74,72 @@ module subgrid_bound
             Zmax = Zmax + dz(k)
         end do
 
-        write(message,'(A)') NEW_LINE(' ')
-        call MPI_FILE_WRITE(fhandle1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    end subroutine local_xyz
 
-        write(message,'(A,A)') '## Domain Info', NEW_LINE(' ')
-        call MPI_FILE_WRITE(fhandle1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    subroutine DEM_for_visual(DEM,ix2,iy2,nnx2,nny2,nx,ny,nz)
+        use hdf5_file_read
+        implicit none
 
-        write(message,'("Xmin:",e12.5," Xmax:",e12.5,A)') Xmin, Xmax, NEW_LINE(' ')
-        call MPI_FILE_WRITE(fhandle1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        real(8):: DEM(:,:)  !allocated in main
+        integer:: ix2,iy2,nnx2,nny2,nx,ny,nz
+        integer:: nnx,nny,nnz
+        integer:: npnts,ncell
 
-        write(message,'("Ymin:",e12.5," Ymax:",e12.5,A)') Ymin, Ymax, NEW_LINE(' ')
-        call MPI_FILE_WRITE(fhandle1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        !----------------------------
+        DEM = 0.0d0
+        ! read in DEM
+        ! fname = trim(adjustl(DEMname))
+        ! call pfb_read(DEM,fname,nx,ny,nztemp)
+        call read_files(DEM,ix2,iy2,nnx2,nny2,nz)
 
-        write(message,'("Zmin:",e12.5," Zmax:",e12.5,A)') Zmin, Zmax, NEW_LINE(' ')
-        call MPI_FILE_WRITE(fhandle1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        !----------------------------
+        ! grid +1 variables, for DEM part
+        nnx=nx+1
+        nny=ny+1
+        nnz=nz+1
 
-    end subroutine subgrid_max_xyz
+        ! Set up grid locations for file output
+        npnts=nnx*nny*nnz
+        ncell=nx*ny*nz
+
+        allocate(Pnts(npnts,3))
+        Pnts=0
+        m=1
+
+        ! Need the maximum height of the model and elevation locations
+        Z = 0.0d0
+        Zt(0) = 0.0D0
+        do ik = 1, nz
+            Z = Z + dz(ik)
+            Zt(ik) = Z
+            ! print*, Z, dz(ik), Zt(ik), ik
+        end do
+        maxZ=Z
+
+        ! candidate loops for OpenMP
+        do k=1,nnz
+            do j=1,nny
+                do i=1,nnx
+                    Pnts(m,1)=DBLE(i-1)*dx
+                    Pnts(m,2)=DBLE(j-1)*dy
+                    ! This is a simple way of handling the maximum edges
+                    if (i <= nx) then
+                        ii=i
+                    else
+                        ii=nx
+                    endif
+                    if (j <= ny) then
+                        jj=j
+                    else
+                        jj=ny
+                    endif
+                    ! This step translates the DEM
+                    ! The specified initial heights in the pfb (z1) are ignored and the
+                    ! offset is computed based on the model thickness
+                    Pnts(m,3) = (DEM(ii,jj)-maxZ) + Zt(k-1)
+                    m=m+1
+                end do
+            end do
+        end do
+    end subroutine DEM_for_visual
 end module subgrid_bound

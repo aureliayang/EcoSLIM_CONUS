@@ -25,9 +25,127 @@ module variable_list
 
     use cudafor
     ! CPU variables
+    !--------------------------------------------------------------------
+    ! (1) Define variables
+    !--------------------------------------------------------------------
+    CHARACTER*20,allocatable::conc_header(:)
+    ! name for variables written in the C array above.  Dimensioned as l above.
+    real*8,allocatable::Time_Next(:)
+    ! Vector of real times at which ParFlow dumps outputs
+    real*8,allocatable::Zt(:)
+    ! Delta Z values in the vertical direction
+    ! Elevations in z-direction in local coordinates
+    real*8, allocatable::Pnts(:,:), DEM(:,:) ! DEM and grid points for concentration output
+
+    integer Ploc(3)
+    ! Particle's location whithin a cell
+
+    integer nind, itemp
+
+    integer nx, nnx, ny, nny, nz, nnz, nztemp
+    ! number of cells in the domain and cells+1 in x, y, and z directions
+
+    integer np_ic, np, np_active, np_active2, icwrite, jj, npnts, ncell, npout
+    ! number of particles for intial pulse IC, total, and running active
+
+    integer nt, n_constituents
+    ! number of timesteps ParFlow; numer of C vectors written for VTK output
+
+    integer pid
+
+    real*8  pfdt, advdt(3)
+    ! ParFlow timestep value, advection timestep for each direction
+    ! for each individual particle step; used to chose optimal particle timestep
+
+    integer pft1, pft2, tout1, pfnt, n_cycle
+    ! parflow start and stop file numbers number of ParFlow timesteps
+    ! flag specifying the number for the first output write (0= start with pft1)
+    ! number of timestep cycles
+
+    real*8  Time_first
+    ! initial timestep for Parflow ((pft1-1)*pfdt)
+
+    integer kk
+    ! Loop counter for the time steps (pfnt)
+    integer pfkk, outkk
+    ! Counter for the file numbers starts at pft1
+    ! Counter for the output writing
+
+    integer ii
+    ! Loop counter for the number of particles (np)
+    integer iflux_p_res, i_added_particles
+    ! Number of particles per cell for flux input and
+    ! number of particle added total for precip input per
+    ! timestep
+    integer i, j, k, l, ik, ji, m, ij, nzclm, nCLMsoil
+
+    character*200 runname, filenum, filenumout, pname, fname, vtk_file, DEMname, Indname
+    ! runname = SLIM runname
+    ! filenum = ParFlow file number
+    ! filenumout = File number for Ecoslim writing
+    ! pname = ParFlow output runname
+    ! fname = Full name of a ParFlow's output
+    ! vtk_file = concentration file
+    ! DEMname = DEM file name
+
+    real*8 Clocx, Clocy, Clocz, Z, maxz
+    ! The fractional location of each particle within it's grid cell
+    ! Particle Z location
+
+    real*8 V_mult
+    ! Multiplier for forward/backward particle tracking
+    ! If V_mult = 1, forward tracking
+    ! If V_mult = -1, backward tracking
+
+    logical clmtrans, clmfile, source1
+    ! logical for mode of operation with CLM, will add particles with P-ET > 0
+    ! will remove particles if ET > 0
+    ! clmfile governs reading of the full CLM output, not just evaptrans
+
+    real*8 dtfrac
+    ! fraction of dx/Vx (as well as dy/Vy and dz/Vz) assuring
+    ! numerical stability while advecting a particle to a new
+    ! location.
+
+    real*8 Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
+    real*8 Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+    ! Domain boundaries in local / grid coordinates. min values set to zero,
+    ! DEM is read in later to output to Terrain Following Grid used by ParFlow.
+
+    real*8 dx, dy
+    ! Domain's number of cells in x and y directions
+
+    real*8 Vpx, Vpy, Vpz
+    ! Particle velocity in x, y, and z directions
+
+    real*8 particledt, delta_time
+    ! The time it takes for a particle to displace from
+    ! one location to another and the local particle from-to time
+    ! for each PF timestep
+
+    real*8 mean_age, mean_comp, mean_mass, total_mass
+    ! mean age and composition and mass of all particles in domain
+
+    real*8 Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
+    ! Particles initial locations i.e., where they are injected
+    ! into the domain.
+
+    ! density of water (M/L3), molecular diffusion (L2/T), fractionation
+    real*8 denh2o, moldiff, Efract  !, ran1
+
+    real*8 ET_dt
+    ! time interval for ET
+    ! integer counters and operators.
+    ! the first set are used for total run timing the latter for component timing
+    real*8 Total_time1, Total_time2, t1, t2, IO_time_read, IO_time_write, parallel_time
+    real*8 sort_time
+    ! integers for writing C or point based output
+    integer ipwrite, ibinpntswrite
+    ! integers for writing gridded ET outputs
+    integer etwrite
+
     real(8),allocatable,pinned:: P(:,:)
     integer:: N_send !single host value
-    integer:: n_proc ! this is the total MPI processes and t_rank = n_proc - 1
     integer,allocatable:: N_recv_all(:) !sum(neigh_list) ??? pinned
     real(8),allocatable,pinned:: P_exit(:,:)
     integer,allocatable,pinned:: neigh_list(:) ! t_rank, and should be initilized at the very beginning
@@ -52,6 +170,7 @@ module variable_list
     real*8,allocatable,pinned:: C(:,:,:,:)
         ! Concentration array, in i,j,k with l (first index) as consituent or
         ! property.  These are set by user at runtime using input
+    real*8,allocatable,pinned::dz(:), dz2(:)
 
     !-------------------------------------
     ! GPU variables
@@ -62,6 +181,7 @@ module variable_list
     real(8),allocatable,device:: out_age_de(:),out_mass_de(:),out_comp_de(:)
     real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
     real(8),allocatable,device:: CLMvars_de(:,:),PET_balance_de(:),PET_balance_da_de(:)
+    ! initialization of PET_balance
     integer,allocatable,device:: d_isValid(:),d_indices(:)
     real(8),allocatable,device:: P_send(:,:),P_recv(:,:)
     integer,allocatable,device:: Zone_de(:,:),holes(:)
