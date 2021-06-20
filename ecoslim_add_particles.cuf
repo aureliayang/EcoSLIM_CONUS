@@ -1,4 +1,5 @@
 module add_particles
+    use curand_device
     use mrand, only: h
 contains
 attributes(global) subroutine add_init_particles( &
