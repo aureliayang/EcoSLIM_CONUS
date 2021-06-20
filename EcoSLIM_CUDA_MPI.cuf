@@ -37,12 +37,12 @@ character(len=MPI_MAX_PROCESSOR_NAME):: hostname
 character(200):: loadf, restartf, exitedf, logf, message
 integer:: deviceID, namelength, np_active_log
 integer(MPI_OFFSET_KIND):: offset
-
+!--------------------------------------------------------------------
 integer:: np_ps, add_f, p_redis, path, nsub, cycle_f
 ! ??? probably these above line is not necessary anymore.
 integer,allocatable:: nump(:),PME_tot(:,:,:),subid(:)
 integer:: np_lo, np_ln, np_ro, np_rn
-
+!--------------------------------------------------------------------
 ! IO control
 ! ipwrite controls an ASCII, .3D particle file not recommended due to poor performance
 ! this is left as a compiler option, currently disabled
@@ -88,12 +88,12 @@ subroutine vtk_write_points(p,np_active, np,icycle,vtk_file,dx,dy,nx,ny,maxz,dem
 end subroutine vtk_write_points
 end interface
 
-!----------------------------------------
+!--------------------------------------------------------------------
 call MPI_INIT(ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
 
-!----------------------------------------
+!--------------------------------------------------------------------
 ! This part has to be thought again for extra processes to do I/O
 ! Get and set unique device
 call assignDevice(deviceID)
@@ -109,7 +109,7 @@ call MPI_FILE_WRITE(fh0,message,len(trim(message)),MPI_CHARACTER, &
     MPI_STATUS_IGNORE, ierr)
 call MPI_FILE_CLOSE(fh0, ierr)
 
-!----------------------------------------
+!--------------------------------------------------------------------
 ! I think how to do timing is also a new question due to asyn.
 ! Set up timing
 Total_time1 = 0.d0
@@ -202,13 +202,12 @@ nzclm = 13 + nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables
 
 n_constituents = 9
 
-!-------------------------------------
+!--------------------------------------------------------------------
 call gridinfo(nx,ny,ppx,qqy,rank)
 ! then we get subdomain info
-
+!--------------------------------------------------------------------
 ! allocate arrays
-allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
-         nump(ppx*qqy),grid(ppx*qqy,4))
+allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
 allocate(dz(nz), dz2(nz))
 allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
          Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
@@ -221,8 +220,6 @@ allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
 allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
 allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
 allocate(conc_header(n_constituents))
-allocate(PME_tot(-buff+1:nnx1+buff,-buff+1:nny1+buff,1), &
-         nump_path(-buff+1:nnx1+buff,-buff+1:nny1+buff,1))
 
 ! Intialize everything to Zero
 Vx = 0.0d0
@@ -391,94 +388,96 @@ call local_xyz()
 if (DEMname /= '') call DEM_for_visual()
 
 !-------------------------------------
-! Read porosity values from ParFlow .pfb file
-fname=trim(adjustl(pname))//'.out.porosity.pfb'
-call pfb_read(Porosity,fname,nx,ny,nz)
+    ! Read porosity values from ParFlow .pfb file
+    fname=trim(adjustl(pname))//'.out.porosity.pfb'
+    call pfb_read(Porosity,fname,nx,ny,nz)
 
-! Read the in initial Saturation from ParFlow
-! kk = 0
-pfkk = pft1-1
-write(filenum,'(i5.5)') pfkk
-fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
-call pfb_read(Saturation,fname,nx,ny,nz)
-! this should not do if restart
+    ! Read the initial Saturation from ParFlow
+    if(tout1 == 0) then
+        pfkk = pft1 - 1
+        write(filenum,'(i5.5)') pfkk
+        fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
+        call pfb_read(Saturation,fname,nx,ny,nz)
+        ! this is not necessary if restart
+    end if
 
-! copy necessary data from host to device
-! this part together with allocation should be done after update subdomain
-dz_de = dz2 ! can't understand why dz doesn't work.
-Ind_de = Ind
-Porosity_de = Porosity
-Zone_de = Zone
-! think about initialization of some device variables
-! since they are not updated each timestep.
+    ! copy necessary data from host to device
+    ! this part together with allocation should be done after update subdomain
+    dz_de = dz2 ! can't understand why dz doesn't work.
+    Ind_de = Ind
+    Porosity_de = Porosity
+    Zone_de = Zone
+    !!! initialization pf P_de, probably need a new kernel
+    ! think about initialization of some device variables
+    ! since they are not updated each timestep.
 
-call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
+    call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+    tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
 
-neigh_list = d_isValid(1:t_rank)
-! don't need to do this every timestep. Only after update of decomposition
-if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
+    neigh_list = d_isValid(1:t_rank)
+    ! don't need to do this every timestep. Only after update of decomposition
+    if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
 
-! return the global and local info of the subdomain
-! add grid info to log file
-! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
-! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
-! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    ! return the global and local info of the subdomain
+    ! add grid info to log file
+    ! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
+    ! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
+    ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-! Intialize cuRand device API and this part need to check through again.
-allocate(h(np)); call createRand()
+    ! Intialize cuRand device API and this part need to check through again.
+    allocate(h(np)); call createRand()
 
 !-------------------------------------
-! Define initial particles' locations and mass
-if (np_ic > 0)  then
-    np_active = 0
-    pid = 0
-    if (np_active + np_ic*nnx1*nny1*nz >= np ) then
-        write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    ! Define initial particles' locations and mass
+    if (np_ic > 0)  then
+        np_active = 0
+        pid = 0
+        if (np_active + np_ic*nnx1*nny1*nz >= np ) then
+            write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            ! now there is no restart after 9090
 
-        goto 9090
-    endif
+            goto 9090
+        endif
 
-    call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
-    tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
-    np_ic,np_active,pid,nind,nnx1,nny1,nz,dx,dy,dz, &
-    pfdt,denh2o,outkk)
+        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
+        tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
+        np_ic,np_active,pid,nind,nnx1,nny1,nz,dx,dy,dz, &
+        pfdt,denh2o,outkk)
 
-    np_active = np_ic*nnx1*nny1*nz
-    pid = np_ic*nnx1*nny1*nz
+        np_active = np_ic*nnx1*nny1*nz
+        pid = np_ic*nnx1*nny1*nz
 
-! if np_ic = -1 then we read a restart file
-else if (np_ic == -1) then
+    ! if np_ic = -1 then we read a restart file
+    else if (np_ic == -1) then
 
-    call read_restarts (fh1,fh2,rank,restartf,np,nind,P)
-    P_de = P
+        call read_restarts (fh1,fh2,rank,restartf,np,nind,P)
+        P_de = P
 
-end if
+    end if
 
-! Define initial particles' locations by surface water
-!
-if (np_ic < -1)  then
-    np_active = 0
-    pid = np_active
+    ! Define initial particles' locations by surface water
+    if (np_ic < -1)  then
+        np_active = 0
+        pid = np_active
 
-    if(np_active + abs(np_ic)*nnx1*nny1 >= np) then
-        write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        if(np_active + abs(np_ic)*nnx1*nny1 >= np) then
+            write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        goto 9090
-    else
+            goto 9090
+        end if
 
         call river_init_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
         tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
@@ -488,8 +487,7 @@ if (np_ic < -1)  then
         np_active = abs(np_ic)*nnx1*nny1
         pid = abs(np_ic)*nnx1*nny1
 
-    end if
-end if ! river IC
+    end if ! river IC
 
 ! Write out intial concentrations
 ! normalize ages by mass
@@ -848,7 +846,7 @@ if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
 end if
 
 ! LB criteria: if the difference between max- and min-number of particles over some limitation
-if()then
+if() then
     ! call decomposition
     ! Build neighbor list. do this after a particle loop
     call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &

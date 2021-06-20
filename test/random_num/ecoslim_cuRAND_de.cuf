@@ -25,4 +25,25 @@ contains
             call curand_init(seed, seq, offset, h(ii))
     end subroutine createRand_loop
 
+    attributes(global) subroutine createRand_test()
+    ! integer(8),value:: nx, ny, nz, rank
+    integer(8):: seed, seq, offset
+    integer:: ii
+        ii = threadIdx%x
+        seed = 123_8
+        seq = 0_8
+        offset = ii
+        call curand_init(seed, seq, offset, h(ii))
+    end subroutine createRand_test
+
+    attributes(global) subroutine callRand_test(rnum,pfnt)
+    real(8),intent(out):: rnum(:,:)
+    integer,value:: pfnt
+    integer:: ii,j
+        ii = threadIdx%x
+        do j = 1, pfnt
+            rnum(ii,j) = curand_uniform(h(ii))
+        end do
+    end subroutine callRand_test
+
 end module

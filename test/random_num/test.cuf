@@ -1,0 +1,21 @@
+program test_rand
+    use cudafor
+    use mrand
+    implicit none
+    integer:: pfnt, np, i, j
+    integer:: tPB = 256
+    real(8),allocatable,device:: rnum_de(:,:)
+    real(8),allocatable,pinned:: rnum_h(:,:)
+
+    pfnt=5
+    np = tPB
+    allocate(rnum_de(pfnt,np),h(np))
+    allocate(rnum_h(pfnt,np))
+
+    call createRand_test<<<1,tPB>>>()
+    call callRand_test<<<1,tPB>>>(rnum_de,pfnt)
+    rnum_h = rnum_de
+
+    write(*,'(5(10(f13.8,1x),/))') ((rnum_h(i,j),j = 1,10),i=1,pfnt)
+
+end program
