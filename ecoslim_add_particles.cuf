@@ -26,7 +26,7 @@ attributes(global) subroutine add_init_particles( &
         else
             k = ii/(nnx1*nny1) + 1
             if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
-                j = mod(ii,nnx1*nny1)/nnx1
+                j = nny1
                 i = nnx1
             else
                 j = mod(ii,nnx1*nny1)/nnx1 + 1

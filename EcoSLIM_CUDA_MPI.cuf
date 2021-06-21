@@ -383,9 +383,9 @@ P = 0.d0    ! clear out all particle attributes
 P(1:np,7:9) = 1.d0  ! make all particles active to start with and original from 1 = GW/IC
 
 !-------------------------------------
-call global_xyz()
-call local_xyz()
-if (DEMname /= '') call DEM_for_visual()
+    call global_xyz()
+    call local_xyz()
+    if (DEMname /= '') call DEM_for_visual()
 
 !-------------------------------------
     ! Read porosity values from ParFlow .pfb file
@@ -406,6 +406,7 @@ if (DEMname /= '') call DEM_for_visual()
     dz_de = dz2 ! can't understand why dz doesn't work.
     Ind_de = Ind
     Porosity_de = Porosity
+    Saturation_de = Saturation
     Zone_de = Zone
     !!! initialization pf P_de, probably need a new kernel
     ! think about initialization of some device variables
@@ -426,7 +427,7 @@ if (DEMname /= '') call DEM_for_visual()
     ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
     ! Intialize cuRand device API and this part need to check through again.
-    allocate(h(nx*ny*nz))
+    allocate(h(nnx1*nny1*nz))
     call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
     rank,np_ic,nnx1,nny1)
     ! each subdomain has different dimension, so we set a fixed offset of h using the whole domain
