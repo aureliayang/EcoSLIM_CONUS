@@ -1,6 +1,10 @@
 program initial_particles
-    use add_particles
-    use mrand
+    #ifdef  _GPU
+        use add_particles
+        use mrand
+    #elif _CPU
+        use ran_mod
+    #endif
     use cudafor
 
     implicit none
@@ -9,43 +13,101 @@ program initial_particles
     real(8):: dx, dy, denh2o, np_active, pid
     real(8),allocatable,pinned:: P(:,:), dz(:), C(:,:,:,:)
     real(8),allocatable,pinned:: Porosity(:,:,:), Saturation(:,:,:)
+    character*200 pname, fname
 
-    real(8),allocatable,device:: P_de(:,:), dz_de(:), C_de(:,:,:,:)
-    real(8),allocatable,device:: Porosity_de(:,:,:), Saturation_de(:,:,:)
-    integer:: tPB = 256
+    #ifdef  _GPU
+        real(8),allocatable,device:: P_de(:,:), dz_de(:), C_de(:,:,:,:)
+        real(8),allocatable,device:: Porosity_de(:,:,:), Saturation_de(:,:,:)
+        integer:: tPB = 256
+    #elif _CPU
+        integer:: ii, ij, ik, i, j, k, ir
+        real(8):: Z
+    #endif
+
+    pname = 'ncp'
 
     nnx1 = 509;   nny1 = 921;   nz = 5;  rank = 0
     np_ic = 2; nc = 9; np = 100000000;  nind = 5
     ix1 = 0; iy1 = 0; outkk = 1
-    nx = nnx1
-    ny = nny1
-
+    nx = nnx1; ny = nny1
     dx = 1000.d0; dy = 1000.d0; denh2o = 1000.d0
 
-    allocate(dz(nz),dz_de(nz))
-    allocate(P(np,17+2*nind), Porosity(nx,ny,nz), Saturation(nx,ny,nz), C(9,nx,ny,nz))
-    allocate(P_de(np,17+2*nind), Porosity_de(nx,ny,nz), Saturation_de(nx,ny,nz), C_de(9,nx,ny,nz))
+    allocate(P(np,17+2*nind), Porosity(nx,ny,nz), &
+    Saturation(nx,ny,nz), C(9,nx,ny,nz), dz(nz))
 
     ! read porosity and saturation
-    allocate(P(np,17+nind*2))
+    fname=trim(adjustl(pname))//'.out.porosity.pfb'
+    call pfb_read(Porosity,fname,nx,ny,nz)
+    fname=trim(adjustl(pname))//'.out.satur.00000.pfb'
+    call pfb_read(Saturation,fname,nx,ny,nz)
     P = 0.d0    ! clear out all particle attributes
     P(1:np,7:9) = 1.d0
     dz = [100., 1., 0.6, 0.3, 0.1]
+    np_active = 0
+    pid = 0
 
     ! host to device
-    P_de = P
-    dz_de = dz
-    Porosity = Porosity_de
-    Saturation = Saturation_de
+    #ifdef  _GPU
+        allocate(P_de(np,17+2*nind), Porosity_de(nx,ny,nz), &
+        Saturation_de(nx,ny,nz), C_de(9,nx,ny,nz) ,dz_de(nz))
+        P_de = P
+        dz_de = dz
+        Porosity = Porosity_de
+        Saturation = Saturation_de
 
-    allocate(h(nx*ny*nz))
-    call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz,rank)
+        allocate(h(nx*ny*nz))
+        call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>( &
+            nx,ny,nz,rank,np_ic,nnx1,nny1)
+        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
+        tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
+        np_ic,nind,denh2o,outkk,nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
 
-    call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
-    tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
-    np_ic,nind,denh2o,outkk,nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
+        np_active = np_ic*nnx1*nny1*nz
+        pid = np_ic*nnx1*nny1*nz
 
-    np_active = np_ic*nnx1*nny1*nz
-    pid = np_ic*nnx1*nny1*nz
+    #elif _CPU
 
+        ir = -3333
+        C = 0.d0
+
+        do k = 1, nz
+            do j = 1, nny1 !iy1+1,iy1+nny1 !1, ny
+                do i = 1, nnx1 !ix1+1,ix1+nnx1 !1, nx
+                    if (Saturation(i,j,k) > 0.0) then ! check if we are in the active domain
+                    do ij = 1, np_ic
+                        np_active = np_active + 1
+                        pid = pid + 1
+                        ii = np_active
+                        P(ii,13+2*nind)=float(pid) !Saving a particle ID number
+                        P(ii,1) = float(i-1)*dx  +ran1(ir)*dx
+                        P(ii,14+2*nind)=P(ii,1) ! Saving the initial location
+                        P(ii,2) = float(j-1)*dy  +ran1(ir)*dy
+                        P(ii,15+2*nind)=P(ii,2)
+                        P(ii,17+2*nind) = outkk + 0.0 !setting insert time to the start time
+
+                        Z = 0.0d0
+                        do ik = 1, k
+                        Z = Z + dz(ik)
+                        end do
+
+                        P(ii,3) = Z -dz(k)*ran1(ir)
+                        P(ii,16+2*nind)=P(ii,3)
+
+                        P(ii,6) = dx*dy*dz(k)*(Porosity(i,j,k)  &
+                        *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
+                        P(ii,7) = 1.0d0
+                        P(ii,8) = 1.0d0
+                        C(1,i,j,k) = C(1,i,j,k) + P(ii,8)*P(ii,6) /  &
+                        (dx*dy*dz(k)*(Porosity(i,j,k)*Saturation(i,j,k)))
+                        C(2,i,j,k) = C(2,i,j,k) + P(ii,8)*P(ii,4)*P(ii,6)
+                        C(4,i,j,k) = C(4,i,j,k) + P(ii,8)*P(ii,7)*P(ii,6)
+                        C(3,i,j,k) = C(3,i,j,k) + P(ii,8)*P(ii,6)
+                    end do   ! particles per cell
+                    end if   !  active domain
+                end do ! i
+            end do ! j
+        end do ! k
+    #endif
+
+    !!! print something to verify
 end program initial_particles
