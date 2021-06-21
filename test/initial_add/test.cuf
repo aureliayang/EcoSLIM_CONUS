@@ -1,0 +1,51 @@
+program initial_particles
+    use add_particles
+    use mrand
+    use cudafor
+
+    implicit none
+    integer:: nnx1, nny1, nz, rank, np_ic, nc, np, nind, ix1, iy1, outkk
+    integer:: nx, ny
+    real(8):: dx, dy, denh2o, np_active, pid
+    real(8),allocatable,pinned:: P(:,:), dz(:), C(:,:,:,:)
+    real(8),allocatable,pinned:: Porosity(:,:,:), Saturation(:,:,:)
+
+    real(8),allocatable,device:: P_de(:,:), dz_de(:), C_de(:,:,:,:)
+    real(8),allocatable,device:: Porosity_de(:,:,:), Saturation_de(:,:,:)
+    integer:: tPB = 256
+
+    nnx1 = 509;   nny1 = 921;   nz = 5;  rank = 0
+    np_ic = 2; nc = 9; np = 100000000;  nind = 5
+    ix1 = 0; iy1 = 0; outkk = 1
+    nx = nnx1
+    ny = nny1
+
+    dx = 1000.d0; dy = 1000.d0; denh2o = 1000.d0
+
+    allocate(dz(nz),dz_de(nz))
+    allocate(P(np,17+2*nind), Porosity(nx,ny,nz), Saturation(nx,ny,nz), C(9,nx,ny,nz))
+    allocate(P_de(np,17+2*nind), Porosity_de(nx,ny,nz), Saturation_de(nx,ny,nz), C_de(9,nx,ny,nz))
+
+    ! read porosity and saturation
+    allocate(P(np,17+nind*2))
+    P = 0.d0    ! clear out all particle attributes
+    P(1:np,7:9) = 1.d0
+    dz = [100., 1., 0.6, 0.3, 0.1]
+
+    ! host to device
+    P_de = P
+    dz_de = dz
+    Porosity = Porosity_de
+    Saturation = Saturation_de
+
+    allocate(h(nx*ny*nz))
+    call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz,rank)
+
+    call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
+    tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
+    np_ic,nind,denh2o,outkk,nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
+
+    np_active = np_ic*nnx1*nny1*nz
+    pid = np_ic*nnx1*nny1*nz
+
+end program initial_particles
