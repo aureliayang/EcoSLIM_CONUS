@@ -1,0 +1,31 @@
+module mrand
+    use curand_device
+    type(curandStateXORWOW),allocatable,device:: h(:)
+contains
+
+    attributes(global) subroutine createRand_init(nx,ny,nz,rank, &
+    np_ic,nnx1,nny1)
+        integer,value:: nx, ny, nz, rank, np_ic, nnx1, nny1
+        integer(8):: seed, seq, offset
+        integer:: ii
+        ii = threadIdx%x
+        if(ii <= nnx1*nny1*nz)then
+            seed = 123_8
+            seq = 0_8
+            offset = 3_8*np_ic*ii + 3_8*np_ic*nx*ny*nz*rank
+            call curand_init(seed, seq, offset, h(ii))
+        endif
+    end subroutine createRand_init
+
+    attributes(global) subroutine createRand_loop(np,rank,pfnt)
+        integer(8),value:: np, rank, pfnt
+        integer(8):: seed, seq, offset
+        integer:: ii
+            ii = threadIdx%x
+            seed = 12345_8
+            seq = 0_8
+            offset = 40_8*ii*pfnt + 40_8*pfnt*np*rank
+            call curand_init(seed, seq, offset, h(ii))
+    end subroutine createRand_loop
+
+end module
