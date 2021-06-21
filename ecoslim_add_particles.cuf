@@ -3,16 +3,16 @@ module add_particles
     use mrand, only: h
 contains
 attributes(global) subroutine add_init_particles( &
-    P,C,Saturation,Porosity,np_ic,np_active,pid,nind, &
-    nnx1,nny1,nz,ix1,iy1,dx,dy,dz,pfdt,denh2o,outkk)
+    P,C,Saturation,Porosity,np_ic,nind,denh2o,outkk, &
+    nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
 
     implicit none
     real(8),intent(inout):: P(:,:), C(:,:,:,:)
     real(8),intent(in):: Saturation(:,:,:), Porosity(:,:,:), dz(:)
-    integer,value:: np_ic, np_active, nind
+    integer,value:: np_ic, nind
     integer,value:: outkk, nnx1, nny1, nz, ix1, iy1
-    real(8),value:: dx, dy, pfdt, denh2o
-    integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
+    real(8),value:: dx, dy, denh2o
+    integer:: i, j, k, index, ij, ik, ii, Ploc(3)
     real(8):: Z
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
@@ -39,8 +39,8 @@ attributes(global) subroutine add_init_particles( &
 
                 index = ii*np_ic - (ij - 1)
 
-                P(index,1) = float(i-1)*dx + curand_uniform(h(index))*dx ! should use global
-                P(index,2) = float(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
+                P(index,1) = float(i-1+ix1)*dx + curand_uniform(h(ii))*dx ! should use global
+                P(index,2) = float(j-1+iy1)*dy + curand_uniform(h(ii))*dy ! update that for random number
                 P(index,13+2*nind) = float(index)
                 P(index,14+2*nind) = P(index,1)
                 P(index,15+2*nind) = P(index,2)
@@ -50,16 +50,16 @@ attributes(global) subroutine add_init_particles( &
                 do ik = 1, nz
                     Z = Z + dz(ik)
                 end do
-                P(index,3) = Z - dz(k)*curand_uniform(h(index))
+                P(index,3) = Z - dz(k)*curand_uniform(h(ii))
                 P(index,16+2*nind) = P(index,3)
 
                 P(index,6) = dx*dy*dz(k)*(Porosity(i,j,k) &
-                            *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
-                P(index,7) = 1.d0
-                P(index,8)  = 1.0d0  ! make particle active
+                             *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
+                P(index,7) = 1.0d0
+                P(index,8) = 1.0d0  ! make particle active
 
                 C(1,i,j,k) = 0.d0
-                C(1,i,j,k) = C(1,i,j,k) + P(ii,8)*P(index,6) / &
+                C(1,i,j,k) = C(1,i,j,k) + P(index,8)*P(index,6) / &
                 (dx*dy*dz(k)*(Porosity(i,j,k)*Saturation(i,j,k)))
 
                 C(2,i,j,k) = 0.d0

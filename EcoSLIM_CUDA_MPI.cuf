@@ -426,7 +426,8 @@ if (DEMname /= '') call DEM_for_visual()
     ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
     ! Intialize cuRand device API and this part need to check through again.
-    allocate(h(np)); call createRand()
+    allocate(h(nx*ny*nz))
+    call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz,rank)
 
 !-------------------------------------
     ! Define initial particles' locations and mass
@@ -448,8 +449,7 @@ if (DEMname /= '') call DEM_for_visual()
 
         call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
         tPB >>> (P_de,C_de,Saturation_de,Porosity_de, &
-        np_ic,np_active,pid,nind,nnx1,nny1,nz,dx,dy,dz, &
-        pfdt,denh2o,outkk)
+        np_ic,nind,denh2o,outkk,nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
 
         np_active = np_ic*nnx1*nny1*nz
         pid = np_ic*nnx1*nny1*nz
