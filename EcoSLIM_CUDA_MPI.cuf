@@ -427,7 +427,9 @@ if (DEMname /= '') call DEM_for_visual()
 
     ! Intialize cuRand device API and this part need to check through again.
     allocate(h(nx*ny*nz))
-    call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz,rank)
+    call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
+    rank,np_ic,nnx1,nny1)
+    ! each subdomain has different dimension, so we set a fixed offset of h using the whole domain
 
 !-------------------------------------
     ! Define initial particles' locations and mass
