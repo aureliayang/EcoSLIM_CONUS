@@ -3,15 +3,17 @@ module exchange_particles
     use variable_list, only: N_recv_all, N_send, neigh_list
     ! neigh_list is allocated after getting number of total GPUs
     ! N_recv_all is allocated or deallocated after initialization/update of grid
-
     use variable_list, only: P_exit, P_de, C_de, d_isValid, d_indices, &
-    P_send, P_recv, Zone_de, holes
+    Zone_de, P_send, P_recv, holes
+    use variable_list, only: dx,dy,dz_de,nz,mean_age_de,mean_comp_de,total_mass_de
+    use create_subdomain, only: ix1,iy1,nnx1,nny1,buff
 
 contains
-    subroutine MPI_particle_exchange(rank,t_rank,nind,tPB,np_active)
+    subroutine particle_exchange(rank,t_rank,nind,tPB,np_active)
         use mpi
         implicit none
-        integer:: rank, t_rank, nind, tPB, np_active
+        integer,intent(in):: rank, t_rank, nind, tPB
+        integer,intent(inout):: np_active
         integer:: i, j, ierr, status(MPI_STATUS_SIZE)
         integer:: ncount1, ncount2, ncount3, ncount4, &
                   request1(t_rank), request2(t_rank), &
@@ -20,7 +22,7 @@ contains
         ncount2 = 0; ncount4 = 0
         do i = 0, t_rank-1
             !-----------------------------------------
-            ! receive part. N_recv_all and P_recv are for all neighbors which send particles.
+            ! receive part. N_recv_all and P_recv are for neighbors which send particles.
             !-----------------------------------------
             ! Rank by rank. For each rank, other ranks send particles to it while it must
             ! not send particles to itself. So the following actions can be reached.
@@ -103,24 +105,27 @@ contains
         end do
 
         ! then connect received particles
-        if(ncount3 > 0) &
-        call MPI_WAITALL(ncount3,request2(1:ncount3),status,ierr)
-        ! if receive happened, we wait
+        if(ncount3 > 0) then
+            call MPI_WAITALL(ncount3,request2(1:ncount3),status,ierr)
+            ! if receive happened, we wait
 
-        call connect_recv<<<ceiling(dble(sum(N_recv_all))/tPB),&
-        tPB>>>(P_de,P_recv,np_active,sum(N_recv_all),17+nind*2)
-        np_active = np_active + sum(N_recv_all)
+            call connect_recv<<<ceiling(dble(sum(N_recv_all))/tPB),&
+            tPB>>>(P_de,P_recv,np_active,sum(N_recv_all),17+nind*2)
+            np_active = np_active + sum(N_recv_all)
 
-        deallocate(P_recv) ! deallocate P_send after transfer back to host
+            deallocate(P_recv) ! deallocate P_send after transfer back to host
+        endif
 
-        call Update_C_Array <<< ceiling(dble(np_active)/tPB),tPB >>> (P_de,C_de,dx,dy,dz, &
+        call Update_C_Array <<< ceiling(dble(np_active)/tPB),tPB >>> (P_de,C_de,dx,dy,dz_de, &
         nz,ix1,iy1,nnx1,nny1,buff,mean_age_de,mean_comp_de,total_mass_de,np_active)
 
         ! then separate inactive particles
         call prepare_exit<<<ceiling(dble(np_active)/tPB),tPB>>>(P_de(:,8),d_isValid,np_active)
         call thrustscan(d_isValid,np_active,d_indices)
+        ! active and ET-inactive particles in overlap zone are sent
+        ! out of domain, all outfolw-inactive, received ET-inactive are scanned here
 
-        call MPI_WAIT(request3(ncount2),status,ierr) ! no if condition since send anyway
+        if(ncount2 > 0) call MPI_WAIT(request3(ncount2),status,ierr) ! no if condition since send anyway
         N_send = np_active - d_indices(np_active)
 
         if(ncount4 > 0)then
@@ -144,65 +149,6 @@ contains
 
         end if
 
-    end subroutine MPI_particle_exchange
-
-    attributes(global) subroutine Update_C_Array(P,C,dx,dy,dz,nz,ix1,iy1, &
-                                                nnx1,nny1,buff,mean_age, &
-                                                mean_comp,total_mass,np_active)
-        implicit none
-        real(8),intent(in):: P(:,:),dz(:)
-        real(8),intent(inout):: C(:,:,:,:)
-        real(8),intent(inout):: mean_age(:),total_mass(:),mean_comp(:)
-        integer,value:: nnx1,nny1,nz,ix1,iy1,buff,np_active
-        real(8),value:: dx,dy
-        integer:: Ploc(3), ii, k
-        real(8):: lock, Z
-
-        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        lock = 1.d0
-
-        if(ii < np_active) then
-            ! Transfer global to local
-            P(ii,1) = P(ii,1) - ix1*dx
-            P(ii,2) = P(ii,2) - iy1*dy
-
-            ! Find the "adjacent" "cell corresponding to the particle's location
-            Ploc(1) = floor(P(ii,1) / dx)
-            Ploc(2) = floor(P(ii,2) / dy)
-            if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
-            if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
-
-            Z = 0.d0
-            do k = 1, nz
-                Z = Z + dz(k)
-                if (Z >= P(ii,3)) then
-                    Ploc(3) = k - 1
-                    exit
-                end if
-            end do
-
-            if(P(ii,8) == 0. .and. P(ii,10) == 2.) then
-                temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
-                temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6))  ! particle mass added to ET
-                temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
-                temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
-            end if
-
-            temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
-            temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
-            temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
-            temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
-            temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
-        !--------------------------------------
-            ! increment mean age, composition and mass
-            temp = atomicAdd(mean_age, P(ii,4)*P(ii,6))
-            temp = atomicAdd(mean_comp, P(ii,7)*P(ii,6))
-            temp = atomicAdd(total_mass, P(ii,6))
-        !--------------------------------------
-            P(ii,1) = P(ii,1) + ix1*dx
-            P(ii,2) = P(ii,2) + iy1*dy
-        end if
-
-    end subroutine Update_C_Array
+    end subroutine particle_exchange
 
 end module exchange_particles

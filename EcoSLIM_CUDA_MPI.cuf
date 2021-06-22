@@ -237,6 +237,7 @@ end interface
     allocate(out_np_cpu(1),ET_np_cpu(1))
     allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
     allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
+    allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
 
     allocate(neigh_list(t_rank),nump(t_rank))
 !-------------------------------------
@@ -255,6 +256,7 @@ end interface
     allocate(out_np_de(1),ET_np_de(1))
     allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
     allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+    allocate(mean_age_de(1),mean_comp_de(1),mean_mass_de(1),total_mass_de(1))
 
     allocate(d_isValid(np),d_isValid(np))
     allocate(h(np))
@@ -683,25 +685,28 @@ end interface
 
         ! this has to be checked later.
         ! call MPI_ALLReduce(MPI_IN_PLACE, PET_balance_da(kk,:), 2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance,    2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
         PET_balance = PET_balance_de
         ! print to log file, or PET_balance can be a long array and do print at last
 !-------------------------------------
         ! particle loop here
         call particles_independent <<< ceiling(dble(np_active)/tPB),tPB >>> ( &
             P_de,C_de,dz_de,EvapTrans_de,Vx_de,Vy_de,Vz_de,Saturation_de, &
-            Porosity_de,Ind_de,zone_de,out_age_de,out_mass_de,out_comp_de, &
+            Porosity_de,Ind_de,Zone_de,out_age_de,out_mass_de,out_comp_de, &
             et_age_de,et_mass_de,et_comp_de,out_np_de,et_np_de, &
             kk,np_active,nz,nind,pfdt,moldiff,dx,dy,denh2o,dtfrac, &
             ix1,iy1,buff,reflect,nnx1,nny1,rank, &
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin,ymin,zmin,xmax,ymax,zmax)
+            ! P_de is initialized either after allocation of P, or
+            ! read restart files
 !-------------------------------------
         ! particle exchange here
         ! neigh_list is an 1D array of size t_rank. If an element is 1, it has this neighbor.
         ! sum(neigh_list) > 0, this means there must be at least one neighbor.
         ! sum(neigh_list) > 0 could be put in main to determine if call this subroutine
-        if(sum(neigh_list) > 0) call MPI_particle_exchange(rank,t_rank,nind,tPB,np_active)
+        if(sum(neigh_list) > 0) call particle_exchange(rank,t_rank,nind,tPB,np_active)
+        ! at this moment, np_active is not updated
 !-------------------------------------
         if(N_send > 0) then
             allocate(P_exit(N_send,17+2*nind))
@@ -709,6 +714,7 @@ end interface
         end if
         ! copy exited particles back and output later.
         ! considering asyn data copy.
+        ! N_send is npout, make it clear later
 
         C              = C_de
 !-------------------------------------
@@ -765,12 +771,13 @@ end interface
                                     PET_balance_da(kk,1), PET_balance_da(kk,2)
             flush(16)
 
-            if (total_mass > 0.0d0)  then
-                mean_age =  mean_age / total_mass
-                mean_comp = mean_comp / total_mass
-                mean_mass = total_mass / float(np_active2)
-            end if
         endif
+
+        if (total_mass > 0.0d0)  then
+            mean_age =  mean_age / total_mass
+            mean_comp = mean_comp / total_mass
+            mean_mass = total_mass / dble(np_active)
+        end if
 
         write(message,'(3(i10),7(1x,e12.5,1x),3(i8),2(i12),a)') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
         mean_mass,total_mass,PET_balance(kk,1), &
