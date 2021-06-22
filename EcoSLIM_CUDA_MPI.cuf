@@ -182,7 +182,6 @@ end interface
         write(11,*) 'warning NP_IC greater than IC'
         np = np_ic
         end if
-
         ! write nx, ny, nz, and np in the log file
         write(11,*) 'Grid information'
         write(11,*) 'nx:',nx
@@ -413,16 +412,16 @@ end interface
     end if
 
     ! copy necessary data from host to device
-    ! this part together with allocation should be done after update subdomain
-    dz_de = dz2 ! can't understand why dz doesn't work.
+    ! this part together with allocation should be done after update of subdomain
+    dz_de = dz2 ! I can't understand why dz doesn't work.
     Ind_de = Ind
     Porosity_de = Porosity
     Saturation_de = Saturation
     Zone_de = Zone
     P_de = P
-    !!! initialization pf P_de, probably need a new kernel
+    !!! initialization of P_de, probably need a new kernel
     ! think about initialization of some device variables
-    ! since they are not updated each timestep.
+    ! particularly those which are not updated each timestep.
 
     call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
     tPB>>>(Zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
@@ -557,6 +556,11 @@ end interface
         open(16,file=trim(runname)//'_PET_balance.txt')
         write(16,*) 'TIME P[kg] ET[kg]'
     endif
+
+    ! Intialize cuRand device API and this part need to check through again.
+    allocate(h(nnx1*nny1*nz))
+    call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
+    rank,np_ic,nnx1,nny1)
 
 !--------------------------------------------------------------------
 ! (3) For each timestep, loop over all particles to find and
@@ -760,128 +764,130 @@ end interface
                 mean_comp = mean_comp / total_mass
                 mean_mass = total_mass / float(np_active2)
             end if
-            write(message,'(3(i10),7(1x,e12.5,1x),3(i8),2(i12),a)') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
-                                                      mean_mass,total_mass,PET_balance(kk,1), &
-                                                      PET_balance(kk,2),i_added_particles,ET_np_cpu(1), &
-                                                      Out_np_cpu(1),np_active,np_active2,new_line(' ')
-            call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
         endif
 
-write(filenumout,'(i10.10)') kk
+        write(message,'(3(i10),7(1x,e12.5,1x),3(i8),2(i12),a)') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
+        mean_mass,total_mass,PET_balance(kk,1), &
+        PET_balance(kk,2),i_added_particles,ET_np_cpu(1), &
+        Out_np_cpu(1),np_active,np_active2,new_line(' ')
+        call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
 
-! write all active particles at concentration in ASCII VisIT 3D file format
-! as noted above, this option is very slow compared to VTK binary output
-if(ipwrite > 0) then
-if(mod(kk,ipwrite) == 0)  then
-! open/create/write the 3D output file
-open(14,file=trim(runname)//'_transient_particle.'//trim(adjustl(filenumout))//'.3D')
-write(14,*) 'X Y Z TIME ID'
-do ii = 1, np_active
-if (P(ii,8) == 1) write(14,61) P(ii,1), P(ii,2), P(ii,3), P(ii,4), P(ii,13+2*nind)
-end do
-close(14)
-end if
-end if
+        write(filenumout,'(i10.10)') kk
 
-! normalize ages by mass
-!where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
-!where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
-!where (C(3,:,:,:)>0.0)  C(5,:,:,:) = C(5,:,:,:) / C(3,:,:,:)
+        ! write all active particles at concentration in ASCII VisIT 3D file format
+        ! as noted above, this option is very slow compared to VTK binary output
+        if(ipwrite > 0) then
+        if(mod(kk,ipwrite) == 0)  then
+        ! open/create/write the 3D output file
+        open(14,file=trim(runname)//'_transient_particle.'//trim(adjustl(filenumout))//'.3D')
+        write(14,*) 'X Y Z TIME ID'
+        do ii = 1, np_active
+        if (P(ii,8) == 1) write(14,61) P(ii,1), P(ii,2), P(ii,3), P(ii,4), P(ii,13+2*nind)
+        end do
+        close(14)
+        end if
+        end if
 
-! normalize ET ages by mass
-!where (C(7,:,:,:)>0.0)  C(8,:,:,:) = C(8,:,:,:) / C(7,:,:,:)
-!where (C(7,:,:,:)>0.0)  C(9,:,:,:) = C(9,:,:,:) / C(7,:,:,:)
-! the normalization can be considred on GPU
+        ! normalize ages by mass
+        !where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
+        !where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
+        !where (C(3,:,:,:)>0.0)  C(5,:,:,:) = C(5,:,:,:) / C(3,:,:,:)
 
-! Write gridded ET outputs to text files
-if(etwrite > 0) then
-if (mod(kk,etwrite) == 0) then
-! open/create/write the 3D output file
-open(14,file=trim(runname)//'_ET_summary.'//trim(adjustl(filenumout))//'.txt')
-write(14,*) 'X Y Z ET_npart, ET_mass, ET_age, ET_comp, EvapTrans_Rate, Saturation, Porosity'
-do i = 1, nx
-do j = 1, ny
-do k = 1, nz
-  if (EvapTrans(i,j,k) < 0.0d0)   &
-  write(14,'(3(i6), 7(e13.5))')  i, j, k, C(6,i,j,k), C(7,i,j,k), C(8,i,j,k), &
-       C(9,i,j,k), EvapTrans(i,j,k), Saturation(i,j,k), Porosity(i,j,k)
-end do
-end do
-end do
-close(14)
-end if
-end if
+        ! normalize ET ages by mass
+        !where (C(7,:,:,:)>0.0)  C(8,:,:,:) = C(8,:,:,:) / C(7,:,:,:)
+        !where (C(7,:,:,:)>0.0)  C(9,:,:,:) = C(9,:,:,:) / C(7,:,:,:)
+        ! the normalization can be considered on GPU
 
-! write grid based values ("concentrations")
-vtk_file=trim(runname)//'_cgrid'
-if(icwrite > 0)  then
-    !if(mod(kk,icwrite) == 0)  &
-    !call vtk_write(Time_Next(kk),C,conc_header,nx,ny,nz,kk,n_constituents,Pnts,vtk_file)
-    if(mod(kk,icwrite) == 0 .and. rank == 0)  then
-        fname=trim(runname)//'.out.C1.'//trim(adjustl(filenumout))//'.pfb'
-        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,1)
-        fname=trim(runname)//'.out.C2.'//trim(adjustl(filenumout))//'.pfb'
-        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,2)
-        fname=trim(runname)//'.out.C3.'//trim(adjustl(filenumout))//'.pfb'
-        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,3)
-        fname=trim(runname)//'.out.C4.'//trim(adjustl(filenumout))//'.pfb'
-        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,4)
-        fname=trim(runname)//'.out.C5.'//trim(adjustl(filenumout))//'.pfb'
-        call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,5)
-        !fname=trim(runname)//'.out.C6.'//trim(adjustl(filenumout))//'.pfb'
-        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,6)
-        !fname=trim(runname)//'.out.C7.'//trim(adjustl(filenumout))//'.pfb'
-        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,7)
-        !fname=trim(runname)//'.out.C8.'//trim(adjustl(filenumout))//'.pfb'
-        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,8)
-        !fname=trim(runname)//'.out.C9.'//trim(adjustl(filenumout))//'.pfb'
-        !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,9)
-    end if
-end if
+        ! Write gridded ET outputs to text files
+        if(etwrite > 0) then
+        if (mod(kk,etwrite) == 0) then
+        ! open/create/write the 3D output file
+        open(14,file=trim(runname)//'_ET_summary.'//trim(adjustl(filenumout))//'.txt')
+        write(14,*) 'X Y Z ET_npart, ET_mass, ET_age, ET_comp, EvapTrans_Rate, Saturation, Porosity'
+        do i = 1, nx
+        do j = 1, ny
+        do k = 1, nz
+        if (EvapTrans(i,j,k) < 0.0d0)   &
+        write(14,'(3(i6), 7(e13.5))')  i, j, k, C(6,i,j,k), C(7,i,j,k), C(8,i,j,k), &
+            C(9,i,j,k), EvapTrans(i,j,k), Saturation(i,j,k), Porosity(i,j,k)
+        end do
+        end do
+        end do
+        close(14)
+        end if
+        end if
 
-! write binary particle locations and attributes
-vtk_file=trim(runname)//'_pnts'
-if(ibinpntswrite > 0)  then
-if(mod(kk,ibinpntswrite) == 0)  &
-call vtk_write_points(P,np_active,np,kk,vtk_file, dx, dy,nx,ny, maxZ,dem)
-end if
+        ! write grid based values ("concentrations")
+        vtk_file=trim(runname)//'_cgrid'
+        if(icwrite > 0)  then
+            !if(mod(kk,icwrite) == 0)  &
+            !call vtk_write(Time_Next(kk),C,conc_header,nx,ny,nz,kk,n_constituents,Pnts,vtk_file)
+            if(mod(kk,icwrite) == 0 .and. rank == 0)  then
+                fname=trim(runname)//'.out.C1.'//trim(adjustl(filenumout))//'.pfb'
+                call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,1)
+                fname=trim(runname)//'.out.C2.'//trim(adjustl(filenumout))//'.pfb'
+                call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,2)
+                fname=trim(runname)//'.out.C3.'//trim(adjustl(filenumout))//'.pfb'
+                call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,3)
+                fname=trim(runname)//'.out.C4.'//trim(adjustl(filenumout))//'.pfb'
+                call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,4)
+                fname=trim(runname)//'.out.C5.'//trim(adjustl(filenumout))//'.pfb'
+                call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,5)
+                !fname=trim(runname)//'.out.C6.'//trim(adjustl(filenumout))//'.pfb'
+                !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,6)
+                !fname=trim(runname)//'.out.C7.'//trim(adjustl(filenumout))//'.pfb'
+                !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,7)
+                !fname=trim(runname)//'.out.C8.'//trim(adjustl(filenumout))//'.pfb'
+                !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,8)
+                !fname=trim(runname)//'.out.C9.'//trim(adjustl(filenumout))//'.pfb'
+                !call pfb_write(C,fname,nx,ny,nz,dx,dy,dy,n_constituents,9)
+            end if
+        end if
 
-if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
-    call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-                       MPI_INFO_NULL,fh2,ierr)
-    call MPI_FILE_WRITE(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
-    call MPI_FILE_WRITE(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
-    call MPI_FILE_WRITE(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
-                        MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
-    call MPI_FILE_CLOSE(fh2, ierr)
-end if
-! if writing restart, we need to copy, if not, we don't need copy.
+        ! write binary particle locations and attributes
+        vtk_file=trim(runname)//'_pnts'
+        if(ibinpntswrite > 0)  then
+        if(mod(kk,ibinpntswrite) == 0)  &
+        call vtk_write_points(P,np_active,np,kk,vtk_file, dx, dy,nx,ny, maxZ,dem)
+        end if
 
-! LB criteria: if the difference between max- and min-number of particles over some limitation
+        if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
+            call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                            MPI_INFO_NULL,fh2,ierr)
+            call MPI_FILE_WRITE(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+            call MPI_FILE_WRITE(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+            call MPI_FILE_WRITE(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
+                                MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+            call MPI_FILE_CLOSE(fh2, ierr)
+        end if
+        ! if writing restart, we need to copy, if not, we don't need copy.
 
-if((maxval(nump) - minval(nump))/maxval(nump) > 0.5d0) then
-    !!!! call decomposition
-    ! deallocate
-    ! allocate
-    ! initialization if necessary
-    ! Build neighbor list. do this after a particle loop
-    call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-    tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
-    neigh_list = d_isValid(1:t_rank)
-    ! don't need to do this every timestep. Only after update of decomposition
-    if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
-    ! notice: make sure N_recv_all is deallocated before new allocation
-    ! used to know how many particles this rank will receive
-    ! N_recv_all should be set after update of decomposition.
-    ! its size is the number of its neighbors. it will have elements of value 0,
-    ! this means that neighbor will not send particles to this rank this time step.
-end if
+        ! LB criteria: if the difference between max- and min-number of particles over some limitation
+        if((maxval(nump) - minval(nump))/maxval(nump) > 0.5d0) then
+            !!!! call decomposition
+            ! deallocate
+            ! allocate
+            ! initialization if necessary
+            ! Build neighbor list. do this after a particle loop
+            call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+            tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
+            neigh_list = d_isValid(1:t_rank)
+            ! don't need to do this every timestep. Only after update of decomposition
+            if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
+            ! notice: make sure N_recv_all is deallocated before new allocation
+            ! used to know how many particles this rank will receive
+            ! N_recv_all should be set after update of decomposition.
+            ! its size is the number of its neighbors. it will have elements of value 0,
+            ! this means that neighbor will not send particles to this rank this time step.
+            call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
+            rank,np_ic,nnx1,nny1)
+        end if
 
-end do !! timesteps and cycles
+    end do !! timesteps and cycles
 
-9090 continue  !! continue statement for running out of particles when assigning precip flux.
-               !!  code exits gracefully (writes files and possibly a restart file so the user can
-               !!  re-run the simulation)
+    9090 continue  !! continue statement for running out of particles when assigning precip flux.
+                !!  code exits gracefully (writes files and possibly a restart file so the user can
+                !!  re-run the simulation)
 
     ! close output file
     call MPI_FILE_CLOSE(fh3, ierr)
@@ -904,59 +910,56 @@ end do !! timesteps and cycles
         close(16)
     endif
 
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        Total_time2 = MPI_Wtime()
+    write(message,'(a)') new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a)') new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a,a)') '###  Execution Finished', new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a,a)') '###  Execution Finished', new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a)') new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a)') new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(i10,a,a)') npout,' particles exited the domain via outflow or ET.',new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(i10,a,a)') npout,' particles exited the domain via outflow or ET.',new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a)') new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a)') new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a,a)') 'Simulation Timing and Profiling:', new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a,a)') 'Simulation Timing and Profiling:', new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'("Total Execution Time (s):",e12.5,a)') Total_time2-Total_time1,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("Total Execution Time (s):",e12.5,a)') Total_time2-Total_time1,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'("File IO Time Read (s):",e12.5,a)') IO_time_read,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("File IO Time Read (s):",e12.5,a)') IO_time_read,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'("File IO Time Write (s):",e12.5,a)') IO_time_write,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("File IO Time Write (s):",e12.5,a)') IO_time_write,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'("Time Sorting (s):",e12.5,a)') sort_time,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("Time Sorting (s):",e12.5,a)') sort_time,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'("Parallel Particle Time (s):",e12.5,a)') parallel_time,new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("Parallel Particle Time (s):",e12.5,a)') parallel_time,new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    write(message,'(a)') new_line(' ')
+    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(a)') new_line(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    call MPI_FILE_CLOSE(fh1, ierr)
+    call MPI_FINALIZE(ierr)
 
-        call MPI_FILE_CLOSE(fh1, ierr)
-        call MPI_FINALIZE(ierr)
-
-   end program EcoSLIM
+end program EcoSLIM
 

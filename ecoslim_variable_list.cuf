@@ -1,4 +1,5 @@
 module variable_list
+
         ! P = Particle array [np,attributes]
         ! np = Number of particles
         ! P(np,1) = X coordinate [L]
@@ -24,58 +25,57 @@ module variable_list
         ! P(np,17+nind*2) = Time that particle was added [T]
 
     use cudafor
+
+    !--------------------------------------------------------------------
     ! CPU variables
-    !--------------------------------------------------------------------
-    ! (1) Define variables
-    !--------------------------------------------------------------------
     CHARACTER*20,allocatable:: conc_header(:)
     ! name for variables written in the C array above.  Dimensioned as l above.
     real(8),allocatable:: Time_Next(:)
     ! Vector of real times at which ParFlow dumps outputs
 
-    real(8), allocatable:: DEM(:,:) ! DEM and grid points for concentration output
+    real(8),allocatable:: DEM(:,:) ! DEM and grid points for concentration output
 
-    integer Ploc(3)
+    integer:: Ploc(3)
     ! Particle's location whithin a cell
 
-    integer nind, itemp
+    integer:: nind, itemp
 
-    integer nx, nnx, ny, nny, nz, nnz, nztemp
+    integer:: nx, nnx, ny, nny, nz, nnz, nztemp
     ! number of cells in the domain and cells+1 in x, y, and z directions
 
-    integer np_ic, np, np_active, np_active2, icwrite, jj, npnts, ncell, npout
+    integer:: np_ic, np, np_active, np_active2, icwrite, jj, npnts, ncell, npout
     ! number of particles for intial pulse IC, total, and running active
 
-    integer nt, n_constituents
+    integer:: nt, n_constituents
     ! number of timesteps ParFlow; numer of C vectors written for VTK output
 
-    integer pid
+    integer:: pid
 
-    real(8)  pfdt, advdt(3)
+    real(8):: pfdt, advdt(3)
     ! ParFlow timestep value, advection timestep for each direction
     ! for each individual particle step; used to chose optimal particle timestep
 
-    integer pft1, pft2, tout1, pfnt, n_cycle
+    integer:: pft1, pft2, tout1, pfnt, n_cycle
     ! parflow start and stop file numbers number of ParFlow timesteps
     ! flag specifying the number for the first output write (0= start with pft1)
     ! number of timestep cycles
 
-    real(8)  Time_first
+    real(8):: Time_first
     ! initial timestep for Parflow ((pft1-1)*pfdt)
 
-    integer kk
+    integer:: kk
     ! Loop counter for the time steps (pfnt)
-    integer pfkk, outkk
+    integer:: pfkk, outkk
     ! Counter for the file numbers starts at pft1
     ! Counter for the output writing
 
-    integer ii
+    integer:: ii
     ! Loop counter for the number of particles (np)
-    integer iflux_p_res, i_added_particles
+    integer:: iflux_p_res, i_added_particles
     ! Number of particles per cell for flux input and
     ! number of particle added total for precip input per
     ! timestep
-    integer i, j, k, l, ik, ji, m, ij, nzclm, nCLMsoil
+    integer:: i, j, k, l, ik, ji, m, ij, nzclm, nCLMsoil
 
     character*200 runname, filenum, filenumout, pname, fname, vtk_file, DEMname, Indname
     ! runname = SLIM runname
@@ -86,11 +86,11 @@ module variable_list
     ! vtk_file = concentration file
     ! DEMname = DEM file name
 
-    real(8) Clocx, Clocy, Clocz, Z, maxz
+    real(8):: Clocx, Clocy, Clocz, Z, maxz
     ! The fractional location of each particle within it's grid cell
     ! Particle Z location
 
-    real(8) V_mult
+    real(8):: V_mult
     ! Multiplier for forward/backward particle tracking
     ! If V_mult = 1, forward tracking
     ! If V_mult = -1, backward tracking
@@ -100,31 +100,23 @@ module variable_list
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
 
-    real(8) dtfrac
+    real(8):: dtfrac
     ! fraction of dx/Vx (as well as dy/Vy and dz/Vz) assuring
     ! numerical stability while advecting a particle to a new
     ! location.
 
-    real(8) Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
-    real(8) Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+    real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
+    real(8):: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
     ! Domain boundaries in local / grid coordinates. min values set to zero,
     ! DEM is read in later to output to Terrain Following Grid used by ParFlow.
 
-    real(8) dx, dy
+    real(8):: dx, dy
     ! Domain's number of cells in x and y directions
 
-    real(8) Vpx, Vpy, Vpz
-    ! Particle velocity in x, y, and z directions
-
-    real(8) particledt, delta_time
-    ! The time it takes for a particle to displace from
-    ! one location to another and the local particle from-to time
-    ! for each PF timestep
-
-    real(8) mean_age, mean_comp, mean_mass, total_mass
+    real(8):: mean_age, mean_comp, mean_mass, total_mass
     ! mean age and composition and mass of all particles in domain
 
-    real(8) Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
+    real(8):: Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
     ! Particles initial locations i.e., where they are injected
     ! into the domain.
 
