@@ -43,7 +43,7 @@ module variable_list
     integer:: nx, nnx, ny, nny, nz, nnz, nztemp
     ! number of cells in the domain and cells+1 in x, y, and z directions
 
-    integer:: np_ic, np, np_active, np_active2, icwrite, jj, npnts, ncell, npout
+    integer:: np_ic, np, np_active, icwrite, jj, npout
     ! number of particles for intial pulse IC, total, and running active
 
     integer:: nt, n_constituents
@@ -51,7 +51,7 @@ module variable_list
 
     integer:: pid
 
-    real(8):: pfdt, advdt(3)
+    real(8):: pfdt
     ! ParFlow timestep value, advection timestep for each direction
     ! for each individual particle step; used to chose optimal particle timestep
 

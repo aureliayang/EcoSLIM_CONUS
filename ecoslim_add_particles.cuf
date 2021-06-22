@@ -1,6 +1,8 @@
 module add_particles
     use curand_device
+    ! call curand_uniform
     use mrand, only: h
+    ! curand states saved in global memory
 contains
 attributes(global) subroutine add_init_particles( &
     P,C,Saturation,Porosity,np_ic,nind,denh2o,outkk, &

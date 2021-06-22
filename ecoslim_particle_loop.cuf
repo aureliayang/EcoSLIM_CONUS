@@ -1,4 +1,5 @@
 module particle_loop
+    use curand_device
     use mrand, only: h
 contains
  attributes(global) subroutine particles_independent( &

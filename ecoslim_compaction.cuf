@@ -183,31 +183,33 @@ contains
     integer,intent(in):: zone(:,:)
     integer,intent(out):: d_isValid(:)
     integer,value:: nnx1,nny1,buff,rank,t_rank
-    integer:: ii,i,j,temp,lock,length   !global index in the array
+    integer:: ii,i,j,temp,lock,length
 
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-    lock = 1
-    length = (nnx1+2*buff)*(nny1+2*buff)
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        lock = 1
+        length = (nnx1+2*buff)*(nny1+2*buff)
+        ! this is the total length of zone array when it was transformed to 1D
 
-    if(ii <= length) then
-        if(mod(ii, nnx1 + 2*buff) == 0) then
-            j = ii/(nnx1 + 2*buff) - buff
-            i = nnx1 + buff
-        else
-            j = ii/(nnx1 + 2*buff) - buff + 1
-            i = mod(ii,nnx1 + 2*buff) - buff
+        if(ii <= length) then
+            if(mod(ii, nnx1 + 2*buff) == 0) then
+                j = ii/(nnx1 + 2*buff) - buff
+                i = nnx1 + buff
+            else
+                j = ii/(nnx1 + 2*buff) - buff + 1
+                i = mod(ii,nnx1 + 2*buff) - buff
+            end if
         end if
-    end if
 
-    if(ii <= t_rank) d_isValid(ii) = 0
+        if(ii <= t_rank) d_isValid(ii) = 0
+        ! for this scan, we only have t_rank elements
 
-    if(ii <= length) then
-        if(zone(i,j) >= 0 .and. zone(i,j) /= rank) then
-            temp = atomicAdd(d_isValid(zone(i,j)+1),lock)
+        if(ii <= length) then
+            if(zone(i,j) >= 0 .and. zone(i,j) /= rank) then
+                temp = atomicAdd(d_isValid(zone(i,j)+1),lock)
+            end if
         end if
-    end if
 
-    if(ii <= length .and. d_isValid(ii) > 0) d_isValid(ii) = 1
+        if(ii <= t_rank .and. d_isValid(ii) > 0) d_isValid(ii) = 1
 
     end subroutine scan_zone
 

@@ -21,11 +21,13 @@ contains
         integer(8),value:: np, rank, pfnt
         integer(8):: seed, seq, offset
         integer:: ii
-            ii = threadIdx%x
+        ii = threadIdx%x
+        if(ii <= np)then
             seed = 12345_8
             seq = 0_8
             offset = 40_8*ii*pfnt + 40_8*pfnt*np*rank
             call curand_init(seed, seq, offset, h(ii))
+        endif
     end subroutine createRand_loop
 
 end module
