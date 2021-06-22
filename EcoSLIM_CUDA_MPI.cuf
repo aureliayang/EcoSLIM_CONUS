@@ -254,7 +254,7 @@ end interface
     allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
     allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
 
-    allocate(d_isValid(np))
+    allocate(d_isValid(np),d_isValid(np))
 
 !-------------------------------------
     ! read dx, dy as scalars
@@ -404,7 +404,7 @@ end interface
     call pfb_read(Porosity,fname,nx,ny,nz)
 
     ! Read the initial Saturation from ParFlow
-    if(tout1 == 0) then
+    if(np_ic /= -1) then
         pfkk = pft1 - 1
         write(filenum,'(i5.5)') pfkk
         fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
@@ -500,72 +500,72 @@ end interface
 
 ! Write out intial concentrations
 ! normalize ages by mass
+
 ! call MPI_ALLReduce(MPI_IN_PLACE,C,n_constituents*nx*ny*nz,MPI_DOUBLE_PRECISION, &
 !                    MPI_SUM,MPI_COMM_WORLD,ierr)
-! ! this may not be used for this version, we will do parallel output
+! this may not be used for this version, we will do parallel output
+    if (np_ic /= -1) then
+        where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
+        where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
 
-where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
-where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
+        ! Set up output options for VTK grid output
+        ! icwrite = 1
+        vtk_file=trim(runname)//'_cgrid'
+        conc_header(1) = 'Concentration'
+        conc_header(2) = 'Age'
+        conc_header(3) = 'Mass'
+        conc_header(4) = 'Comp'
+        conc_header(5) = 'Delta'
+        conc_header(6) = 'ET_Npart'
+        conc_header(7) = 'ET_Mass'
+        conc_header(8) = 'ET_Age'
+        conc_header(9) = 'ET_Comp'
 
-! here need hdf5 output for initial C array
+        if(icwrite > 0)  &
+        call vtk_write(Time_first,C,conc_header,nx,ny,nz,0,n_constituents,Pnts,vtk_file)
+        ! each rank visualize its own subdomain
+    end if
 
-! ! Set up output options for VTK grid output
-! ! icwrite = 1
-! vtk_file=trim(runname)//'_cgrid'
-! conc_header(1) = 'Concentration'
-! conc_header(2) = 'Age'
-! conc_header(3) = 'Mass'
-! conc_header(4) = 'Comp'
-! conc_header(5) = 'Delta'
-! conc_header(6) = 'ET_Npart'
-! conc_header(7) = 'ET_Mass'
-! conc_header(8) = 'ET_Age'
-! conc_header(9) = 'ET_Comp'
-!
-! if(icwrite > 0 .and. rank == 0)  &
-! call vtk_write(Time_first,C,conc_header,nx,ny,nz,0,n_constituents,Pnts,vtk_file)
+    ! keep the following output as it is. we can figure out a better way to handle them later.
+    call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                    MPI_INFO_NULL,fh4,ierr)
+        write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
+        call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
+                                ETOut NP_PrecipIn NP_ETOut NP_QOut NP_active_old NP_filtered', new_line(' ')
+        call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
+        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-! keep the following output as it is. we can figure out a better way to handle them later.
+    ! open exited partile file and write header
+    call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                    MPI_INFO_NULL,fh3,ierr)
 
-call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-                   MPI_INFO_NULL,fh4,ierr)
-    write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
-    call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
-    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-    write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
-                             ETOut NP_PrecipIn NP_ETOut NP_QOut NP_active_old NP_filtered', new_line(' ')
-    call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
-    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+    if(rank == 0) then
+        if(ipwrite < 0) then
+        ! open/create/write the 3D output file which will write particles out each timestemp, very slowly in parallel
+        open(214,file=trim(runname)//'_total_particle_trace.3D')
+        write(214,*) 'X Y Z TIME'
+        end if !! ipwrite < 0
 
-! open exited partile file and write header
-call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-                   MPI_INFO_NULL,fh3,ierr)
+        open(13,file=trim(runname)//'_ET_output.txt')
+        write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
 
-if(rank == 0) then
-    if(ipwrite < 0) then
-    ! open/create/write the 3D output file which will write particles out each timestemp, very slowly in parallel
-    open(214,file=trim(runname)//'_total_particle_trace.3D')
-    write(214,*) 'X Y Z TIME'
-    end if !! ipwrite < 0
+        open(15,file=trim(runname)//'_flow_output.txt')
+        write(15,*) 'TIME Out_age Out_comp1 outcomp2 outcomp3 Out_mass Out_NP'
 
-    open(13,file=trim(runname)//'_ET_output.txt')
-    write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
-
-    open(15,file=trim(runname)//'_flow_output.txt')
-    write(15,*) 'TIME Out_age Out_comp1 outcomp2 outcomp3 Out_mass Out_NP'
-
-    open(16,file=trim(runname)//'_PET_balance.txt')
-    write(16,*) 'TIME P[kg] ET[kg]'
-endif
+        open(16,file=trim(runname)//'_PET_balance.txt')
+        write(16,*) 'TIME P[kg] ET[kg]'
+    endif
 
 !--------------------------------------------------------------------
 ! (3) For each timestep, loop over all particles to find and
 !     update their new locations
 !--------------------------------------------------------------------
 ! loop over timesteps
-!
-pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1
-do kk = outkk, pfnt
+
+    pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1
+    do kk = outkk, pfnt
 
 ! reset ParFlow counter for cycles
         if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
@@ -722,10 +722,11 @@ do kk = outkk, pfnt
         ! call MPI_ALLReduce(MPI_IN_PLACE,C,n_constituents*nx*ny*nz,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
         ! I think here it is not necessary. You just need to write into hdf5 if necessary.
 
-        call MPI_Reduce(np_active, np_active_log, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+        ! call MPI_Reduce(np_active, np_active_log, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+        call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
 
-        if(rank == n_proc) then
-            write(12,*) np_active_log, T2-T1, redis_time
+        if(rank == 0) then
+            write(12,*) sum(nump), T2-T1, redis_time
             flush(12)
 
             if (ET_mass_cpu(1) > 0 ) then
@@ -790,6 +791,7 @@ end if
 ! normalize ET ages by mass
 !where (C(7,:,:,:)>0.0)  C(8,:,:,:) = C(8,:,:,:) / C(7,:,:,:)
 !where (C(7,:,:,:)>0.0)  C(9,:,:,:) = C(9,:,:,:) / C(7,:,:,:)
+! the normalization can be considred on GPU
 
 ! Write gridded ET outputs to text files
 if(etwrite > 0) then
@@ -853,10 +855,15 @@ if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
                         MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
     call MPI_FILE_CLOSE(fh2, ierr)
 end if
+! if writing restart, we need to copy, if not, we don't need copy.
 
 ! LB criteria: if the difference between max- and min-number of particles over some limitation
-if() then
-    ! call decomposition
+
+if((maxval(nump) - minval(nump))/maxval(nump) > 0.5d0) then
+    !!!! call decomposition
+    ! deallocate
+    ! allocate
+    ! initialization if necessary
     ! Build neighbor list. do this after a particle loop
     call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
     tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
@@ -876,26 +883,26 @@ end do !! timesteps and cycles
                !!  code exits gracefully (writes files and possibly a restart file so the user can
                !!  re-run the simulation)
 
-! close output file
-call MPI_FILE_CLOSE(fh3, ierr)
-call MPI_FILE_CLOSE(fh4, ierr)
+    ! close output file
+    call MPI_FILE_CLOSE(fh3, ierr)
+    call MPI_FILE_CLOSE(fh4, ierr)
 
-! format statements for particle output
-61  FORMAT(4(e12.5))
-64  FORMAT(6(e12.5),i12)
+    ! format statements for particle output
+    61  FORMAT(4(e12.5))
+    64  FORMAT(6(e12.5),i12)
 
-if(rank == 0) then
-    flush(13)
-    close(13)
+    if(rank == 0) then
+        flush(13)
+        close(13)
 
-    if(ipwrite < 0) close(214)
+        if(ipwrite < 0) close(214)
 
-    flush(15)
-    close(15)
+        flush(15)
+        close(15)
 
-    flush(16)
-    close(16)
-endif
+        flush(16)
+        close(16)
+    endif
 
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         Total_time2 = MPI_Wtime()
