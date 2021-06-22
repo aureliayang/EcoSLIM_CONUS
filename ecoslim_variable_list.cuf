@@ -28,14 +28,12 @@ module variable_list
     !--------------------------------------------------------------------
     ! (1) Define variables
     !--------------------------------------------------------------------
-    CHARACTER*20,allocatable::conc_header(:)
+    CHARACTER*20,allocatable:: conc_header(:)
     ! name for variables written in the C array above.  Dimensioned as l above.
-    real*8,allocatable::Time_Next(:)
+    real(8),allocatable:: Time_Next(:)
     ! Vector of real times at which ParFlow dumps outputs
-    real*8,allocatable::Zt(:)
-    ! Delta Z values in the vertical direction
-    ! Elevations in z-direction in local coordinates
-    real*8, allocatable::Pnts(:,:), DEM(:,:) ! DEM and grid points for concentration output
+
+    real(8), allocatable:: DEM(:,:) ! DEM and grid points for concentration output
 
     integer Ploc(3)
     ! Particle's location whithin a cell
@@ -53,7 +51,7 @@ module variable_list
 
     integer pid
 
-    real*8  pfdt, advdt(3)
+    real(8)  pfdt, advdt(3)
     ! ParFlow timestep value, advection timestep for each direction
     ! for each individual particle step; used to chose optimal particle timestep
 
@@ -62,7 +60,7 @@ module variable_list
     ! flag specifying the number for the first output write (0= start with pft1)
     ! number of timestep cycles
 
-    real*8  Time_first
+    real(8)  Time_first
     ! initial timestep for Parflow ((pft1-1)*pfdt)
 
     integer kk
@@ -88,11 +86,11 @@ module variable_list
     ! vtk_file = concentration file
     ! DEMname = DEM file name
 
-    real*8 Clocx, Clocy, Clocz, Z, maxz
+    real(8) Clocx, Clocy, Clocz, Z, maxz
     ! The fractional location of each particle within it's grid cell
     ! Particle Z location
 
-    real*8 V_mult
+    real(8) V_mult
     ! Multiplier for forward/backward particle tracking
     ! If V_mult = 1, forward tracking
     ! If V_mult = -1, backward tracking
@@ -102,43 +100,43 @@ module variable_list
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
 
-    real*8 dtfrac
+    real(8) dtfrac
     ! fraction of dx/Vx (as well as dy/Vy and dz/Vz) assuring
     ! numerical stability while advecting a particle to a new
     ! location.
 
-    real*8 Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
-    real*8 Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+    real(8) Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
+    real(8) Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
     ! Domain boundaries in local / grid coordinates. min values set to zero,
     ! DEM is read in later to output to Terrain Following Grid used by ParFlow.
 
-    real*8 dx, dy
+    real(8) dx, dy
     ! Domain's number of cells in x and y directions
 
-    real*8 Vpx, Vpy, Vpz
+    real(8) Vpx, Vpy, Vpz
     ! Particle velocity in x, y, and z directions
 
-    real*8 particledt, delta_time
+    real(8) particledt, delta_time
     ! The time it takes for a particle to displace from
     ! one location to another and the local particle from-to time
     ! for each PF timestep
 
-    real*8 mean_age, mean_comp, mean_mass, total_mass
+    real(8) mean_age, mean_comp, mean_mass, total_mass
     ! mean age and composition and mass of all particles in domain
 
-    real*8 Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
+    real(8) Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
     ! Particles initial locations i.e., where they are injected
     ! into the domain.
 
     ! density of water (M/L3), molecular diffusion (L2/T), fractionation
-    real*8 denh2o, moldiff, Efract  !, ran1
+    real(8) denh2o, moldiff, Efract  !, ran1
 
-    real*8 ET_dt
+    real(8) ET_dt
     ! time interval for ET
     ! integer counters and operators.
     ! the first set are used for total run timing the latter for component timing
-    real*8 Total_time1, Total_time2, t1, t2, IO_time_read, IO_time_write, parallel_time
-    real*8 sort_time
+    real(8) Total_time1, Total_time2, t1, t2, IO_time_read, IO_time_write, parallel_time
+    real(8) sort_time
     ! integers for writing C or point based output
     integer ipwrite, ibinpntswrite
     ! integers for writing gridded ET outputs
@@ -167,10 +165,10 @@ module variable_list
         ! Vy = Velocity y-direction [nx,ny+1,nz] -- ParFlow output
         ! Vz = Velocity z-direction [nx,ny,nz+1] -- ParFlow output
 
-    real*8,allocatable,pinned:: C(:,:,:,:)
+    real(8),allocatable,pinned:: C(:,:,:,:)
         ! Concentration array, in i,j,k with l (first index) as consituent or
         ! property.  These are set by user at runtime using input
-    real*8,allocatable,pinned::dz(:), dz2(:)
+    real(8),allocatable,pinned:: dz(:), dz2(:)
 
     !-------------------------------------
     ! GPU variables
@@ -188,11 +186,5 @@ module variable_list
     real(8),allocatable,device:: mean_age_de(:), mean_comp_de(:), total_mass_de(:)
 
 contains
-    !subroutine allocate_array(nz)
-    !    implicit none
-    !    integer:: nz
 
-    !    allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz))
-
-    !end subroutine allocate_array
 end module variable_list

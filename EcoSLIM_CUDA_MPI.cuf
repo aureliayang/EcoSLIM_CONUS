@@ -24,6 +24,7 @@ use mpiDeviceUtil
 use variable_list
 use hdf5_file_read
 use hdf5_file_write
+use subdomain_bound
 use create_subdomain
 use exchange_particles
 
@@ -89,303 +90,313 @@ end subroutine vtk_write_points
 end interface
 
 !--------------------------------------------------------------------
-call MPI_INIT(ierr)
-call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
+    call MPI_INIT(ierr)
+    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
 
 !--------------------------------------------------------------------
-! This part has to be thought again for extra processes to do I/O
-! Get and set unique device
-call assignDevice(deviceID)
-call MPI_GET_PROCESSOR_NAME(hostname, namelength, ierr)
-write(message,"('[',i2.2 ,'] host: ', a, ', device: ', i2.2, a)") &
-rank, trim(hostname), deviceID, new_line(' ')
-offset = len(trim(message))*rank
+    ! This part has to be thought again for extra processes to do I/O
+    ! Get and set unique device
+    call assignDevice(deviceID)
+    call MPI_GET_PROCESSOR_NAME(hostname, namelength, ierr)
+    write(message,"('[',i2.2 ,'] host: ', a, ', device: ', i2.2, a)") &
+    rank, trim(hostname), deviceID, new_line(' ')
+    offset = len(trim(message))*rank
 
-call MPI_FILE_OPEN(MPI_COMM_WORLD, 'EcoSLIM_Device_Utility.txt', &
-MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh0, ierr)
-call MPI_FILE_SEEK(fh0,offset,MPI_SEEK_SET,ierr)
-call MPI_FILE_WRITE(fh0,message,len(trim(message)),MPI_CHARACTER, &
-    MPI_STATUS_IGNORE, ierr)
-call MPI_FILE_CLOSE(fh0, ierr)
-
-!--------------------------------------------------------------------
-! I think how to do timing is also a new question due to asyn.
-! Set up timing
-Total_time1 = 0.d0
-Total_time2 = 0.d0
-t1 = 0.d0
-t2 = 0.d0
-IO_time_read = 0.d0
-IO_time_write = 0.d0
-parallel_time = 0.d0
-sort_time = 0.d0
+    call MPI_FILE_OPEN(MPI_COMM_WORLD, 'EcoSLIM_Device_Utility.txt', &
+    MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh0, ierr)
+    call MPI_FILE_SEEK(fh0,offset,MPI_SEEK_SET,ierr)
+    call MPI_FILE_WRITE(fh0,message,len(trim(message)),MPI_CHARACTER, &
+        MPI_STATUS_IGNORE, ierr)
+    call MPI_FILE_CLOSE(fh0, ierr)
 
 !--------------------------------------------------------------------
-! (2) Read inputs, set up domain, write the log file, and
-! initialize particles
+    ! I think how to do timing is also a new question due to asyn.
+    ! Set up timing
+    Total_time1 = 0.d0
+    Total_time2 = 0.d0
+    t1 = 0.d0
+    t2 = 0.d0
+    IO_time_read = 0.d0
+    IO_time_write = 0.d0
+    parallel_time = 0.d0
+    sort_time = 0.d0
+
 !--------------------------------------------------------------------
-! Note: The following file numbers refer to
-!
-!       - #10: slimin.txt
-!       - #11: runname_log.txt
-!       - #12: runname_particle.3D (visualizes particles in VisIT)
-!       - #13: runname_endparticle.txt
+    ! (2) Read inputs, set up domain, write the log file, and
+    ! initialize particles
+!--------------------------------------------------------------------
+    ! Note: The following file numbers refer to
+    !
+    !       - #10: slimin.txt
+    !       - #11: runname_log.txt
+    !       - #12: runname_particle.3D (visualizes particles in VisIT)
+    !       - #13: runname_endparticle.txt
 
-! open SLIM input .txt file
-open (10,file='slimin.txt')
+    ! open SLIM input .txt file
+    open (10,file='slimin.txt')
 
-! read SLIM run name
-read(10,*) runname
+    ! read SLIM run name
+    read(10,*) runname
 
-! read ParFlow run name
-read(10,*) pname
+    ! read ParFlow run name
+    read(10,*) pname
 
-! read DEM file name
-read(10,*) DEMname
+    ! read DEM file name
+    read(10,*) DEMname
 
-if(rank == 0) then
-    ! open/create/write the output log.txt file. If doesn't exist, it's created.
-    open(11,file=trim(runname)//'_log.txt')
-    write(11,*) '### EcoSLIM Log File'
-    write(11,*)
-    write(11,*) 'run name:',trim(runname)
-    write(11,*)
-    write(11,*) 'ParFlow run name:',trim(pname)
-    write(11,*)
-    if (DEMname /= '') then
-    write(11,*) 'ParFlow DEM name:',trim(DEMname)
+    if(rank == 0) then
+        ! open/create/write the output log.txt file. If doesn't exist, it's created.
+        open(11,file=trim(runname)//'_log.txt')
+        write(11,*) '### EcoSLIM Log File'
+        write(11,*)
+        write(11,*) 'run name:',trim(runname)
+        write(11,*)
+        write(11,*) 'ParFlow run name:',trim(pname)
+        write(11,*)
+        if (DEMname /= '') then
+        write(11,*) 'ParFlow DEM name:',trim(DEMname)
+        else
+        write(11,*) 'Not reading ParFlow DEM'
+        end if
+        write(11,*)
+    endif ! rank = 0, write logfile through channel 11
+
+    ! read domain number of cells and number of particles to be injected
+    read(10,*) nx
+    read(10,*) ny
+    read(10,*) nz
+    read(10,*) nCLMsoil
+    read(10,*) ppx
+    read(10,*) qqy
+    ! read in number of particles for IC (if np_ic = -1 then restart from a file)
+    read(10,*) np_ic
+
+    ! read in the number of particles total
+    read(10,*) np
+
+    if(rank == 0) then
+        ! check to make sure we don't assign more particles for IC than we have allocated
+        ! in total
+        if (np_ic > np) then
+        write(11,*) 'warning NP_IC greater than IC'
+        np = np_ic
+        end if
+
+        ! write nx, ny, nz, and np in the log file
+        write(11,*) 'Grid information'
+        write(11,*) 'nx:',nx
+        write(11,*) 'ny:',ny
+        write(11,*) 'nz:',nz
+        write(11,*)
+        write(11,*) 'Particle IC Information'
+        write(11,*) 'np IC:',np_ic
+        if (np_ic == -1) &
+        write(11,*) 'Reading particle restart file:',trim(runname)//'_particle_restart.bin'
+        write(11,*) 'np:',np
+    endif ! rank=0
+
+    ! nCLMsoil = 10 ! number of CLM soil layers over the root zone !this doesn't matter
+    nzclm = 13 + nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables not domain NZ,
+            !  e.g. 23 for 10 soil layers (default) and 17 for 4 soil layers (Noah soil
+            ! layer setup)
+    n_constituents = 9
+
+!--------------------------------------------------------------------
+    call gridinfo(nx,ny,ppx,qqy,rank)
+    ! then we get subdomain info
+!--------------------------------------------------------------------
+    ! allocate arrays
+    allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+    allocate(dz(nz), dz2(nz))
+    allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+            Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+            Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1))
+    allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+            Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+            EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                    Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+    allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+    allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
+    allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+    allocate(conc_header(n_constituents))
+
+    ! Intialize everything to Zero
+    Vx = 0.0d0
+    Vy = 0.0d0
+    Vz = 0.0d0
+
+    Saturation = 0.0d0
+    Porosity = 0.0d0
+    EvapTrans = 0.0d0
+    EvapTrans_da = 0.0d0
+    C = 0.0d0
+
+    allocate(out_np_cpu(1),ET_np_cpu(1))
+    allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
+    allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
+
+    allocate(neigh_list(t_rank))
+!-------------------------------------
+    ! allocate arrays on GPU
+    allocate(dz_de(nz))
+    allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+            Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+            Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1), &
+            Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+    allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+            Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+            EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+    allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+
+    allocate(out_np_de(1),ET_np_de(1))
+    allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
+    allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+
+    allocate(d_isValid(np))
+
+!-------------------------------------
+    ! read dx, dy as scalars
+    read(10,*) dx
+    read(10,*) dy
+    ! read dz as an array
+    read(10,*) dz(1:nz)
+    dz2 = dz
+    ! read in (constant for now) ParFlow dt
+    read(10,*) pfdt
+    ! read in parflow start and stop times
+    read(10,*) pft1
+    read(10,*) pft2
+    read(10,*) tout1
+    read(10,*) n_cycle
+    read(10,*) add_f
+
+    pfnt=n_cycle*(pft2-pft1+1)
+    outkk = tout1 + 1
+
+    ! set ET DT to ParFlow one and allocate ET arrays accordingly
+    ET_dt = pfdt
+    allocate(PET_balance(pfnt,2))
+    allocate(PET_balance_da(pfnt,2))
+    PET_balance = 0.0d0
+    PET_balance_da = 0.0d0
+
+    ! clear out output particles
+    npout = 0  !!! no use but need this info through a new way
+
+    ! IO control, each value is a timestep interval, e.g. 1= every timestep, 2=every other, 0 = no writing
+    read(10,*) ipwrite        ! controls an ASCII, .3D particle file not recommended due to poor performance
+    read(10,*) ibinpntswrite  !  controls VTK, binary output of particle locations and attributes
+    read(10,*) etwrite        !  controls ASCII ET output
+    read(10,*) icwrite        ! controls VTK, binary grid based output where particle masses, concentrations,
+                            ! ages are mapped to a grid and written every N timesteps
+
+    ! allocate and assign timesteps
+    ! this can be a scalar and update every timestep
+    allocate(Time_Next(pfnt))
+    Time_Next=0.d0
+    do kk = outkk, pfnt
+        Time_Next(kk) = float(kk)*pfdt
+    end do
+
+    Time_first = float(outkk-1)*pfdt
+
+    ! read in velocity multiplier
+    read(10,*) V_mult
+
+    ! do we read in clm evap trans?
+    read(10,*) clmtrans
+    ! do we read in clm output file?
+    read(10,*) clmfile
+
+    ! read in IC number of particles for flux
+    read(10,*) iflux_p_res
+
+    ! read in density h2o
+    read(10,*) denh2o
+
+    ! read in diffusivity
+    ! moldiff = (1.15e-9)*3600.d0
+    read(10,*) moldiff
+
+    ! fraction of dx/Vx
+    read(10,*) dtfrac
+
+    if(rank == 0) then
+        ! wite out log file
+        write(11,*)
+        write(11,*) 'Grid Dimensions'
+        write(11,'(" dx:",e12.5)') dx
+        write(11,'(" dy:",e12.5)') dy
+        write(11,'(" dz:",*(e12.5,", "))') dz(1:nz)
+        write(11,*)
+        write(11,*) 'Timestepping Information'
+        write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt
+        write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
+        write(11,'(" ParFlow start step, pft1:",i12)') pft1
+        write(11,'(" ParFlow end step, pft2:",i12)') pft2
+        write(11,'(" Output step start:",i12)') outkk
+        write(11,'(" Time loops, cycles, n_cycle:",i12)') n_cycle
+        write(11,'(" Total time steps:",i12)') pfnt
+
+        write(11,*)
+        write(11,*) 'V mult: ',V_mult,' for forward/backward particle tracking'
+        write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
+        write(11,*)
+        write(11,*) 'Physical Constants'
+        write(11,*) 'denh2o: ',denh2o,' M/L^3'
+        write(11,*) 'Molecular Diffusivity: ',moldiff,' '
+        !write(11,*) 'Fractionation: ',Efract,' '
+        write(11,*)
+        write(11,*) 'Numerical Stability Information'
+        write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac
+    endif
+
+    read(10,*) nind
+    read(10,*) Indname
+    if(rank == 0) then
+        write(11,*)
+        write(11,*) 'Indicator File'
+        write(11,*) nind, 'Indicators'
+    endif
+
+    ! end of SLIM input
+    close(10)
+
+    Ind = 1.0d0
+    ! read in Indicator file
+    if (nind>0) then
+    if (Indname /= '') then
+        fname = trim(adjustl(Indname))
+        call pfb_read(Ind,fname,nx,ny,nz)
+        if(rank == 0) &
+        write(11,*) 'Read Indicator File:', fname
     else
-    write(11,*) 'Not reading ParFlow DEM'
-    end if
-    write(11,*)
-endif ! rank = 0, write logfile through channel 11
-
-! read domain number of cells and number of particles to be injected
-read(10,*) nx
-read(10,*) ny
-read(10,*) nz
-read(10,*) nCLMsoil
-read(10,*) ppx
-read(10,*) qqy
-! read in number of particles for IC (if np_ic = -1 then restart from a file)
-read(10,*) np_ic
-
-! read in the number of particles total
-read(10,*) np
-
-if(rank == 0) then
-    ! check to make sure we don't assign more particles for IC than we have allocated
-    ! in total
-    if (np_ic > np) then
-    write(11,*) 'warning NP_IC greater than IC'
-    np = np_ic
+        if(rank == 0) &
+        write(11,*) 'WARNING: indicator flage >0 but no indicator file provided'
+    end if ! Ind
     end if
 
-    ! write nx, ny, nz, and np in the log file
-    write(11,*) 'Grid information'
-    write(11,*) 'nx:',nx
-    write(11,*) 'ny:',ny
-    write(11,*) 'nz:',nz
-    write(11,*)
-    write(11,*) 'Particle IC Information'
-    write(11,*) 'np IC:',np_ic
-    if (np_ic == -1) &
-    write(11,*) 'Reading particle restart file:',trim(runname)//'_particle_restart.bin'
-    write(11,*) 'np:',np
-endif ! rank=0
+    if(rank == 0) then
+        flush(11)
+        close(11)
+    endif
 
-! nCLMsoil = 10 ! number of CLM soil layers over the root zone !this doesn't matter
-nzclm = 13 + nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables not domain NZ,
-           !  e.g. 23 for 10 soil layers (default) and 17 for 4 soil layers (Noah soil
-           ! layer setup)
-
-n_constituents = 9
-
-!--------------------------------------------------------------------
-call gridinfo(nx,ny,ppx,qqy,rank)
-! then we get subdomain info
-!--------------------------------------------------------------------
-! allocate arrays
-allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
-allocate(dz(nz), dz2(nz))
-allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
-         Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
-         Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1))
-allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-           Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-          EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
-allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-allocate(conc_header(n_constituents))
-
-! Intialize everything to Zero
-Vx = 0.0d0
-Vy = 0.0d0
-Vz = 0.0d0
-
-Saturation = 0.0d0
-Porosity = 0.0d0
-EvapTrans = 0.0d0
-EvapTrans_da = 0.0d0
-C = 0.0d0
-
-allocate(out_np_cpu(1),ET_np_cpu(1))
-allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
-allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
-!-------------------------------------
-! allocate arrays on GPU
-allocate(dz_de(nz))
-allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
-         Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
-         Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1), &
-        Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-           Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-          EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-               Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-
-allocate(out_np_de(1),ET_np_de(1))
-allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
-allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+    allocate(P(np,17+nind*2))
+    P = 0.d0    ! clear out all particle attributes
+    P(1:np,7:9) = 1.d0
+    ! make all particles active to start with and original from 1 = GW/IC
 
 !-------------------------------------
-! read dx, dy as scalars
-read(10,*) dx
-read(10,*) dy
-! read dz as an array
-read(10,*) dz(1:nz)
-dz2 = dz
-! read in (constant for now) ParFlow dt
-read(10,*) pfdt
-! read in parflow start and stop times
-read(10,*) pft1
-read(10,*) pft2
-read(10,*) tout1
-read(10,*) n_cycle
-read(10,*) add_f
+    call global_xyz(nx, ny, nz, dx, dy, dz, rank, &
+    Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax, fh1, &
+    loadf, restartf, exitedf, logf)
 
-pfnt=n_cycle*(pft2-pft1+1)
-outkk = tout1 + 1
+    call local_xyz(nnx1, nny1, nz, dx, dy, dz, buff, &
+    Xmin, Xmax, Ymin, Ymax, Zmin, Zmax)
 
-! set ET DT to ParFlow one and allocate ET arrays accordingly
-ET_dt = pfdt
-allocate(PET_balance(pfnt,2))
-allocate(PET_balance_da(pfnt,2))
-PET_balance = 0.0d0
-PET_balance_da = 0.0d0
-
-! clear out output particles
-npout = 0  !!! no use but need this info through a new way
-
-! IO control, each value is a timestep interval, e.g. 1= every timestep, 2=every other, 0 = no writing
-read(10,*) ipwrite        ! controls an ASCII, .3D particle file not recommended due to poor performance
-read(10,*) ibinpntswrite  !  controls VTK, binary output of particle locations and attributes
-read(10,*) etwrite        !  controls ASCII ET output
-read(10,*) icwrite        ! controls VTK, binary grid based output where particle masses, concentrations,
-                          ! ages are mapped to a grid and written every N timesteps
-
-! allocate and assign timesteps
-allocate(Time_Next(pfnt))
-Time_Next=0.d0
-do kk = outkk, pfnt
-    Time_Next(kk) = float(kk)*pfdt
-end do
-
-Time_first = float(outkk-1)*pfdt
-
-! read in velocity multiplier
-read(10,*) V_mult
-
-! do we read in clm evap trans?
-read(10,*) clmtrans
-! do we read in clm output file?
-read(10,*) clmfile
-
-! read in IC number of particles for flux
-read(10,*) iflux_p_res
-
-! read in density h2o
-read(10,*) denh2o
-
-! read in diffusivity
-! moldiff = (1.15e-9)*3600.d0
-read(10,*) moldiff
-
-! fraction of dx/Vx
-read(10,*) dtfrac
-
-if(rank == 0) then
-    ! wite out log file
-    write(11,*)
-    write(11,*) 'Grid Dimensions'
-    write(11,'(" dx:",e12.5)') dx
-    write(11,'(" dy:",e12.5)') dy
-    write(11,'(" dz:",*(e12.5,", "))') dz(1:nz)
-    write(11,*)
-    write(11,*) 'Timestepping Information'
-    write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt
-    write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
-    write(11,'(" ParFlow start step, pft1:",i12)') pft1
-    write(11,'(" ParFlow end step, pft2:",i12)') pft2
-    write(11,'(" Output step start:",i12)') outkk
-    write(11,'(" Time loops, cycles, n_cycle:",i12)') n_cycle
-    write(11,'(" Total time steps:",i12)') pfnt
-
-    write(11,*)
-    write(11,*) 'V mult: ',V_mult,' for forward/backward particle tracking'
-    write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
-    write(11,*)
-    write(11,*) 'Physical Constants'
-    write(11,*) 'denh2o: ',denh2o,' M/L^3'
-    write(11,*) 'Molecular Diffusivity: ',moldiff,' '
-    !write(11,*) 'Fractionation: ',Efract,' '
-    write(11,*)
-    write(11,*) 'Numerical Stability Information'
-    write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac
-endif
-
-read(10,*) nind
-read(10,*) Indname
-if(rank == 0) then
-    write(11,*)
-    write(11,*) 'Indicator File'
-    write(11,*) nind, 'Indicators'
-endif
-
-! end of SLIM input
-close(10)
-
-Ind = 1.0d0
-! read in Indicator file
-if (nind>0) then
-  if (Indname /= '') then
-    fname = trim(adjustl(Indname))
-    call pfb_read(Ind,fname,nx,ny,nz)
-    if(rank == 0) &
-    write(11,*) 'Read Indicator File:', fname
-  else
-    if(rank == 0) &
-    write(11,*) 'WARNING: indicator flage >0 but no indicator file provided'
-  end if ! Ind
-end if
-
-if(rank == 0) then
-    flush(11)
-    close(11)
-endif
-
-allocate(P(np,17+nind*2))
-P = 0.d0    ! clear out all particle attributes
-P(1:np,7:9) = 1.d0  ! make all particles active to start with and original from 1 = GW/IC
-
-!-------------------------------------
-    call global_xyz()
-    call local_xyz()
-    if (DEMname /= '') call DEM_for_visual()
+    call DEM_for_visual(DEM,DEMname,ix1,iy1,nnx1,nny1,nz)
 
 !-------------------------------------
     ! Read porosity values from ParFlow .pfb file
@@ -408,23 +419,18 @@ P(1:np,7:9) = 1.d0  ! make all particles active to start with and original from 
     Porosity_de = Porosity
     Saturation_de = Saturation
     Zone_de = Zone
+    P_de = P
     !!! initialization pf P_de, probably need a new kernel
     ! think about initialization of some device variables
     ! since they are not updated each timestep.
 
     call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-    tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
+    tPB>>>(Zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
+    ! ix2, iy2, nnx2, and nny2 are only used for read files
 
     neigh_list = d_isValid(1:t_rank)
     ! don't need to do this every timestep. Only after update of decomposition
     if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
-
-    ! return the global and local info of the subdomain
-    ! add grid info to log file
-    ! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
-    ! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
-    ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-    ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
     ! Intialize cuRand device API and this part need to check through again.
     allocate(h(nnx1*nny1*nz))

@@ -1,24 +1,25 @@
-module subgrid_bound
+module subdomain_bound
 
     contains
-    subroutine global_xyz(nx,ny,nz,dx,dy,dz, &
-        Xmin, Xmax, Ymin, Ymax, Zmin, Zmax)
+    subroutine global_xyz(nx, ny, nz, dx, dy, dz, rank, &
+        Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, fh1, &
+        loadf, restartf, exitedf, logf)
 
         use mpi
         implicit none
 
-        integer:: nx, ny, nz
+        integer:: nx, ny, nz, rank
         real(8):: dx, dy, dz(:)
         real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
-        character(len=MPI_MAX_PROCESSOR_NAME):: message
+        character(200):: loadf, restartf, exitedf, logf, message
         integer:: k, ierr, fh1
 
         ! set up domain boundaries
         Xmin = 0.0d0
         Ymin = 0.0d0
         Zmin = 0.0d0
-        Xmax = float(nx)*dx
-        Ymax = float(ny)*dy
+        Xmax = dble(nx)*dx
+        Ymax = dble(ny)*dy
         Zmax = 0.0d0
         do k = 1, nz
             Zmax = Zmax + dz(k)
@@ -54,16 +55,16 @@ module subgrid_bound
 
     end subroutine global_xyz
 
-    subroutine local_xyz(nnx1,nny1,nz,dx,dy,dz,buff &
+    subroutine local_xyz(nnx1, nny1, nz, dx, dy, dz, buff, &
         Xmin, Xmax, Ymin, Ymax, Zmin, Zmax)
-
+        use mpi
         implicit none
 
-        integer:: nx, ny, nz
+        integer:: nnx1, nny1, nz, k
         real(8):: dx, dy, dz(:), buff
         real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
 
-        !set up domain boundaries
+        ! set up subdomain boundaries
         Xmin = -dble(buff)*dx
         Ymin = -dble(buff)*dy
         Zmin = 0.0d0
@@ -73,71 +74,82 @@ module subgrid_bound
         do k = 1, nz
             Zmax = Zmax + dz(k)
         end do
+        ! need output to log file
+        ! return the global and local info of the subdomain
+        ! add grid info to log file
+        ! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
+        ! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
+        ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+        ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
     end subroutine local_xyz
 
-    subroutine DEM_for_visual(DEM,ix2,iy2,nnx2,nny2,nx,ny,nz)
+    subroutine DEM_for_visual(DEM,DEMname,ix1,iy1,nnx1,nny1,nz)
+
         use hdf5_file_read
+
         implicit none
 
         real(8):: DEM(:,:)  !allocated in main
-        integer:: ix2,iy2,nnx2,nny2,nx,ny,nz
-        integer:: nnx,nny,nnz
-        integer:: npnts,ncell
+        character(200):: DEMname
+        integer:: ix1, iy1, nnx1, nny1, nz
+        integer:: nnx, nny, nnz, npnts
+        real(8):: Z, maxZ, Zt(:), Pnts(:,:)
+        integer:: ik, m, i, j, k, ii, jj
 
         !----------------------------
         DEM = 0.0d0
         ! read in DEM
         ! fname = trim(adjustl(DEMname))
         ! call pfb_read(DEM,fname,nx,ny,nztemp)
-        call read_files(DEM,ix2,iy2,nnx2,nny2,nz)
+        if (DEMname /= '') &
+        call read_files(DEM,ix1,iy1,nnx1,nny1,nz)
 
         !----------------------------
         ! grid +1 variables, for DEM part
-        nnx=nx+1
-        nny=ny+1
-        nnz=nz+1
+        nnx = nnx1 + 1
+        nny = nny1 + 1
+        nnz = nz + 1
 
         ! Set up grid locations for file output
-        npnts=nnx*nny*nnz
-        ncell=nx*ny*nz
+        npnts = nnx*nny*nnz
 
-        allocate(Pnts(npnts,3))
-        Pnts=0
-        m=1
+        allocate(Pnts(npnts,3),Zt(0:nz))
+        Pnts = 0
+        m = 1
 
         ! Need the maximum height of the model and elevation locations
         Z = 0.0d0
-        Zt(0) = 0.0D0
+        Zt(0) = 0.0d0
         do ik = 1, nz
             Z = Z + dz(ik)
             Zt(ik) = Z
             ! print*, Z, dz(ik), Zt(ik), ik
         end do
-        maxZ=Z
+        maxZ = Z
 
         ! candidate loops for OpenMP
         do k=1,nnz
             do j=1,nny
                 do i=1,nnx
-                    Pnts(m,1)=DBLE(i-1)*dx
-                    Pnts(m,2)=DBLE(j-1)*dy
+                    Pnts(m,1) = DBLE(i-1)*dx
+                    Pnts(m,2) = DBLE(j-1)*dy
                     ! This is a simple way of handling the maximum edges
-                    if (i <= nx) then
-                        ii=i
+                    if (i <= nnx1) then
+                        ii = i
                     else
-                        ii=nx
+                        ii = nnx1
                     endif
-                    if (j <= ny) then
-                        jj=j
+                    if (j <= nny1) then
+                        jj = j
                     else
-                        jj=ny
+                        jj = nny1
                     endif
                     ! This step translates the DEM
                     ! The specified initial heights in the pfb (z1) are ignored and the
                     ! offset is computed based on the model thickness
-                    Pnts(m,3) = (DEM(ii,jj)-maxZ) + Zt(k-1)
-                    m=m+1
+                    Pnts(m,3) = (DEM(ii,jj) - maxZ) + Zt(k-1)
+                    m = m + 1
                 end do
             end do
         end do
@@ -187,4 +199,4 @@ module subgrid_bound
         stop
         end if
     end subroutine read_restarts
-end module subgrid_bound
+end module subdomain_bound
