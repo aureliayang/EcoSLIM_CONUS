@@ -168,7 +168,7 @@ contains
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
     if(ii <= N_recv) then
-        d_recv(ii,8) = 1.d0
+        ! d_recv(ii,8) = 1.d0
         do j = 1, n_attri
             d_in(ii+numElements,j) = d_recv(ii,j)
         end do

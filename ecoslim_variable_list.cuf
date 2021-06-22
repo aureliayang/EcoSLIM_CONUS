@@ -63,9 +63,7 @@ module variable_list
     real(8):: Time_first
     ! initial timestep for Parflow ((pft1-1)*pfdt)
 
-    integer:: kk
-    ! Loop counter for the time steps (pfnt)
-    integer:: pfkk, outkk
+    integer:: kk, pfkk, outkk
     ! Counter for the file numbers starts at pft1
     ! Counter for the output writing
 
@@ -86,16 +84,12 @@ module variable_list
     ! vtk_file = concentration file
     ! DEMname = DEM file name
 
-    real(8):: Clocx, Clocy, Clocz, Z, maxz
-    ! The fractional location of each particle within it's grid cell
-    ! Particle Z location
-
     real(8):: V_mult
     ! Multiplier for forward/backward particle tracking
     ! If V_mult = 1, forward tracking
     ! If V_mult = -1, backward tracking
 
-    logical clmtrans, clmfile, source1
+    logical clmtrans, clmfile, reflect
     ! logical for mode of operation with CLM, will add particles with P-ET > 0
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
@@ -112,9 +106,6 @@ module variable_list
 
     real(8):: dx, dy
     ! Domain's number of cells in x and y directions
-
-    real(8):: mean_age, mean_comp, mean_mass, total_mass
-    ! mean age and composition and mass of all particles in domain
 
     real(8):: Xlow, Xhi, Ylow, Yhi, Zlow, Zhi
     ! Particles initial locations i.e., where they are injected
@@ -143,7 +134,7 @@ module variable_list
     real(8),allocatable,pinned:: out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
     real(8),allocatable,pinned:: ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
     real(8),allocatable,pinned:: PET_balance(:),PET_balance_da(:)
-    real(8),allocatable,pinned:: mean_age(:), mean_comp(:), total_mass(:)
+    real(8),allocatable,pinned:: mean_age(:), mean_comp(:), mean_mass(:), total_mass(:)
 
     real(8),allocatable,pinned:: Saturation(:,:,:)    ! Saturation (read from ParFlow)
     real(8),allocatable,pinned:: Porosity(:,:,:)      ! Porosity (read from ParFlow)
@@ -175,7 +166,7 @@ module variable_list
     integer,allocatable,device:: d_isValid(:),d_indices(:)
     real(8),allocatable,device:: P_send(:,:),P_recv(:,:)
     integer,allocatable,device:: Zone_de(:,:),holes(:)
-    real(8),allocatable,device:: mean_age_de(:), mean_comp_de(:), total_mass_de(:)
+    real(8),allocatable,device:: mean_age_de(:), mean_comp_de(:), mean_mass_de(:), total_mass_de(:)
 
 contains
 
