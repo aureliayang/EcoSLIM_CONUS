@@ -1,0 +1,10 @@
+module create_sudomain
+    use cudafor
+    integer,parameter:: buff = 1
+    !Buffer can be specified by user, for GW 1km or 2km is enough
+    !1 km spatial resolution
+    integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
+    integer,allocatable,pinned:: Zone(:,:), Zone_old(:,:), Zone_new(:,:)
+contains
+
+end module create_sudomain
