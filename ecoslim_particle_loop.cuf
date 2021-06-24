@@ -330,45 +330,45 @@ contains
         lock = 1.d0
 
         if(ii < np_active) then
-        ! Transfer global to local
-        P(ii,1) = P(ii,1) - ix1*dx
-        P(ii,2) = P(ii,2) - iy1*dy
+            ! Transfer global to local
+            P(ii,1) = P(ii,1) - ix1*dx
+            P(ii,2) = P(ii,2) - iy1*dy
 
-        ! Find the "adjacent" "cell corresponding to the particle's location
-        Ploc(1) = floor(P(ii,1) / dx)
-        Ploc(2) = floor(P(ii,2) / dy)
-        ! if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
-        ! if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
+            ! Find the "adjacent" "cell corresponding to the particle's location
+            Ploc(1) = floor(P(ii,1) / dx)
+            Ploc(2) = floor(P(ii,2) / dy)
+            ! if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
+            ! if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
 
-        Z = 0.d0
-        do k = 1, nz
-        Z = Z + dz(k)
-        if (Z >= P(ii,3)) then
-        Ploc(3) = k - 1
-        exit
-        end if
-        end do
+            Z = 0.d0
+            do k = 1, nz
+            Z = Z + dz(k)
+            if (Z >= P(ii,3)) then
+            Ploc(3) = k - 1
+            exit
+            end if
+            end do
 
-        if(P(ii,8) == 0. .and. P(ii,10) == 2.) then
-        temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
-        temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6))  ! particle mass added to ET
-        temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
-        temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
-        end if
+            if(P(ii,8) == 0. .and. P(ii,10) == 2.) then
+                temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+                temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6))  ! particle mass added to ET
+                temp = atomicAdd(C(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
+                temp = atomicAdd(C(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
+            end if
 
-        temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
-        temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
-        temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
-        temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
-        temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
-        !--------------------------------------
-        ! increment mean age, composition and mass
-        temp = atomicAdd(mean_age,   P(ii,8)*P(ii,4)*P(ii,6))
-        temp = atomicAdd(mean_comp,  P(ii,8)*P(ii,7)*P(ii,6))
-        temp = atomicAdd(total_mass, P(ii,8)*P(ii,6))
-        !--------------------------------------
-        P(ii,1) = P(ii,1) + ix1*dx
-        P(ii,2) = P(ii,2) + iy1*dy
+            temp = atomicAdd(C(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,11)*P(ii,6))
+            temp = atomicAdd(C(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,4)*P(ii,6))
+            temp = atomicAdd(C(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,5)*P(ii,6))
+            temp = atomicAdd(C(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,6))
+            temp = atomicAdd(C(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,8)*P(ii,12)*P(ii,6))
+            !--------------------------------------
+            ! increment mean age, composition and mass
+            temp = atomicAdd(mean_age,   P(ii,8)*P(ii,4)*P(ii,6))
+            temp = atomicAdd(mean_comp,  P(ii,8)*P(ii,7)*P(ii,6))
+            temp = atomicAdd(total_mass, P(ii,8)*P(ii,6))
+            !--------------------------------------
+            P(ii,1) = P(ii,1) + ix1*dx
+            P(ii,2) = P(ii,2) + iy1*dy
         end if
 
     end subroutine Update_C_Array
