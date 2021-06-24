@@ -1,10 +1,89 @@
 module create_sudomain
     use cudafor
     integer,parameter:: buff = 1
-    !Buffer can be specified by user, for GW 1km or 2km is enough
-    !1 km spatial resolution
+    ! Buffer can be specified by user, for GW 1km or 2km is enough
+    ! 1 km spatial resolution
     integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
     integer,allocatable,pinned:: Zone(:,:), Zone_old(:,:), Zone_new(:,:)
+    integer,allocatable,device:: Zone_de(:,:), Zones_old(:,:), Zones_new(:,:)
+    integer,allocatable,device:: Zonet_old(:,:), Zonet_new(:,:)
+    ! if zone was never used on cpu, we don't need pinned
+
+    ! grid is on GPU, and should be initialized as
+    ! grid = 0
+    ! grid(1,1) = 0;  grid(1,2) = 0
+    ! grid(1,3) = nx; grid(1,4) = ny
+
 contains
+    subroutine gridinfo(p_num, d_indices, ppx, qqy)
+    ! this kernel needs
+    implicit none
+    integer,intent(in):: p_num(:,:)
+
+    dir = 1; if(qqy > ppx) dir = -1
+    nlev=idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
+    n = ppx*qqy
+
+    do i = 1, nlev
+        do j = 1, ppx*qqy, n
+            ! temp = max(nx_temp,ny_temp)
+            call column_sum<<<>>>(p_num,c_sum,i,j,dir)
+            if (dir == 1) then
+                call thrustscan(c_sum,nx_temp,d_indices)
+            else
+                call thrustscan(c_sum,ny_temp,d_indices)
+            endif
+            call build_tree<<<>>>()
+        end do
+        if(min(ppx,qqy) > 1) dir = -dir
+        n = n/2
+    end do
+
+    end subroutine gridinfo
+
+    attributes(global) subroutine column_sum(p_num,c_sum,grid,i,j,dir)
+    ! this kernel needs
+    implicit none
+    integer,intent(in):: p_num(:,:),grid(:,:) ! (ppx*qqy,4)
+    integer,intent(out):: c_sum(:,:) ! the longer dimension, 921 for NCP
+    integer,value:: i,j,dir
+    integer:: ii
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if (dir == 1) then
+            if(ii <= nx) then
+                c_sum(ii) = sum(p_num(ii,1:ny))
+            endif
+        else
+            if(ii <= ny) then
+                c_sum(ii) = sum(p_num(1:nx,ii))
+            endif
+        end if
+
+    end subroutine column_sum
+
+    attributes(global) subroutine build_tree(grid, d_indices, nd, n)
+
+    implicit none
+    integer,intent(out):: p_num(:,:)
+    integer,intent(in):: d_indices(:)
+    integer,value:: nd, n
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    if(ii > 1 .and. ii < nd) then
+        grid
+    end if
+
+
+
+
+    end subroutine build_tree
 
 end module create_sudomain
+
+! for each nlev (do loop on cpu, can be a module)
+! 1. case(1/-1)
+! 2.
+
