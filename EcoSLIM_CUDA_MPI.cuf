@@ -26,6 +26,7 @@ use hdf5_file_read
 use hdf5_file_write
 use subdomain_bound
 use create_subdomain
+use exchange_zone
 use exchange_particles
 
 implicit none

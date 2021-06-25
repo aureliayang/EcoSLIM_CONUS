@@ -1,0 +1,24 @@
+module exchange_zone
+use cudafor
+integer,allocatable,device:: Zones_old(:,:), Zones_new(:,:)
+integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
+
+contains
+    subroutine zone_exchange()
+
+    implicit none
+    integer::
+
+
+
+    end subroutine zone_exchange
+
+    attributes(global) subroutine create_zones()
+    implicit none
+    integer::
+
+
+    end subroutine create_zones
+
+
+end module exchange_zone
