@@ -1,78 +1,110 @@
 module create_sudomain
     ! subroutine gridinfo
+    ! attributes(global) subroutine build_p_sum
     ! attributes(global) subroutine column_sum
     ! attributes(global) subroutine build_tree
     !--------------------------------------------
     use cudafor
     use thrust
+    use variable_list, only: P_de
+    use variable_list, only: p_num, c_sum
     use variable_list, only: Zone_de, d_indices
-    integer,parameter:: buff = 1
-    ! Buffer can be specified by user, for GW 1km or 2km is enough
-    ! 1 km spatial resolution
-    integer:: ppx, qqy
-    integer,allocatable,device:: Zone_old(:,:), Zonet_new(:,:)
-    integer,allocatable,device:: p_num(:,:), c_sum(:)
-    ! if zone was never used on cpu, we don't need pinned
-    integer,allocatable,managed:: gridn(:,:), grido(:,:)
-
-    ! grid is on GPU, and should be initialized as
-    ! grid = 0
-    ! grid(1,1) = 0;  grid(1,2) = 0
-    ! grid(1,3) = nx; grid(1,4) = ny
+    use variable_list, only: ppx, qqy
+    use variable_list, only: dx,dy,ix1,iy1,nnx1,nny1,np_active
+    use variable_list, only: gird, grid_old
+    use variable_list, only: Zonet_old, Zonet_new
 
 contains
     subroutine gridinfo(nx,ny,tPB)
-    ! this kernel only happens on the extra GPU
-    ! 1 0 0 0 0 0 0 0  n=8  nd=4 j do 1
-    ! 1 0 0 0 1 0 0 0  n=4  nd=2 j do 2
-    ! 1 0 1 0 1 0 1 0  n=2  nd=1 j do 4 after this, it is done
-    ! 1 1 1 1 1 1 1 1
-    implicit none
-    integer:: nx, ny, tPB
-    integer:: i, j, dir, nlev, n
-    integer:: max_dim
+        ! this kernel only happens on the extra GPU
+        ! 1 0 0 0 0 0 0 0  n=8  nd=4 j do 1
+        ! 1 0 0 0 1 0 0 0  n=4  nd=2 j do 2
+        ! 1 0 1 0 1 0 1 0  n=2  nd=1 j do 4 after this, it is done
+        ! 1 1 1 1 1 1 1 1
 
-    max_dim = max(nx,ny)
-    allocate(c_sum(max_dim))
+        ! n is the interval between father nodes
+        ! nd is the interval between the new child node and its father node
+        implicit none
+        integer:: nx, ny, tPB
+        integer:: i, j, dir, nlev, n
+        integer:: max_dim
 
+        grid_old = grid
+        Zonet_old = Zonet_new
 
-    dir = 1; if(qqy > ppx) dir = -1
-    nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
-    n = ppx*qqy
+        ! build p_sum on each rank
+        call build_p_sum<<< ceiling(dble(np_active)/tPB),tPB >>>()
 
-    do i = 1, nlev
-        do j = 1, ppx*qqy, n
-            if (dir == 1) then
-                call column_sum<<<ceiling(dble(gridn(j,3))/tPB),tPB>>>(j,dir)
-                call thrustscan(c_sum,gridn(j,3),d_indices)
-                max_dim = max(ppx*qqy,gridn(j,3)*gridn(j,4))
-                call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n)
-            else
-                call column_sum<<<ceiling(dble(gridn(j,4))/tPB),tPB>>>(j,dir)
-                call thrustscan(c_sum,gridn(j,4),d_indices)
-                max_dim = max(ppx*qqy,gridn(j,3)*gridn(j,4))
-                call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n)
-            endif
+        ! send p_sum to the p_sum on rank of ppx*qqy
+        ! now we could use send and recv while we latter can change to scatter/gather
+        ! p_sum is the same name but the size is the whole domain on rank ppx*qqy
 
+        max_dim = max(nx,ny)
+        allocate(c_sum(max_dim))
+
+        dir = 1; if(qqy > ppx) dir = -1
+        nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
+        n = ppx*qqy
+
+        do i = 1, nlev
+            do j = 1, ppx*qqy, n
+                if (dir == 1) then
+                    call column_sum<<<ceiling(dble(gird(j,3))/tPB),tPB>>>(j,dir)
+                    call thrustscan(c_sum,gird(j,3),d_indices)
+                    max_dim = max(ppx*qqy,gird(j,3)*gird(j,4))
+                    call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n)
+                else
+                    call column_sum<<<ceiling(dble(gird(j,4))/tPB),tPB>>>(j,dir)
+                    call thrustscan(c_sum,gird(j,4),d_indices)
+                    max_dim = max(ppx*qqy,gird(j,3)*gird(j,4))
+                    call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n)
+                endif
+
+            end do
+            if(min(ppx,qqy) > 1) dir = -dir
+            n = n/2
         end do
-        if(min(ppx,qqy) > 1) dir = -dir
-        n = n/2
-    end do
 
-    deallocate(c_sum)
+        deallocate(c_sum)
+
+        ! send zone_de
+        ! ! becast grid and then copy to ix1n etc.
 
     end subroutine gridinfo
 
+    attributes(global) subroutine build_p_sum()
+        implicit none
+        integer:: Ploc(3), ii, lock, temp
+        ! p_sum doesn't need buffer zone
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        lock = 1
+
+        if(ii < np_active) then
+            P(ii,1) = P(ii,1) - ix1*dx
+            P(ii,2) = P(ii,2) - iy1*dy
+
+            Ploc(1) = floor(P(ii,1) / dx)
+            Ploc(2) = floor(P(ii,2) / dy)
+
+            temp = atomicAdd(p_sum(Ploc(1)+1,Ploc(2)+1),lock)
+
+            P(ii,1) = P(ii,1) + ix1*dx
+            P(ii,2) = P(ii,2) + iy1*dy
+        endif
+
+    end subroutine build_p_sum
+
     attributes(global) subroutine column_sum(j,dir)
-    implicit none
-    integer,value:: j,dir
-    ! this nx and ny are the temporal dimension of the subdomain in the decompositon
-    integer:: ii, tempx0, tempy0, tempnx, tempny
+        implicit none
+        integer,value:: j,dir
+        ! this nx and ny are the temporal dimension of the subdomain in the decompositon
+        integer:: ii, tempx0, tempy0, tempnx, tempny
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-        tempx0 = gridn(j,1); tempy0 = gridn(j,2)
-        tempnx = gridn(j,3); tempny = gridn(j,4)
+        tempx0 = gird(j,1); tempy0 = gird(j,2)
+        tempnx = gird(j,3); tempny = gird(j,4)
 
         if (dir == 1) then
             if(ii >= 1 .and. ii <= tempnx) then
@@ -88,66 +120,63 @@ contains
 
     attributes(global) subroutine build_tree(n,dir,i,j)
 
-    implicit none
-    integer,value:: n, dir, i, j
-    integer:: ii, nd, tempx0, tempy0, tempnx, tempny, nlev
+        implicit none
+        integer,value:: n, dir, i, j
+        integer:: ii, nd, tempx0, tempy0, tempnx, tempny, nlev
 
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-    nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
 
-    tempx0 = gridn(j,1); tempy0 = gridn(j,2)
-    tempnx = gridn(j,3); tempny = gridn(j,4)
+        tempx0 = gird(j,1); tempy0 = gird(j,2)
+        tempnx = gird(j,3); tempny = gird(j,4)
 
-    nd = n/2 ! n is the interval between father nodes
-    ! nd is the interval between the new child node and its father node
+        nd = n/2
+        ! n is the interval between father nodes
+        ! nd is the interval between the new child node and its father node
 
-    if (dir == 1) then
-        if(ii > 1 .and. ii < tempnx) then
-            ! c_sum(ii) = sum(p_num(ii+tempx0,tempy0+1:tempy0+tempny))
-            if(d_indices(ii) <= d_indices(tempnx)/2 .and. &
-               d_indices(ii+1) > d_indices(tempnx)/2) then
-               gridn(j+nd,1) = tempx0 + ii
-               gridn(j+nd,2) = gridn(j,2)
-               gridn(j+nd,3) = tempnx - ii
-               gridn(j+nd,4) = gridn(j,4)
+        if (dir == 1) then
+            if(ii > 1 .and. ii < tempnx) then
+                ! c_sum(ii) = sum(p_num(ii+tempx0,tempy0+1:tempy0+tempny))
+                if(d_indices(ii) <= d_indices(tempnx)/2 .and. &
+                d_indices(ii+1) > d_indices(tempnx)/2) then
+                gird(j+nd,1) = tempx0 + ii
+                gird(j+nd,2) = gird(j,2)
+                gird(j+nd,3) = tempnx - ii
+                gird(j+nd,4) = gird(j,4)
 
-               gridn(j,3) = ii
+                gird(j,3) = ii
+                endif
             endif
-        endif
-    else
-        if(ii > 1 .and. ii < tempny) then
-            ! c_sum(ii) = sum(p_num(tempx0+1:tempx0+tempnx,ii+tempy0))
-            if(d_indices(ii) <= d_indices(tempny)/2 .and. &
-               d_indices(ii+1) > d_indices(tempny)/2) then
-               gridn(j+nd,1) = gridn(j,1)
-               gridn(j+nd,2) = tempy0 + ii
-               gridn(j+nd,3) = gridn(j,3)
-               gridn(j+nd,4) = tempny - ii
-
-               gridn(j,4) = ii
-            endif
-        endif
-    end if
-
-    length = gridn(j+nd,3)*gridn(j+nd,4)
-    ! this is the total length of zone array when it was transformed to 1D
-
-    if(ii <= length) then
-        if(mod(ii,gridn(j+nd,3)) == 0) then
-            j = ii/gridn(j+nd,3)
-            i = gridn(j+nd,3)
         else
-            j = ii/gridn(j+nd,3) + 1
-            i = mod(ii,gridn(j+nd,3))
+            if(ii > 1 .and. ii < tempny) then
+                ! c_sum(ii) = sum(p_num(tempx0+1:tempx0+tempnx,ii+tempy0))
+                if(d_indices(ii) <= d_indices(tempny)/2 .and. &
+                d_indices(ii+1) > d_indices(tempny)/2) then
+                gird(j+nd,1) = gird(j,1)
+                gird(j+nd,2) = tempy0 + ii
+                gird(j+nd,3) = gird(j,3)
+                gird(j+nd,4) = tempny - ii
+
+                gird(j,4) = ii
+                endif
+            endif
         end if
-        Zonet_new(ii) = j + nd - 1
-    end if
+
+        length = gird(j+nd,3)*gird(j+nd,4)
+        ! this is the total length of zone array when it was transformed to 1D
+
+        if(ii <= length) then
+            if(mod(ii,gird(j+nd,3)) == 0) then
+                j = ii/gird(j+nd,3)
+                i = gird(j+nd,3)
+            else
+                j = ii/gird(j+nd,3) + 1
+                i = mod(ii,gird(j+nd,3))
+            end if
+            Zonet_new(ii) = j + nd - 1
+        end if
 
     end subroutine build_tree
 
 end module create_sudomain
-
-! for each nlev (do loop on cpu, can be a module)
-! 1. case(1/-1)
-! 2.
 
