@@ -30,21 +30,6 @@ use exchange_zone
 use exchange_particles
 
 implicit none
-
-integer,parameter:: tPB = 256 ! block size, is it the larger the better?
-integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE)
-integer:: n_proc ! this is the total MPI processes and t_rank = n_proc - 1
-integer:: fh0, fh1, fh2, fh3, fh4
-character(len=MPI_MAX_PROCESSOR_NAME):: hostname
-character(200):: loadf, restartf, exitedf, logf, message
-integer:: deviceID, namelength, np_active_log, add_f
-integer(MPI_OFFSET_KIND):: offset
-integer,allocatable:: nump(:)
-!--------------------------------------------------------------------
-integer:: np_ps, p_redis, path, nsub, cycle_f
-integer,allocatable:: PME_tot(:,:,:),subid(:)
-integer:: np_lo, np_ln, np_ro, np_rn
-! ??? probably these above line is not necessary anymore.
 !--------------------------------------------------------------------
 ! IO control
 ! ipwrite controls an ASCII, .3D particle file not recommended due to poor performance
@@ -251,7 +236,7 @@ end interface
     allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
             Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
             EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+                Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
     allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
 
     allocate(out_np_de(1),ET_np_de(1))
@@ -282,7 +267,6 @@ end interface
     outkk = tout1 + 1
 
     ! set ET DT to ParFlow one and allocate ET arrays accordingly
-    ET_dt = pfdt
     allocate(PET_balance(pfnt,2))
     allocate(PET_balance_da(pfnt,2))
     PET_balance = 0.0d0
@@ -752,7 +736,7 @@ end interface
                 ET_comp_cpu(2) = ET_comp_cpu(2)/ET_mass_cpu(1)
                 ET_comp_cpu(3) = ET_comp_cpu(3)/ET_mass_cpu(1)
             end if
-            write(13,'(6(e12.5),i12)') float(kk)*ET_dt, ET_age_cpu(1), ET_comp_cpu(1), &
+            write(13,'(6(e12.5),i12)') float(kk)*pfdt, ET_age_cpu(1), ET_comp_cpu(1), &
                                     ET_comp_cpu(2), ET_comp_cpu(3), ET_mass_cpu(1), &
                                     ET_np_cpu(1)
             flush(13)
@@ -763,12 +747,12 @@ end interface
                 Out_comp_cpu(2) = Out_comp_cpu(2)/Out_mass_cpu(1)
                 Out_comp_cpu(3) = Out_comp_cpu(3)/Out_mass_cpu(1)
             end if
-            write(15,64) float(kk)*ET_dt, Out_age_cpu(1), Out_comp_cpu(1), &
+            write(15,64) float(kk)*pfdt, Out_age_cpu(1), Out_comp_cpu(1), &
                         Out_comp_cpu(2), Out_comp_cpu(3), Out_mass_cpu(1), &
                         Out_np_cpu(1)
             flush(15)
 
-            write(16,'(5(e12.5,2x))') float(kk)*ET_dt, PET_balance(kk,1), PET_balance(kk,2), &
+            write(16,'(5(e12.5,2x))') float(kk)*pfdt, PET_balance(kk,1), PET_balance(kk,2), &
                                     PET_balance_da(kk,1), PET_balance_da(kk,2)
             flush(16)
 
@@ -878,8 +862,10 @@ end interface
 
         ! LB criteria: if the difference between max- and min-number of particles over some limitation
         if(dble(maxval(nump) - minval(nump))/maxval(nump) > 0.5d0) then
-            !!!! call decomposition
             ! deallocate
+            call gridinfo()
+            call zone_exchange()
+            ! update ix1 etc.
             ! allocate
             ! initialization if necessary
             ! Build neighbor list. do this after a particle loop
