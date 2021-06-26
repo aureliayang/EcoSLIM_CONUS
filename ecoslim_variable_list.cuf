@@ -159,7 +159,7 @@ module variable_list
     integer,parameter:: buff = 1  ! Buffer can be specified by user, for GW 1km or 2km is enough
     integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2  ! this is the old
     integer:: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
-    integer:: neigh_listo, neigh_listn
+    integer,allocatable,pinned:: neigh_listo(:), neigh_listn(:)
 
     integer,allocatable:: nump(:)
     integer,allocatable,device:: Zones_old(:,:), Zones_new(:,:)

@@ -9,13 +9,14 @@ module create_sudomain
     use variable_list, only: P_de
     use variable_list, only: p_num, c_sum
     use variable_list, only: Zone_de, d_indices
-    use variable_list, only: ppx, qqy
+    use variable_list, only: ppx, qqy, nx, ny, tPB
     use variable_list, only: dx,dy,ix1,iy1,nnx1,nny1,np_active
     use variable_list, only: gird, grid_old
+    ! grid is on each rank while grid_old is only on ppx*qqy
     use variable_list, only: Zonet_old, Zonet_new
 
 contains
-    subroutine gridinfo(nx,ny,tPB)
+    subroutine gridinfo()
         ! this kernel only happens on the extra GPU
         ! 1 0 0 0 0 0 0 0  n=8  nd=4 j do 1
         ! 1 0 0 0 1 0 0 0  n=4  nd=2 j do 2
@@ -25,7 +26,6 @@ contains
         ! n is the interval between father nodes
         ! nd is the interval between the new child node and its father node
         implicit none
-        integer:: nx, ny, tPB
         integer:: i, j, dir, nlev, n
         integer:: max_dim
 

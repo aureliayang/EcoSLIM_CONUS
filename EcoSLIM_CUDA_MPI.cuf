@@ -862,12 +862,31 @@ end interface
 
         ! LB criteria: if the difference between max- and min-number of particles over some limitation
         if(dble(maxval(nump) - minval(nump))/maxval(nump) > 0.5d0) then
+
             ! deallocate
+
             call gridinfo()
             call zone_exchange()
-            ! update ix1 etc.
+
+            ix1  = grid(rank+1,1); nnx1 = grid(rank+1,3)
+            iy1  = grid(rank+1,2); nny1 = grid(rank+1,4)
+            ix2  = ix1 - buff; nnx2 = nnx1 + 2*buff
+            iy2  = iy1 - buff; nny2 = nny1 + 2*buff
+            if(ix1 == Xgmin) then
+               ix2 = ix1
+               nnx2 = nnx2 - buff
+            endif
+            if(ix1+nnx1 == Xgmax) nnx2 = nnx2 - buff
+
+            if(iy1 == Ygmin) then
+                iy2 = iy1
+                nny2 = nny2 - buff
+             endif
+            if(iy1+nny1 == Ygmax) nny2 = nny2 - buff
+
             ! allocate
             ! initialization if necessary
+
             ! Build neighbor list. do this after a particle loop
             call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
             tPB>>>(zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank)
