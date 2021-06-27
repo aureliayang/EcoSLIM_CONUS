@@ -93,7 +93,6 @@ end interface
     call MPI_COMM_CREATE(MPI_COMM_WORLD, work_group, work_comm, ierr)
     call MPI_COMM_CREATE(MPI_COMM_WORLD, manage_group, manage_comm, ierr)
 !--------------------------------------------------------------------
-    ! This part has to be thought again for extra processes to do I/O
     ! Get and set unique device
     call assignDevice(deviceID)
     call MPI_GET_PROCESSOR_NAME(hostname, namelength, ierr)
@@ -195,7 +194,7 @@ end interface
 
     ! nCLMsoil = 10 ! number of CLM soil layers over the root zone !this doesn't matter
     nzclm = 13 + nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables not domain NZ,
-                          !  e.g. 23 for 10 soil layers (default) and 17 for 4 soil layers (Noah soil
+                          ! e.g. 23 for 10 soil layers (default) and 17 for 4 soil layers (Noah soil
                           ! layer setup)
     n_constituents = 9
 
@@ -212,10 +211,9 @@ end interface
     ! then we get subdomain info in grid array
     ! for init we don't have to build p_sum on each rank, just
     ! use that for the whole domain with init value of 1
-
     call copy_grid(ix1,iy1,ix2,iy2,nnx1,nny1,nnx2,nny2,grid)
-    call allocate_arrays_temp(ix1,iy1,nnx1,nny1,nx,ny,nz)
-    call allocate_arrays_const(ix1,iy1,nnx1,nny1,nx,ny,nz)
+    call allocate_arrays_temp()
+    call allocate_arrays_const()
     call receive_Zone_de(grid,rank) ! recv Zone_de
 !-------------------------------------
     ! read dx, dy as scalars
@@ -250,7 +248,6 @@ end interface
     do kk = outkk, pfnt
         Time_Next(kk) = float(kk)*pfdt
     end do
-
     Time_first = float(outkk-1)*pfdt
 
     ! read in velocity multiplier

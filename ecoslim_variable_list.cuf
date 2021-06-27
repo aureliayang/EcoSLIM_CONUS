@@ -27,6 +27,7 @@ module variable_list
     !--------------------------------------------------------------------
     use mpi
     use cudafor
+    use mrand, only: h
     !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
@@ -189,5 +190,99 @@ module variable_list
     ! grid(1,3) = nx; grid(1,4) = ny
 
 contains
+    subroutine allocate_arrays_temp()
+        use mpi
+        implicit none
+        !--------------------------------------------------------------------
+        ! allocate arrays
+        if (rank /= ppx*qqy) then
+            allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+
+            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+                    Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+                    Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1))
+
+            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                    Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                    EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+
+            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
+            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+
+            ! Intialize everything to Zero
+            Vx = 0.0d0
+            Vy = 0.0d0
+            Vz = 0.0d0
+            Saturation = 0.0d0
+            Porosity = 0.0d0
+            EvapTrans = 0.0d0
+            EvapTrans_da = 0.0d0
+            C = 0.0d0
+            ! Ind is initialized when reading it.
+            ! CLMvars is initialized when reading it.
+            ! DEM is initialized when reading it.
+
+            !-------------------------------------
+            ! allocate arrays on GPU
+            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+                    Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+                    Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1), &
+                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                    Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                    EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                    CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
+                        Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+        end if
+    end subroutine allocate_arrays_temp
+
+    subroutine allocate_arrays_const()
+        use mpi
+        implicit none
+
+        if (rank /= ppx*qqy) then
+            allocate(out_np_cpu(1),ET_np_cpu(1))
+            allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
+            allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
+            allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
+
+            allocate(out_np_de(1),ET_np_de(1))
+            allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
+            allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+            allocate(mean_age_de(1),mean_comp_de(1),mean_mass_de(1),total_mass_de(1))
+
+            allocate(neigh_listn(t_rank),neigh_listo(t_rank))
+            allocate(neigh_list(t_rank),nump(t_rank))
+            allocate(d_isValid(np),d_isValid(np),h(np))
+
+            allocate(dz(nz),dz2(nz),dz_de(nz))
+            allocate(conc_header(n_constituents))
+
+            allocate(PET_balance(2),PET_balance_da(2))
+            allocate(PET_balance_de(2),PET_balance_da_de(2))
+            PET_balance = 0.0d0
+            PET_balance_da = 0.0d0
+
+            allocate(grid(t_rank-1,4))
+        endif
+
+    end subroutine allocate_arrays_const
+
+    subroutine deallocate_temp()
+        use mpi
+        implicit none
+
+        if (rank /= ppx*qqy) then
+            deallocate(Vx_de,Vy_de,Vz_de,C_de,Ind_de,Saturation_de, &
+            Porosity_de,EvapTrans_de,CLMvars_de)
+            ! zone_de will be deallocated in exchange zone after the use
+            deallocate(Vx,Vy,Vz,C,Ind,Saturation,Porosity,EvapTrans, &
+            EvapTrans_da,CLMvars,DEM)
+        endif
+
+    end subroutine deallocate_temp
 
 end module variable_list

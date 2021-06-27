@@ -1,6 +1,6 @@
 module subdomain_bound
-
-    contains
+    use variable_list, only: ppx, qqy
+contains
     subroutine global_xyz(nx, ny, nz, dx, dy, dz, rank, &
         Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, fh1, &
         loadf, restartf, exitedf, logf)
@@ -14,44 +14,46 @@ module subdomain_bound
         character(200):: loadf, restartf, exitedf, logf, message
         integer:: k, ierr, fh1
 
-        ! set up domain boundaries
-        Xmin = 0.0d0
-        Ymin = 0.0d0
-        Zmin = 0.0d0
-        Xmax = dble(nx)*dx
-        Ymax = dble(ny)*dy
-        Zmax = 0.0d0
-        do k = 1, nz
-            Zmax = Zmax + dz(k)
-        end do
+        if (rank /= ppx*qqy) then
+            ! set up domain boundaries
+            Xmin = 0.0d0
+            Ymin = 0.0d0
+            Zmin = 0.0d0
+            Xmax = dble(nx)*dx
+            Ymax = dble(ny)*dy
+            Zmax = 0.0d0
+            do k = 1, nz
+                Zmax = Zmax + dz(k)
+            end do
 
-        write(loadf,'(a,i3.3,a)') 'Load_info.', rank, '.txt'
-        write(restartf,'(a,i3.3,a)') 'Particle_restart.',rank,'.bin'
-        write(exitedf,'(a,i3.3,a)') 'Exited_particles.',rank,'.bin'
-        write(logf,'(a,i3.3,a)') 'Log_particles.',rank,'.txt'
+            write(loadf,'(a,i3.3,a)') 'Load_info.', rank, '.txt'
+            write(restartf,'(a,i3.3,a)') 'Particle_restart.',rank,'.bin'
+            write(exitedf,'(a,i3.3,a)') 'Exited_particles.',rank,'.bin'
+            write(logf,'(a,i3.3,a)') 'Log_particles.',rank,'.txt'
 
-        call MPI_FILE_OPEN(MPI_COMM_SELF,loadf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-        MPI_INFO_NULL,fh1,ierr)
+            call MPI_FILE_OPEN(MPI_COMM_SELF,loadf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+            MPI_INFO_NULL,fh1,ierr)
 
-        write(message,'(A)') NEW_LINE(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'(A)') NEW_LINE(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'(A,A)') '## Domain Info', NEW_LINE(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'(A,A)') '## Domain Info', NEW_LINE(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("Xmin:",e12.5," Xmax:",e12.5,A)') Xmin, Xmax, NEW_LINE(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'("Xmin:",e12.5," Xmax:",e12.5,A)') Xmin, Xmax, NEW_LINE(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("Ymin:",e12.5," Ymax:",e12.5,A)') Ymin, Ymax, NEW_LINE(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'("Ymin:",e12.5," Ymax:",e12.5,A)') Ymin, Ymax, NEW_LINE(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        write(message,'("Zmin:",e12.5," Zmax:",e12.5,A)') Zmin, Zmax, NEW_LINE(' ')
-        call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(message,'("Zmin:",e12.5," Zmax:",e12.5,A)') Zmin, Zmax, NEW_LINE(' ')
+            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        endif
 
     end subroutine global_xyz
 
