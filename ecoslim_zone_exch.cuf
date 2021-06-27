@@ -1,4 +1,7 @@
 module exchange_zone
+! subroutine zone_exchange
+! attributes(global) subroutine label_particles
+
 use cudafor
 use thrust
 use variable_list, only: N_recv_all, N_send
@@ -126,7 +129,6 @@ contains
         ! then deallocate two zone arrays on each rank
         if(rank /= ppx*qqy) deallocate(Zones_old)
     end subroutine zone_exchange
-
 
     attributes(global) subroutine label_particles(nind,rank,dx,dy,ix1,iy1,np_active)
         ! use this info to send, it looks we don't need this to recv?

@@ -1,4 +1,6 @@
 module exchange_particles
+    ! subroutine particle_exchange
+
     use cudafor
     use thrust
     use variable_list, only: N_recv_all, N_send, neigh_list

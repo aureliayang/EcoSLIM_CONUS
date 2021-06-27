@@ -1,4 +1,9 @@
 module add_particles
+    ! attributes(global) subroutine add_init_particles
+    ! attributes(global) subroutine river_init_particles
+    ! attributes(global) subroutine scan_new_particles
+    ! attributes(global) subroutine add_new_particles
+
     use curand_device
     ! call curand_uniform
     use mrand, only: h

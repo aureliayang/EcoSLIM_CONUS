@@ -1,5 +1,9 @@
 module variable_list
 
+    ! subroutine allocate_arrays_temp
+    ! subroutine allocate_arrays_const
+    ! subroutine deallocate_temp
+
     ! P = Particle array [np,attributes]
     ! np = Number of particles
     ! P(np,1) = X coordinate [L]
