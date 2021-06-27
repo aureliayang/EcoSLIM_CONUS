@@ -1,4 +1,13 @@
 module utilities
+    ! subroutine copy_grid
+    ! subroutine allocate_arrays_temp
+    ! subroutine allocate_arrays_const
+    ! subroutine deallocate_temp
+    ! subroutine combine_p_sum
+    ! attributes(global) subroutine build_p_sum
+    ! subroutine subzones_for_transfer
+    ! subroutine receive_Zone_de
+
     use cudafor
 
     use variable_list, only: Xgmin, Xgmax, Ygmin, Ygmax
@@ -26,28 +35,30 @@ module utilities
 
 contains
     subroutine copy_grid(ix1,iy1,ix2,iy2,nnx1,nny1, &
-                         nnx2,nny2,grid,rank)
+                         nnx2,nny2,grid)
         implicit none
         integer:: ix1, iy1, ix2, iy2, nnx1, nny1, nnx2, nny2
-        integer:: grid(:,:), rank
+        integer:: grid(:,:)
 
-        ix1  = grid(rank+1,1); nnx1 = grid(rank+1,3)
-        iy1  = grid(rank+1,2); nny1 = grid(rank+1,4)
+        if (rank /= ppx*qqy) then
+            ix1  = grid(rank+1,1); nnx1 = grid(rank+1,3)
+            iy1  = grid(rank+1,2); nny1 = grid(rank+1,4)
 
-        ix2  = ix1 - buff; nnx2 = nnx1 + 2*buff
-        iy2  = iy1 - buff; nny2 = nny1 + 2*buff
+            ix2  = ix1 - buff; nnx2 = nnx1 + 2*buff
+            iy2  = iy1 - buff; nny2 = nny1 + 2*buff
 
-        if(ix1 == Xgmin) then
-            ix2  = ix1
-            nnx2 = nnx2 - buff
-        endif
-        if(ix1+nnx1 == Xgmax) nnx2 = nnx2 - buff
+            if(ix1 == Xgmin) then
+                ix2  = ix1
+                nnx2 = nnx2 - buff
+            endif
+            if(ix1+nnx1 == Xgmax) nnx2 = nnx2 - buff
 
-        if(iy1 == Ygmin) then
-            iy2  = iy1
-            nny2 = nny2 - buff
-        endif
-        if(iy1+nny1 == Ygmax) nny2 = nny2 - buff
+            if(iy1 == Ygmin) then
+                iy2  = iy1
+                nny2 = nny2 - buff
+            endif
+            if(iy1+nny1 == Ygmax) nny2 = nny2 - buff
+        end if
 
     end subroutine copy_grid
 

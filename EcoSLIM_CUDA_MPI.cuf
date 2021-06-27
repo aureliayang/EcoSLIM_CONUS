@@ -213,7 +213,7 @@ end interface
     ! for init we don't have to build p_sum on each rank, just
     ! use that for the whole domain with init value of 1
 
-    call copy_grid(ix1,iy1,ix2,iy2,nnx1,nny1,nnx2,nny2,grid,rank)
+    call copy_grid(ix1,iy1,ix2,iy2,nnx1,nny1,nnx2,nny2,grid)
     call allocate_arrays_temp(ix1,iy1,nnx1,nny1,nx,ny,nz)
     call allocate_arrays_const(ix1,iy1,nnx1,nny1,nx,ny,nz)
     call receive_Zone_de(grid,rank) ! recv Zone_de
