@@ -255,22 +255,17 @@ end interface
 
     ! read in velocity multiplier
     read(10,*) V_mult
-
     ! do we read in clm evap trans?
     read(10,*) clmtrans
     ! do we read in clm output file?
     read(10,*) clmfile
-
     ! read in IC number of particles for flux
     read(10,*) iflux_p_res
-
     ! read in density h2o
     read(10,*) denh2o
-
     ! read in diffusivity
     ! moldiff = (1.15e-9)*3600.d0
     read(10,*) moldiff
-
     ! fraction of dx/Vx
     read(10,*) dtfrac
 
