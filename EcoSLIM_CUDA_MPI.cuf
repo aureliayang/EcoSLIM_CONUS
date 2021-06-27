@@ -211,6 +211,8 @@ end interface
     ! then we get subdomain info in grid array
     ! for init we don't have to build p_sum on each rank, just
     ! use that for the whole domain with init value of 1
+    ! when resart, no need this part, directly read from resart file
+
     call copy_grid(ix1,iy1,ix2,iy2,nnx1,nny1,nnx2,nny2,grid)
     call allocate_arrays_temp()
     call allocate_arrays_const()
@@ -622,7 +624,7 @@ end interface
 
         ! this has to be checked later.
         ! call MPI_ALLReduce(MPI_IN_PLACE, PET_balance_da(kk,:), 2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
         PET_balance = PET_balance_de
         ! print to log file, or PET_balance can be a long array and do print at last
 !-------------------------------------
@@ -657,15 +659,15 @@ end interface
 !-------------------------------------
         ! for such reduce, we can use a specific MPI process to do.
         ! we can do this using cuda-aware MPI, and then copy back.
-        call MPI_ALLReduce(MPI_IN_PLACE, ET_age_cpu,  1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_cpu, 3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, ET_np_cpu,   1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, ET_age_cpu,  1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_cpu, 3,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, ET_np_cpu,   1,MPI_INTEGER,         MPI_SUM,work_comm,ierr)
 
-        call MPI_ALLReduce(MPI_IN_PLACE, Out_age_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_cpu,3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_cpu,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-        call MPI_ALLReduce(MPI_IN_PLACE, Out_np_cpu,  1,MPI_INTEGER,         MPI_SUM,MPI_COMM_WORLD,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, Out_age_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_cpu,3,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_cpu,1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        call MPI_ALLReduce(MPI_IN_PLACE, Out_np_cpu,  1,MPI_INTEGER,         MPI_SUM,work_comm,ierr)
 
         out_age_cpu    = out_age_de;    out_mass_cpu   = out_mass_de
         out_comp_cpu   = out_comp_de;   out_np_cpu     = out_np_de
@@ -676,7 +678,7 @@ end interface
         ! I think here it is not necessary. You just need to write into hdf5 if necessary.
 
         ! call MPI_Reduce(np_active, np_active_log, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-        call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
+        call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,work_comm,ierr)
 
         if(rank == 0) then
             write(12,*) sum(nump), T2-T1, redis_time

@@ -1,4 +1,7 @@
 module particle_loop
+    ! attributes(global) subroutine particles_independent
+    ! attributes(global) subroutine Update_C_Array
+
     use curand_device
     use mrand, only: h
 contains
