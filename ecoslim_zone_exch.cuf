@@ -2,7 +2,7 @@ module exchange_zone
 use cudafor
 use thrust
 use variable_list, only: N_recv_all, N_send
-use variable_list, only: Zones_old, Zones_new
+use variable_list, only: Zone_de, Zones_old
 use variable_list, only: Zonet_old, Zonet_new
 use variable_list, only: P_exit, P_de, d_isValid, d_indices, &
                          P_send, P_recv, holes
@@ -22,10 +22,9 @@ contains
                 request1(t_rank), request2(t_rank), &
                 request3(t_rank), request4(t_rank)
 
-        allocate(Zones_old(-buff+1:nnx1n+buff,-buff+1:nny1n+buff), &
-                 Zones_new(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+        allocate(Zones_old(-buff+1:nnx1+buff,-buff+1:nny1+buff))
 
-        ! get Zones_old and Zones_new from rank ppx*qqy
+        ! get Zone_de and Zones_old from rank ppx*qqy
         ! now can just send and recv, later, we can change it to scatter and gather
         ! zone has been sent in DDC subroutine
 
@@ -33,12 +32,12 @@ contains
         rank,dx,dy,ix1,iy1,np_active)
 
         call scan_zone<<< ceiling(dble((nnx1n+2*buff)*(nny1n+2*buff))/tPB), &
-        tPB >>>(Zones_old,nnx1n,nny1n,buff,d_isValid,rank,t_rank)
+        tPB >>>(Zone_de,nnx1n,nny1n,buff,d_isValid,rank,t_rank)
         neigh_listo = d_isValid(1:t_rank)
         if(sum(neigh_listo) > 0) allocate(N_recv_all(sum(neigh_listo)))
 
         call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-        tPB >>>(Zones_new,nnx1,nny1,buff,d_isValid,rank,t_rank)
+        tPB >>>(Zones_old,nnx1,nny1,buff,d_isValid,rank,t_rank)
         neigh_listn = d_isValid(1:t_rank)
         ! old cut new. so the indicator in the box that does not this rank number
         ! need to be sent to other rank.
@@ -46,7 +45,7 @@ contains
         ncount2 = 0; ncount4 = 0
         do i = 0, t_rank-1
         ! use old indicators boxed by new BC to recv
-        ! use Zones_old and neigh_listo
+        ! use Zone_de and neigh_listo
             if(i == rank) then
             ! this is different from particle exchange, if there is this zone,
             ! exchange must happen. but if is better to add safe check.
@@ -74,7 +73,7 @@ contains
             endif
 
             ! use new indicators boxed by old BC to send
-            ! use Zones_new and neigh_listn
+            ! use Zones_old and neigh_listn
             if(neigh_listn(i+1) == 1) then
 
                 ncount2 = ncount2 + 1
@@ -125,7 +124,7 @@ contains
         endif
 
         ! then deallocate two zone arrays on each rank
-        if(rank /= ppx*qqy) deallocate(Zones_old, Zones_new)
+        if(rank /= ppx*qqy) deallocate(Zones_old)
     end subroutine zone_exchange
 
 
@@ -148,8 +147,8 @@ contains
             Ploc(2) = floor(P(ii,2) / dy)
 
             P(ii,13+2*nind) = P(ii,8)
-            if(Zones_new(Ploc(1)+1,Ploc(2)+1) /= rank) then
-                P(ii,13+2*nind) = Zones_new(Ploc(1)+1,Ploc(2)+1) + 10
+            if(Zones_old(Ploc(1)+1,Ploc(2)+1) /= rank) then
+                P(ii,13+2*nind) = Zones_old(Ploc(1)+1,Ploc(2)+1) + 10
             end if
 
             P(ii,1) = P(ii,1) + ix1*dx
