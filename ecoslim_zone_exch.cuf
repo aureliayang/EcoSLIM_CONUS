@@ -4,157 +4,160 @@ module exchange_zone
 
 use cudafor
 use thrust
+use compact_array, only: scan_zone, prepare_neighbor, prepare_holes, compaction_inplace
 use variable_list, only: N_recv_all, N_send
 use variable_list, only: Zone_de, Zones_old
 use variable_list, only: Zonet_old, Zonet_new
-use variable_list, only: P_exit, P_de, d_isValid, d_indices, &
-                         P_send, P_recv, holes
+use variable_list, only: P_de, d_isValid, d_indices, P_send, P_recv, holes
 use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2  ! this is the old
-use variable_list, only: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
-use variable_list, only: buff
+use variable_list, only: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n ! this is temporary new
+use variable_list, only: buff, rank, t_rank, tPB, status
+use variable_list, only: nind, np_active
 use variable_list, only: neigh_listo, neigh_listn
+use variable_list, only: dx, dy
 
 contains
-    subroutine zone_exchange(rank,t_rank,nind,tPB,np_active)
+    subroutine zone_exchange()
         use mpi
         implicit none
-        integer,intent(in):: rank, t_rank, nind, tPB
-        integer,intent(inout):: np_active
-        integer:: i, j, ierr, status(MPI_STATUS_SIZE)
+        integer:: i, j, ierr
         integer:: ncount1, ncount2, ncount3, ncount4, &
-                request1(t_rank), request2(t_rank), &
-                request3(t_rank), request4(t_rank)
+                  request1(t_rank), request2(t_rank), &
+                  request3(t_rank), request4(t_rank)
 
-        allocate(Zones_old(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+        ! send first and then recv
+        if(rank /= ppx*qqy) then
 
-        ! get Zone_de and Zones_old from rank ppx*qqy
-        ! now can just send and recv, later, we can change it to scatter and gather
-        ! zone has been sent in DDC subroutine
+            call label_particles<<< ceiling(dble(np_active)/tPB),tPB >>>()
 
-        call label_particles<<< ceiling(dble(np_active)/tPB),tPB >>>(nind, &
-        rank,dx,dy,ix1,iy1,np_active)
+            call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+            tPB >>>(Zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank-1)
+            neigh_listn = d_isValid(1:t_rank-1)
+            ! old cut new. so the indicator in the box which are not this rank number
+            ! need to be sent to other ranks.
+            ! maybe the dim of subdomain smaller than the total number of ranks. ???
 
-        call scan_zone<<< ceiling(dble((nnx1n+2*buff)*(nny1n+2*buff))/tPB), &
-        tPB >>>(Zone_de,nnx1n,nny1n,buff,d_isValid,rank,t_rank)
-        neigh_listo = d_isValid(1:t_rank)
-        if(sum(neigh_listo) > 0) allocate(N_recv_all(sum(neigh_listo)))
+            call scan_zone<<< ceiling(dble((nnx1n+2*buff)*(nny1n+2*buff))/tPB), &
+            tPB >>>(Zones_old,nnx1n,nny1n,buff,d_isValid,rank,t_rank-1)
+            neigh_listo = d_isValid(1:t_rank-1)
+            if(sum(neigh_listo) > 0) allocate(N_recv_all(sum(neigh_listo)))
 
-        call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-        tPB >>>(Zones_old,nnx1,nny1,buff,d_isValid,rank,t_rank)
-        neigh_listn = d_isValid(1:t_rank)
-        ! old cut new. so the indicator in the box that does not this rank number
-        ! need to be sent to other rank.
+            ncount2 = 0
+            do i = 0, t_rank-2
 
-        ncount2 = 0; ncount4 = 0
-        do i = 0, t_rank-1
-        ! use old indicators boxed by new BC to recv
-        ! use Zone_de and neigh_listo
-            if(i == rank) then
-            ! this is different from particle exchange, if there is this zone,
-            ! exchange must happen. but if is better to add safe check.
-                ncount1 = 0
-                do j = 0, t_rank-1
-                    if(neigh_listo(j+1) == 1) then ! be careful j+1
-                        ncount1 = ncount1 + 1
-                        call MPI_IRECV(N_recv_all(ncount1),1,MPI_INTEGER,j,40,MPI_COMM_WORLD,request1(ncount1),ierr)
+                ! use new indicators boxed by old BC to send, so use Zone_de and neigh_listn
+                if(neigh_listn(i+1) == 1) then
+
+                    ncount2 = ncount2 + 1
+
+                    call prepare_neighbor<<<ceiling(dble(np_active)/tPB),&
+                    tPB>>>(P_de(:,13+2*nind),d_isValid,np_active,i) ! get d_isValid
+                    call thrustscan(d_isValid,np_active,d_indices)
+
+                    if(ncount2 /= 1) call MPI_WAIT(request3(ncount2-1),status,ierr)
+                    N_send = np_active - d_indices(np_active) ! this should be legal
+                    call MPI_ISEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,request3(ncount2),ierr)
+
+                    if(ncount2 /= 1) then
+                        call MPI_WAIT(request4(ncount2-1),status,ierr)
+                        deallocate(P_send)
                     end if
-                end do
+                    allocate(holes(N_send),P_send(N_send,17+nind*2))
 
-                call MPI_WAITALL(ncount1,request1(1:ncount1),status,ierr)
-                allocate(P_recv(sum(N_recv_all),17+nind*2))
+                    call prepare_holes<<<ceiling(dble(np_active)/tPB),&
+                    tPB>>>(holes,d_indices,d_isValid,np_active)
+                    ! block size cannot be reduced ？？
 
-                ncount1 = 0
-                do j = 0, t_rank-1
-                    if(neigh_listo(j+1) == 1) then
-                        ncount1 = ncount1 + 1
-                        call MPI_IRECV(P_recv(sum(N_recv_all(1:ncount1-1))+1:sum(N_recv_all(1:ncount1)),:), &
-                        N_recv_all(ncount1)*(17+nind*2),MPI_DOUBLE_PRECISION, &
-                        j,41,MPI_COMM_WORLD,request2(ncount1),ierr)
-                    end if
-                end do
-                ! The following work doesn't care about if this step has been finished until the connection.
+                    call compaction_inplace<<<ceiling(dble(np_active)/tPB),&
+                    tPB>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,17+nind*2)
+
+                    call MPI_ISEND(P_send,N_send*(17+nind*2),MPI_DOUBLE_PRECISION,i,41,&
+                                MPI_COMM_WORLD,request4(ncount2),ierr)
+                    ! gpu send since it is a gpu buffer?
+
+                    np_active = d_indices(np_active); deallocate(holes)
+
+                end if
+
+                ! use old indicators boxed by new BC to recv, so use Zones_old and neigh_listo
+                if(i == rank) then
+                ! this is different from particle exchange, if there is this zone,
+                ! exchange must happen. but if is better to add safe check.
+                    ncount1 = 0
+                    do j = 0, t_rank-2
+                        if(neigh_listo(j+1) == 1) then ! be careful j+1
+                            ncount1 = ncount1 + 1
+                            call MPI_IRECV(N_recv_all(ncount1),1,MPI_INTEGER,j,40,MPI_COMM_WORLD,request1(ncount1),ierr)
+                        end if
+                    end do
+
+                    call MPI_WAITALL(ncount1,request1(1:ncount1),status,ierr)
+                    allocate(P_recv(sum(N_recv_all),17+nind*2))
+
+                    ncount1 = 0
+                    do j = 0, t_rank-2
+                        if(neigh_listo(j+1) == 1) then
+                            ncount1 = ncount1 + 1
+                            call MPI_IRECV(P_recv(sum(N_recv_all(1:ncount1-1))+1:sum(N_recv_all(1:ncount1)),:), &
+                            N_recv_all(ncount1)*(17+nind*2),MPI_DOUBLE_PRECISION, &
+                            j,41,MPI_COMM_WORLD,request2(ncount1),ierr)
+                        end if
+                    end do
+                    ! The following work doesn't care about if this step has been finished until the connection.
+                endif
+
+            end do
+
+            ! considering status of P_send
+            ! connect received particles
+            if(ncount1 > 0) then
+                call MPI_WAITALL(ncount1,request2(1:ncount1),status,ierr)
+                ! if receive happened, we wait
+
+                call connect_recv<<<ceiling(dble(sum(N_recv_all))/tPB),&
+                tPB>>>(P_de,P_recv,np_active,sum(N_recv_all),17+nind*2)
+                np_active = np_active + sum(N_recv_all)
+
+                deallocate(P_recv) ! deallocate P_send after transfer back to host
             endif
 
-            ! use new indicators boxed by old BC to send
-            ! use Zones_old and neigh_listn
-            if(neigh_listn(i+1) == 1) then
+            ! then deallocate two zone arrays on each rank
+            deallocate(Zone_de,Zones_old)
 
-                ncount2 = ncount2 + 1
-
-                call prepare_neighbor<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(P_de(:,13+2*nind),d_isValid,np_active,i) ! get d_isValid
-                call thrustscan(d_isValid,np_active,d_indices)
-
-                if(ncount2 /= 1) call MPI_WAIT(request3(ncount2-1),status,ierr)
-                N_send = np_active - d_indices(np_active) ! this should be legal
-                call MPI_ISEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,request3(ncount2),ierr)
-
-                ncount4 = ncount4 + 1
-                if(ncount4 /= 1) then
-                    call MPI_WAIT(request4(ncount4-1),status,ierr)
-                    deallocate(P_send)
-                end if
-                allocate(holes(N_send),P_send(N_send,17+nind*2))
-
-                call prepare_holes<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(holes,d_indices,d_isValid,np_active)
-                ! block size cannot be reduced ？？
-
-                call compaction_inplcae<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,17+nind*2)
-
-                call MPI_ISEND(P_send,N_send*(17+nind*2),MPI_DOUBLE_PRECISION,i,41,&
-                            MPI_COMM_WORLD,request4(ncount4),ierr)
-                ! gpu send since it is a gpu buffer?
-
-                np_active = d_indices(np_active); deallocate(holes)
-
+            if(ncount2 > 0) then
+                call MPI_WAIT(request4(ncount2-1),status,ierr)
+                deallocate(P_send)
             end if
 
-        end do
-
-        ! considering status of P_send
-        ! connect received particles
-        if(ncount1 > 0) then
-            call MPI_WAITALL(ncount1,request2(1:ncount1),status,ierr)
-            ! if receive happened, we wait
-
-            call connect_recv<<<ceiling(dble(sum(N_recv_all))/tPB),&
-            tPB>>>(P_de,P_recv,np_active,sum(N_recv_all),17+nind*2)
-            np_active = np_active + sum(N_recv_all)
-
-            deallocate(P_recv) ! deallocate P_send after transfer back to host
         endif
-
-        ! then deallocate two zone arrays on each rank
-        if(rank /= ppx*qqy) deallocate(Zones_old)
     end subroutine zone_exchange
 
-    attributes(global) subroutine label_particles(nind,rank,dx,dy,ix1,iy1,np_active)
-        ! use this info to send, it looks we don't need this to recv?
-        ! use zones_new, i.e., old box with new indicators
+    attributes(global) subroutine label_particles()
+        ! use this info to send, it looks we don't need this process for recv?
+        ! use Zone_de, i.e., old box with new indicators
 
         implicit none
-        integer,value:: nind, rank, ix1, iy1, np_active
-        real(8),value:: dx, dy
         integer:: Ploc(3), ii
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         if(ii < np_active) then
-            P(ii,1) = P(ii,1) - ix1*dx
-            P(ii,2) = P(ii,2) - iy1*dy
 
-            Ploc(1) = floor(P(ii,1) / dx)
-            Ploc(2) = floor(P(ii,2) / dy)
+            P_de(ii,1) = P_de(ii,1) - ix1*dx
+            P_de(ii,2) = P_de(ii,2) - iy1*dy
 
-            P(ii,13+2*nind) = P(ii,8)
-            if(Zones_old(Ploc(1)+1,Ploc(2)+1) /= rank) then
-                P(ii,13+2*nind) = Zones_old(Ploc(1)+1,Ploc(2)+1) + 10
+            Ploc(1) = floor(P_de(ii,1) / dx)
+            Ploc(2) = floor(P_de(ii,2) / dy)
+
+            P_de(ii,13+2*nind) = P_de(ii,8)
+
+            if(Zone_de(Ploc(1)+1,Ploc(2)+1) /= rank) then
+                P_de(ii,13+2*nind) = dble(Zone_de(Ploc(1)+1,Ploc(2)+1) + 10)
             end if
 
-            P(ii,1) = P(ii,1) + ix1*dx
-            P(ii,2) = P(ii,2) + iy1*dy
+            P_de(ii,1) = P_de(ii,1) + ix1*dx
+            P_de(ii,2) = P_de(ii,2) + iy1*dy
+
         endif
 
     end subroutine label_particles

@@ -13,6 +13,7 @@ module exchange_particles
 
 contains
     subroutine particle_exchange(rank,t_rank,nind,tPB,np_active)
+        ! change sequence, send first and then recv
         use mpi
         implicit none
         integer,intent(in):: rank, t_rank, nind, tPB
@@ -24,6 +25,46 @@ contains
 
         ncount2 = 0; ncount4 = 0
         do i = 0, t_rank-1
+
+            !-----------------------------------------
+            ! send part. one by one neighbor, N_send and P_send are repeatedly used.
+            !-----------------------------------------
+            if(neigh_list(i+1) == 1) then
+
+                ncount2 = ncount2 + 1
+
+                call prepare_neighbor<<<ceiling(dble(np_active)/tPB),&
+                tPB>>>(P_de(:,13+2*nind),d_isValid,np_active,i) ! get d_isValid
+                call thrustscan(d_isValid,np_active,d_indices)
+
+                if(ncount2 /= 1) call MPI_WAIT(request3(ncount2-1),status,ierr)
+                N_send = np_active - d_indices(np_active) ! this should be legal
+                call MPI_ISEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,request3(ncount2),ierr)
+
+                if(N_send > 0) then
+                    ncount4 = ncount4 + 1
+                    if(ncount4 /= 1) then
+                        call MPI_WAIT(request4(ncount4-1),status,ierr)
+                        deallocate(P_send)
+                    end if
+                    allocate(holes(N_send),P_send(N_send,17+nind*2))
+
+                    call prepare_holes<<<ceiling(dble(np_active)/tPB),&
+                    tPB>>>(holes,d_indices,d_isValid,np_active)
+                    ! block size cannot be reduced ？？
+
+                    call compaction_inplace<<<ceiling(dble(np_active)/tPB),&
+                    tPB>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,17+nind*2)
+
+                    call MPI_ISEND(P_send,N_send*(17+nind*2),MPI_DOUBLE_PRECISION,i,41,&
+                                MPI_COMM_WORLD,request4(ncount4),ierr)
+                    ! gpu send since it is a gpu buffer?
+
+                    np_active = d_indices(np_active); deallocate(holes)
+                end if
+
+            end if
+
             !-----------------------------------------
             ! receive part. N_recv_all and P_recv are for neighbors which send particles.
             !-----------------------------------------
@@ -62,45 +103,6 @@ contains
                         end if
                     end do
                     ! The following work doesn't care about if this step has been finished until the connection.
-                end if
-
-            end if
-
-            !-----------------------------------------
-            ! send part. one by one neighbor, N_send and P_send are repeatedly used.
-            !-----------------------------------------
-            if(neigh_list(i+1) == 1) then
-
-                ncount2 = ncount2 + 1
-
-                call prepare_neighbor<<<ceiling(dble(np_active)/tPB),&
-                tPB>>>(P_de(:,13+2*nind),d_isValid,np_active,i) ! get d_isValid
-                call thrustscan(d_isValid,np_active,d_indices)
-
-                if(ncount2 /= 1) call MPI_WAIT(request3(ncount2-1),status,ierr)
-                N_send = np_active - d_indices(np_active) ! this should be legal
-                call MPI_ISEND(N_send,1,MPI_INTEGER,i,40,MPI_COMM_WORLD,request3(ncount2),ierr)
-
-                if(N_send > 0) then
-                    ncount4 = ncount4 + 1
-                    if(ncount4 /= 1) then
-                        call MPI_WAIT(request4(ncount4-1),status,ierr)
-                        deallocate(P_send)
-                    end if
-                    allocate(holes(N_send),P_send(N_send,17+nind*2))
-
-                    call prepare_holes<<<ceiling(dble(np_active)/tPB),&
-                    tPB>>>(holes,d_indices,d_isValid,np_active)
-                    ! block size cannot be reduced ？？
-
-                    call compaction_inplcae<<<ceiling(dble(np_active)/tPB),&
-                    tPB>>>(holes,d_indices,d_isValid,P_de,P_send,np_active,17+nind*2)
-
-                    call MPI_ISEND(P_send,N_send*(17+nind*2),MPI_DOUBLE_PRECISION,i,41,&
-                                MPI_COMM_WORLD,request4(ncount4),ierr)
-                    ! gpu send since it is a gpu buffer?
-
-                    np_active = d_indices(np_active); deallocate(holes)
                 end if
 
             end if

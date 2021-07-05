@@ -3,6 +3,9 @@ module create_sudomain
     ! attributes(global) subroutine column_sum
     ! attributes(global) subroutine build_tree
     !--------------------------------------------
+    ! this module is used to decompose the modeling domain based on
+    ! p_num. For init, p_num=1, so the domain will be evenly decomposed.
+
     use cudafor
     use thrust
 
@@ -24,15 +27,16 @@ contains
 
         ! n is the interval between father nodes
         ! nd is the interval between the new child node and its father node
+
         use mpi
         implicit none
         integer:: i, j, dir, nlev, n
-        integer:: max_dim
+        integer:: max_dim, ierr
 
         if (rank == ppx*qqy) then ! this probably will be put in main
             grid_old  = grid
             Zonet_old = Zonet_new
-            grid = 0
+            grid = 0   ! this is legal
             grid(1,1) = 0;  grid(1,2) = 0
             grid(1,3) = nx; grid(1,4) = ny
             Zonet_new = 0
@@ -43,7 +47,7 @@ contains
             n = ppx*qqy
 
             do i = 1, nlev
-                do j = 1, ppx*qqy, n ! which fater node
+                do j = 1, ppx*qqy, n ! which father node
                     if (dir == 1) then
                         call column_sum<<<ceiling(dble(grid(j,3))/tPB),tPB>>>(j,dir)
                         call thrustscan(c_sum,grid(j,3),d_indices)
@@ -57,6 +61,8 @@ contains
                     endif
                 end do
                 if(min(ppx,qqy) > 1) dir = -dir ! if means at least split once (i.e., 2)
+                !!! for this subroutine, you should think about if split in one direction
+                !!! is much more than the other direction???
                 n = n/2
             end do
         endif
@@ -93,10 +99,10 @@ contains
         implicit none
         integer,value:: n, dir, j
         integer:: ii, nd, tempx0, tempy0, tempnx, tempny, nlev
-        integer:: ik, jk
+        integer:: ik, jk, length
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
+        nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0)) ! ??? pass arguments?
 
         tempx0 = grid(j,1); tempy0 = grid(j,2)
         tempnx = grid(j,3); tempny = grid(j,4)
@@ -131,6 +137,8 @@ contains
 
         length = grid(j+nd,3)*grid(j+nd,4)
         ! this is the total length of zone array when it was transformed to 1D
+        ! so the threads are more than this number. Probably we can split this
+        ! part to a new kernel.
 
         if(ii <= length) then
             if(mod(ii,grid(j+nd,3)) == 0) then
