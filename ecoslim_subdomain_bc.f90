@@ -13,7 +13,8 @@ module subdomain_bound
     use variable_list, only: fh1, fh2
     use variable_list, only: np, nind, np_active, pid
     use variable_list, only: P
-    use variable_list, only: nnx1, nny1
+    use variable_list, only: ix1, iy1, nnx1, nny1
+    use variable_list, only: DEM, DEMname
 
 contains
     subroutine global_xyz()
@@ -100,18 +101,14 @@ contains
         end if
     end subroutine local_xyz
 
-    subroutine DEM_for_visual(DEM,DEMname,ix1,iy1,nnx1,nny1,nz)
+    subroutine DEM_for_visual()
 
         use hdf5_file_read
-
         implicit none
 
-        real(8):: DEM(:,:)  !allocated in main
-        character(200):: DEMname
-        integer:: ix1, iy1, nnx1, nny1, nz
         integer:: nnx, nny, nnz, npnts
         real(8):: Z, maxZ, Zt(:), Pnts(:,:)
-        integer:: ik, m, i, j, k, ii, jj
+        integer:: m, i, j, k, ik, ii, jj
 
         !----------------------------
         DEM = 0.0d0

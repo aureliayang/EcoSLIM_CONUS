@@ -46,36 +46,36 @@ implicit none
 ! than the .3D ASCII output but is still much slower than grid based output.  It provides the most
 ! information as particle locations are preserved
 interface
-subroutine vtk_write(time,x,conc_header,ixlim,iylim,izlim,icycle,n_constituents,pnts,vtk_file)
-    real*8                 :: time
-    real*8                 :: x(:,:,:,:)
-    character (len=20)     :: conc_header(:)
-    integer*4              :: ixlim
-    integer*4              :: iylim
-    integer*4              :: izlim
-    real*8                 :: dx
-    real*8                 :: dy
-    real*8                 :: dz(izlim)
-    real*8                 :: pnts(:,:)
-    integer                :: icycle
-    integer                :: n_constituents
-    character (len=200)    :: vtk_file
-end subroutine vtk_write
+    subroutine vtk_write(time,x,conc_header,ixlim,iylim,izlim,icycle,n_constituents,pnts,vtk_file)
+        real*8                 :: time
+        real*8                 :: x(:,:,:,:)
+        character (len=20)     :: conc_header(:)
+        integer*4              :: ixlim
+        integer*4              :: iylim
+        integer*4              :: izlim
+        real*8                 :: dx
+        real*8                 :: dy
+        real*8                 :: dz(izlim)
+        real*8                 :: pnts(:,:)
+        integer                :: icycle
+        integer                :: n_constituents
+        character (len=200)    :: vtk_file
+    end subroutine vtk_write
 
-subroutine vtk_write_points(p,np_active, np,icycle,vtk_file,dx,dy,nx,ny,maxz,dem)
-    real*8                 :: p(:,:)
-    integer                :: icycle
-    integer*4              :: np_active
-    integer*4              :: np
-    integer                :: n_constituents
-    real*8                 :: dx
-    real*8                 :: dy
-    integer*4              :: nx
-    integer*4              :: ny
-    real*8                 :: maxz
-    real*8                 :: dem(:,:)
-    character (len=200)    :: vtk_file
-end subroutine vtk_write_points
+    subroutine vtk_write_points(p,np_active, np,icycle,vtk_file,dx,dy,nx,ny,maxz,dem)
+        real*8                 :: p(:,:)
+        integer                :: icycle
+        integer*4              :: np_active
+        integer*4              :: np
+        integer                :: n_constituents
+        real*8                 :: dx
+        real*8                 :: dy
+        integer*4              :: nx
+        integer*4              :: ny
+        real*8                 :: maxz
+        real*8                 :: dem(:,:)
+        character (len=200)    :: vtk_file
+    end subroutine vtk_write_points
 end interface
 
 !--------------------------------------------------------------------
@@ -310,7 +310,7 @@ end interface
         ! if resart, no need to do this part, directly read necessary info from resart files
         call copy_grid() ! doing this on workers
         call allocate_arrays_temp() ! doing this on workers
-        call receive_Zone_de() ! this need all the ranks, both manager and workers
+        call receive_Zone_de() ! this needs all the ranks, both manager and workers
 
     end if
 
@@ -330,15 +330,15 @@ end interface
             call read_restarts ()
             ! this is in the subdomain_bound module, which is in the ecoslim_subdomain_bc file
 
-            ! read ix1 etc. on worker. specific files or in restarts with P
-            ! read zones on worker
-            ! read grid and Zonet_old on manager
+            ! 1. read ix1 etc. on worker. specific files or in restarts with P
+            ! 2. read zones on worker
+            ! 3. read grid and Zonet_old on manager
             call allocate_arrays_temp()
 
         end if
 
         !-------------------------------------
-        call DEM_for_visual(DEM,DEMname,ix1,iy1,nnx1,nny1,nz)
+        call DEM_for_visual()
 
         call local_xyz()
 
