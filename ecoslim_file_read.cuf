@@ -1,11 +1,74 @@
 module hdf5_file_read
+    use HDF5
     ! use cudafor
-    use variable_list, only: EvapTrans, Porosity, Saturation, CLMvars, &
-                             Vx, Vy, Vz
-    ! think about Porosity to put it at a better place
+    use variable_list, only: fname, dsetname
+    use variable_list, only: ix2, iy2, nnx2, nny2, nz
 contains
-    subroutine read_files()
-        use HDF5
-        use mpi
+    subroutine read_files(data)
+        implicit none
+
+        integer(hid_t):: file_id, dset_id
+        integer(hid_t):: dataspace, memspace
+
+        INTEGER(HSIZE_T):: count(3)  ! Size of hyperslab
+        INTEGER(HSIZE_T):: offset(3) ! Hyperslab offset
+        INTEGER(HSIZE_T):: stride(3) ! Hyperslab stride
+        INTEGER(HSIZE_T):: block(3)  ! Hyperslab block size
+        INTEGER(HSIZE_T):: chunk_dims(3)
+
+        real(8):: data(:,:,:)
+        integer:: error, rank_hdf5
+
+        ! we start the offset from lower-left corner
+        count  = [nnx2, nny2, nz]
+        offset = [ix2, iy2, 0]
+        stride = [1, 1, 1]
+        block  = [1, 1, 1]
+        chunk_dims = [nnx2, nny2, nz]
+
+        ! Open the file.
+        CALL h5fopen_f (fname, H5F_ACC_RDWR_F, file_id, error)
+        ! file name, then we get the file_id
+
+        ! Open the dataset.
+        CALL h5dopen_f(file_id, dsetname, dset_id, error)
+        ! dsetname, then we get the dset_id
+
+        ! Get dataset's dataspace identifier and select subset.
+        CALL h5dget_space_f(dset_id, dataspace, error)
+        ! dset_id, we get the dataspace. only the file dataspace?
+        CALL h5sselect_hyperslab_f(dataspace, H5S_SELECT_SET_F, &
+                                   offset, count, error, stride, block)
+        ! set the block
+
+        CALL h5screate_simple_f(rank_hdf5, chunk_dims, memspace, error)
+        ! memspace doesn't have the location information.
+
+        CALL h5dread_f(dset_id, H5T_NATIVE_INTEGER, data, chunk_dims, error, &
+                       memspace, dataspace)
+
+        ! Close everything opened.
+        CALL h5sclose_f(dataspace, error)
+        CALL h5sclose_f(memspace, error)
+        CALL h5dclose_f(dset_id, error)
+        CALL h5fclose_f(file_id, error)
+
     end subroutine read_files
+
+    subroutine open_hdf5_interface()
+
+        implicit none
+        integer:: error
+        CALL h5open_f(error)
+
+    end subroutine open_hdf5_interface
+
+    subroutine close_hdf5_interface()
+
+        implicit none
+        integer:: error
+        CALL h5close_f(error)
+
+    end subroutine close_hdf5_interface
+
 end module hdf5_file_read
