@@ -1,8 +1,11 @@
 module hdf5_file_read
+
     use HDF5
-    ! use cudafor
-    use variable_list, only: fname, dsetname
-    use variable_list, only: ix2, iy2, nnx2, nny2, nz
+
+    CHARACTER(LEN=9), PARAMETER :: fname = "subset.h5"  ! File name
+    CHARACTER(LEN=8), PARAMETER :: dsetname = "IntArray"   ! Dataset name
+    integer:: ix2, iy2, nnx2, nny2
+
 contains
     subroutine read_files(data)
         implicit none
@@ -10,21 +13,21 @@ contains
         integer(hid_t):: file_id, dset_id
         integer(hid_t):: dataspace, memspace
 
-        INTEGER(HSIZE_T):: count(3)  ! Size of hyperslab
-        INTEGER(HSIZE_T):: offset(3) ! Hyperslab offset
-        INTEGER(HSIZE_T):: stride(3) ! Hyperslab stride
-        INTEGER(HSIZE_T):: block(3)  ! Hyperslab block size
-        INTEGER(HSIZE_T):: chunk_dims(3)
+        INTEGER(HSIZE_T):: count(2)  ! Size of hyperslab
+        INTEGER(HSIZE_T):: offset(2) ! Hyperslab offset
+        INTEGER(HSIZE_T):: stride(2) ! Hyperslab stride
+        INTEGER(HSIZE_T):: block(2)  ! Hyperslab block size
+        INTEGER(HSIZE_T):: chunk_dims(2)
 
-        real(8):: data(:,:,:) ! attention, pinned???
-        integer:: error, rank_hdf5 = 3
+        integer:: data(:,:)
+        integer:: error, rank_hdf5 = 2
 
         ! we start the offset from lower-left corner
-        count  = [nnx2, nny2, nz]
-        offset = [ix2, iy2, 0]
-        stride = [1, 1, 1]
-        block  = [1, 1, 1]
-        chunk_dims = [nnx2, nny2, nz]
+        count  = [nnx2, nny2]
+        offset = [ix2, iy2]
+        stride = [1, 1]
+        block  = [1, 1]
+        chunk_dims = [nnx2, nny2]
 
         ! Open the file.
         CALL h5fopen_f (fname, H5F_ACC_RDONLY_F, file_id, error)

@@ -1,9 +1,9 @@
 module utilities
     ! subroutine copy_grid
     ! subroutine copy_grid_n
+    ! subroutine subzones_for_transfer
     ! subroutine combine_p_num
     ! attributes(global) subroutine build_p_num
-    ! subroutine subzones_for_transfer
     ! subroutine receive_Zone_de
 
     use cudafor
@@ -20,19 +20,21 @@ contains
         implicit none
 
         if (rank /= ppx*qqy) then
-            ix1  = grid(rank+1,1); nnx1 = grid(rank+1,3)
-            iy1  = grid(rank+1,2); nny1 = grid(rank+1,4)
+            ix1  = grid(rank+1,1)
+            nnx1 = grid(rank+1,3)
+            iy1  = grid(rank+1,2)
+            nny1 = grid(rank+1,4)
 
-            ix2  = ix1 - buff; nnx2 = nnx1 + 2*buff
-            iy2  = iy1 - buff; nny2 = nny1 + 2*buff
+            ix2 = ix1 - buff; nnx2 = nnx1 + 2*buff
+            iy2 = iy1 - buff; nny2 = nny1 + 2*buff
 
-            if(ix1 == 1) then
+            if(ix1 == 0) then
                 ix2  = ix1
                 nnx2 = nnx2 - buff
             endif
             if(ix1+nnx1 == nx) nnx2 = nnx2 - buff
 
-            if(iy1 == 1) then
+            if(iy1 == 0) then
                 iy2  = iy1
                 nny2 = nny2 - buff
             endif
@@ -45,19 +47,23 @@ contains
         implicit none
 
         if (rank /= ppx*qqy) then
-            ix1n  = grid(rank+1,1); nnx1n = grid(rank+1,3)
-            iy1n  = grid(rank+1,2); nny1n = grid(rank+1,4)
+            ix1n  = grid(rank+1,1)
+            nnx1n = grid(rank+1,3)
+            iy1n  = grid(rank+1,2)
+            nny1n = grid(rank+1,4)
 
-            ix2n  = ix1n - buff; nnx2n = nnx1n + 2*buff
-            iy2n  = iy1n - buff; nny2n = nny1n + 2*buff
+            ix2n  = ix1n - buff
+            nnx2n = nnx1n + 2*buff
+            iy2n  = iy1n - buff
+            nny2n = nny1n + 2*buff
 
-            if(ix1n == 1) then
+            if(ix1n == 0) then
                 ix2n  = ix1n
                 nnx2n = nnx2n - buff
             endif
             if(ix1n+nnx1n == nx) nnx2n = nnx2n - buff
 
-            if(iy1n == 1) then
+            if(iy1n == 0) then
                 iy2n  = iy1n
                 nny2n = nny2n - buff
             endif
