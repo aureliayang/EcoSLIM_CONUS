@@ -301,6 +301,11 @@ end interface
         p_num = 1 ! check such an initialization. Checked and should be right.
     end if   ! set the manager
 
+    call global_xyz() ! on workers
+
+    ! restart file info inside, so have to call it before restart.
+    call alloc_arrays_const() ! on workers, and P array needs nind
+
     if(np_ic /= -1) then
 
         ! if not restart, we do decompostion and build topology
@@ -310,7 +315,7 @@ end interface
         ! the whole domain with init value of 1.
         ! if resart, no need to do this part, directly read necessary info from restart files
         call copy_grid() ! doing this on workers
-        call allocate_arrays_temp() ! doing this on workers
+        call alloc_arrays_temp() ! doing this on workers
         call receive_Zone_de() ! this needs all the ranks, both manager and workers
 
     end if
@@ -318,9 +323,6 @@ end interface
     if (rank /= ppx*qqy) then
         ! for following, if there is [if (rank /= ppx*qqy)] in the subroutine, please
         ! just keep it there now, and later we can find a better way.
-        call global_xyz() ! on workers
-        ! restart file info inside, so have to call it before restart.
-        call allocate_arrays_const() ! on workers, and P array needs nind
 
         if (np_ic == -1) then
             ! if np_ic = -1 then we read a restart file
@@ -332,9 +334,9 @@ end interface
             ! this is in the subdomain_bound module, which is in the ecoslim_subdomain_bc file
 
             ! 1. read ix1 etc. on worker. specific files or in restarts with P
-            ! 2. read zones on worker
+            ! 2. read zones on workers   ???? copy to cpu
             ! 3. read grid and Zonet_old on manager
-            call allocate_arrays_temp()
+            call alloc_arrays_temp()
 
         end if
 
@@ -458,7 +460,7 @@ end interface
             where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
             ! can be done on GPU
 
-            if(icwrite > 0)  &
+            if(icwrite > 0) &
             call vtk_write(Time_first,C,conc_header,nx,ny,nz,0,n_constituents,Pnts,vtk_file)
             ! each rank visualize its own subdomain
         end if
@@ -865,7 +867,7 @@ end interface
             call copy_grid()
             ! get the new nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
 
-            call allocate_arrays_temp()
+            call alloc_arrays_temp()
 
             call receive_Zone_de(grid)
 

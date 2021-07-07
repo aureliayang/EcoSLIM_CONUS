@@ -1,0 +1,29 @@
+program test_hdf5_read
+use mpi
+use hdf5_file_read
+implicit none
+integer:: data(3,3)
+integer:: i, j
+integer:: ierr, rank, t_rank
+
+call MPI_INIT(ierr)
+call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
+
+    call open_hdf5_interface()
+
+    if(rank == 0) then
+        ix2 = 1; iy2 = 2; nnx2 = 3; nny2 = 3
+    else
+        ix2 = 4; iy2 = 2; nnx2 = 3; nny2 = 3
+    endif
+
+    call read_files(data)
+
+    print *, ((data(i,j),i=1,3),j=1,3)
+
+    call close_hdf5_interface()
+
+call MPI_FINALIZE(ierr)
+
+end program
