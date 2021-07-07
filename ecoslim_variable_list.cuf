@@ -91,7 +91,8 @@ module variable_list
 
     integer:: i, j, k, l, ik, ji, ij, ii
 
-    character*200 filenum, filenumout, fname, dsetname
+    character*200 filenum, filenumout, fname
+    character(9), parameter:: dsetname = 'hdf5_data'
     ! runname = SLIM runname
     ! filenum = ParFlow file number
     ! filenumout = File number for Ecoslim writing
@@ -271,7 +272,7 @@ contains
             allocate(conc_header(n_constituents))
             ! Set up output options for VTK grid output
             ! icwrite = 1
-            vtk_file=trim(runname)//'_cgrid'  ! duplicated with the late output?
+            vtk_file=trim(runname)//'_cgrid'  ! duplicated with the latter output?
             conc_header(1) = 'Concentration'
             conc_header(2) = 'Age'
             conc_header(3) = 'Mass'

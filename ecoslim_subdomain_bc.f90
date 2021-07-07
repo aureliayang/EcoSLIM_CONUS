@@ -11,10 +11,10 @@ module subdomain_bound
     use variable_list, only: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
     use variable_list, only: loadf, restartf, exitedf, logf
     use variable_list, only: fh1, fh2
+    use variable_list, only: ix1, iy1, nnx1, nny1
+    use variable_list, only: DEM, DEMname, fname
     use variable_list, only: np, nind, np_active, pid
     use variable_list, only: P
-    use variable_list, only: ix1, iy1, nnx1, nny1
-    use variable_list, only: DEM, DEMname
 
 contains
     subroutine global_xyz()
@@ -101,22 +101,20 @@ contains
         end if
     end subroutine local_xyz
 
-    subroutine DEM_for_visual()
+    subroutine DEM_visual()
 
         use hdf5_file_read
         implicit none
 
         integer:: nnx, nny, nnz, npnts
-        real(8):: Z, maxZ, Zt(:), Pnts(:,:)
+        real(8):: Z, maxZ
+        real(8),allocatable:: Zt(:), Pnts(:,:) ! use in vtk
         integer:: m, i, j, k, ik, ii, jj
 
         !----------------------------
         DEM = 0.0d0
-        ! read in DEM
-        ! fname = trim(adjustl(DEMname))
-        ! call pfb_read(DEM,fname,nx,ny,nztemp)
-        if (DEMname /= '') &
-        call read_files(DEM,ix1,iy1,nnx1,nny1,nz)
+        fname = trim(adjustl(DEMname))
+        if (DEMname /= '') call read_h5_file(DEM,4)
 
         !----------------------------
         ! grid +1 variables, for DEM part
@@ -128,7 +126,7 @@ contains
         npnts = nnx*nny*nnz
 
         allocate(Pnts(npnts,3),Zt(0:nz))
-        Pnts = 0
+        Pnts = 0.d0
         m = 1
 
         ! Need the maximum height of the model and elevation locations
@@ -142,9 +140,9 @@ contains
         maxZ = Z
 
         ! candidate loops for OpenMP
-        do k=1,nnz
-            do j=1,nny
-                do i=1,nnx
+        do k = 1, nnz
+            do j = 1, nny
+                do i = 1, nnx
                     Pnts(m,1) = DBLE(i-1)*dx
                     Pnts(m,2) = DBLE(j-1)*dy
                     ! This is a simple way of handling the maximum edges
@@ -161,12 +159,15 @@ contains
                     ! This step translates the DEM
                     ! The specified initial heights in the pfb (z1) are ignored and the
                     ! offset is computed based on the model thickness
-                    Pnts(m,3) = (DEM(ii,jj) - maxZ) + Zt(k-1)
+                    Pnts(m,3) = (DEM(ii,jj,1) - maxZ) + Zt(k-1)
                     m = m + 1
                 end do
             end do
         end do
-    end subroutine DEM_for_visual
+
+        deallocate(Pnts,Zt)
+
+    end subroutine DEM_visual
 
     subroutine read_restarts ()
         use mpi
