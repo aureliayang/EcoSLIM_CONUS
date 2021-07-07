@@ -97,6 +97,8 @@ end interface
     call MPI_COMM_CREATE(MPI_COMM_WORLD, work_group, work_comm, ierr)
     call MPI_COMM_CREATE(MPI_COMM_WORLD, manage_group, manage_comm, ierr)
 
+    call open_hdf5_interface()
+
 !--------------------------------------------------------------------
     ! Get and set unique device
     call assignDevice(deviceID)
@@ -291,14 +293,16 @@ end interface
     ! end of SLIM input
     close(10)
 
-    !--------------------------------------------------------------------
+!--------------------------------------------------------------------
     if(rank == ppx*qqy) then
+
         allocate(grid(ppx*qqy,4),grid_old(ppx*qqy,4))
         allocate(Zonet_old(-buff+1:nx+buff,-buff+1:ny+buff))
         allocate(Zonet_new(-buff+1:nx+buff,-buff+1:ny+buff))
         allocate(p_num(nx,ny),c_sum(max(nx,ny)),d_indices(np))
         grid = 0; Zonet_new = -1
         p_num = 1 ! check such an initialization. Checked and should be right.
+
     end if   ! set the manager
 
     call global_xyz() ! on workers
@@ -311,9 +315,9 @@ end interface
         ! if not restart, we do decompostion and build topology
         call gridinfo()
         ! doing this on manager, and then we get subdomain info in grid array
-        ! for init we don't have to build p_sum on each rank, just use that for
+        ! for init, we don't have to build p_sum on each rank, just use that for
         ! the whole domain with init value of 1.
-        ! if resart, no need to do this part, directly read necessary info from restart files
+        ! if restart, no need to do this part, directly read necessary info from restart files
         call copy_grid() ! doing this on workers
         call alloc_arrays_temp() ! doing this on workers
         call receive_Zone_de() ! this needs all the ranks, both manager and workers
@@ -340,8 +344,8 @@ end interface
 
         end if
 
-        !-------------------------------------
-        call DEM_for_visual()
+!-------------------------------------
+        call DEM_visual()
 
         call local_xyz()
 
@@ -349,9 +353,8 @@ end interface
         if (nind>0) then
             if (Indname /= '') then
                 fname = trim(adjustl(Indname))
-                call pfb_read(Ind,fname,nx,ny,nz)
-                if(rank == 0) &
-                write(11,*) 'Read Indicator File:', fname
+                call read_h5_file(Ind,0)
+                if(rank == 0) write(11,*) 'Read Indicator File:', fname
             else
                 if(rank == 0) &
                 write(11,*) 'WARNING: indicator flage >0 but no indicator file provided'
@@ -363,23 +366,22 @@ end interface
             close(11)
         endif
 
-        ! Read porosity values from ParFlow .pfb file
-        fname=trim(adjustl(pname))//'.out.porosity.pfb'
-        call pfb_read(Porosity,fname,nx,ny,nz)
+        ! Read porosity values
+        fname=trim(adjustl(pname))//'.out.porosity.h5'
+        call read_h5_file(Porosity,0)
 
         ! Read the initial Saturation from ParFlow
         if(np_ic /= -1) then
 
             pfkk = pft1 - 1
             write(filenum,'(i5.5)') pfkk
-            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(Saturation,fname,nx,ny,nz)
-            ! this is not necessary if restart
+            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Saturation,0)
 
-            ! Intialize cuRand device API and this part need to check through again.
+            ! Intialize cuRand device API.
             call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
             rank,np_ic,nnx1,nny1)
-            ! each subdomain has different dimension, so we set a fixed offset of h using the whole domain.
+            ! each subdomain has a different dim, so we set a fixed offset of h using the whole domain.
 
         end if
 
@@ -390,11 +392,12 @@ end interface
         Porosity_de   = Porosity
         Saturation_de = Saturation
         P_de = P
+        C_de = C
         !!! initialization of P_de, probably need a new kernel
         ! think about initialization of some device variables
         ! particularly those which are not updated each timestep.
 
-        !-------------------------------------
+!-------------------------------------
         ! Define initial particles' locations and mass
         if (np_ic > 0)  then
             np_active = 0
@@ -407,7 +410,6 @@ end interface
                 write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
                 call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
                 MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-                ! now there is no restart after 9090
 
                 goto 9090
             endif
@@ -456,38 +458,39 @@ end interface
 
         ! this may not be used for this version later, we will do parallel output
         if (np_ic /= -1) then
+
             where (C(3,:,:,:)>0.0)  C(2,:,:,:) = C(2,:,:,:) / C(3,:,:,:)
             where (C(3,:,:,:)>0.0)  C(4,:,:,:) = C(4,:,:,:) / C(3,:,:,:)
-            ! can be done on GPU
+            ! can be done on GPU??? data copy back to CPU and then output
 
-            if(icwrite > 0) &
-            call vtk_write(Time_first,C,conc_header,nx,ny,nz,0,n_constituents,Pnts,vtk_file)
-            ! each rank visualize its own subdomain
+            if(icwrite > 0) then
+                C = C_de
+                call vtk_write(Time_first,C,conc_header,nx,ny,nz,0,n_constituents,Pnts,vtk_file)
+                ! each rank visualize its own subdomain, have to check this later.
+            end if
+
         end if
 
         ! keep the following output as it is. we can figure out a better way to handle them later.
-        call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-                        MPI_INFO_NULL,fh4,ierr)
+        call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh4,ierr)
 
         write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
-        call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
 
         write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
                                 ETOut NP_PrecipIn NP_ETOut NP_QOut NP_active_old NP_filtered', new_line(' ')
-        call MPI_FILE_WRITE(fh4, trim(message), len(trim(message)), &
-        MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
 
-        ! open exited partile file and write header
-        call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-                        MPI_INFO_NULL,fh3,ierr)
+        ! open exited particle file and write header
+        call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh3,ierr)
 
         if(rank == 0) then
+
             if(ipwrite < 0) then
             ! open/create/write the 3D output file which will write particles out each timestemp, very slowly in parallel
-            open(214,file=trim(runname)//'_total_particle_trace.3D')
-            write(214,*) 'X Y Z TIME'
-            end if !! ipwrite < 0
+                open(214,file=trim(runname)//'_total_particle_trace.3D')
+                write(214,*) 'X Y Z TIME'
+            end if ! ipwrite < 0
 
             open(13,file=trim(runname)//'_ET_output.txt')
             write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
@@ -501,19 +504,19 @@ end interface
 
         call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
         tPB>>>(Zone_de,nnx1,nny1,buff,d_isValid,rank,t_rank-1)
-        ! ix2, iy2, nnx2, and nny2 are only used for read files
+        ! ix2, iy2, nnx2, and nny2 are only used for reading files
         neigh_list = d_isValid(1:t_rank-1)
         if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
-        ! don't have to do this every timestep, only after update of decomposition
+        ! don't have to do this every timestep, only after the update of decomposition
 
         ! Intialize cuRand device API and this part need to check through again.
         call createRand_loop<<< ceiling(dble(np_active)/tPB),tPB >>>(np, rank, pfnt)
     end if
 
-    !--------------------------------------------------------------------
+!--------------------------------------------------------------------
     ! (3) For each timestep, loop over all particles to find and
     !     update their new locations
-    !--------------------------------------------------------------------
+!--------------------------------------------------------------------
     ! loop over timesteps
     pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1    ! outkk is tout1+1
 
@@ -527,22 +530,22 @@ end interface
             write(filenum,'(i5.5)') pfkk
             !----------------------------------------
             ! wait for hdf5 ready
-            fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(Vx,fname,nx+1,ny,nz)
+            fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vx,1)
 
-            fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(Vy,fname,nx,ny+1,nz)
+            fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vy,2)
 
-            fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(Vz,fname,nx,ny,nz+1)
+            fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vz,3)
 
-            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(Saturation,fname,nx,ny,nz)
+            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Saturation,0)
 
             if (clmtrans) then
                 ! Read in the Evap_Trans
-                fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
-                call pfb_read(EvapTrans,fname,nx,ny,nz)
+                fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
+                call read_h5_file(EvapTrans,0)
 
                 if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
                 where (EvapTrans > 0.d0) EvapTrans_da = EvapTrans_da + EvapTrans
@@ -550,8 +553,8 @@ end interface
                 ! check if we read full CLM output file
                 if (clmfile) then
                     ! Read in CLM output file @RMM to do make this input
-                    fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
-                    call pfb_read(CLMvars,fname,nx,ny,nzclm)
+                    fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
+                    call read_h5_file(CLMvars,0)
                 end if
             end if
             !----------------------------------------
@@ -873,7 +876,7 @@ end interface
 
             if(rank /= ppx*qqy) then
 
-                call DEM_for_visual(DEM,DEMname,ix1,iy1,nnx1,nny1,nz)
+                call DEM_visual(DEM,DEMname,ix1,iy1,nnx1,nny1,nz)
 
                 call local_xyz()
 
@@ -971,6 +974,8 @@ end interface
     MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
     call MPI_FILE_CLOSE(fh1, ierr)
+
+    call close_hdf5_interface()
     call MPI_FINALIZE(ierr)
 
 end program EcoSLIM
