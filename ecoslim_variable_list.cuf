@@ -86,6 +86,7 @@ module variable_list
     ! number of particles for intial pulse IC, total, and running active
 
     real(8),allocatable:: DEM(:,:) ! DEM and grid points for concentration output
+    real(8),allocatable:: Pnts(:,:) ! use in vtk
 
     integer:: nind, pid
 
@@ -306,7 +307,10 @@ contains
             Porosity_de,EvapTrans_de,CLMvars_de,p_num)
             ! zone_de will be deallocated in exchange zone after the use
             deallocate(Vx,Vy,Vz,C,Ind,Saturation,Porosity,EvapTrans, &
-            EvapTrans_da,CLMvars,DEM)
+            EvapTrans_da,CLMvars,DEM,Pnts)
+            ! Pnts is allocated in DEM_visual. It is used in vtk write and
+            ! it has to be deallocated and re-allocated once the topology of
+            ! the modeling domain is changed.
         endif
 
     end subroutine deallocate_temp

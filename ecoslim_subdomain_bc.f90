@@ -12,7 +12,7 @@ module subdomain_bound
     use variable_list, only: loadf, restartf, exitedf, logf
     use variable_list, only: fh1, fh2
     use variable_list, only: ix1, iy1, nnx1, nny1
-    use variable_list, only: DEM, DEMname, fname
+    use variable_list, only: DEM, DEMname, fname, Pnts
     use variable_list, only: np, nind, np_active, pid
     use variable_list, only: P
 
@@ -108,7 +108,7 @@ contains
 
         integer:: nnx, nny, nnz, npnts
         real(8):: Z, maxZ
-        real(8),allocatable:: Zt(:), Pnts(:,:) ! use in vtk
+        real(8),allocatable:: Zt(:)
         integer:: m, i, j, k, ik, ii, jj
 
         !----------------------------
@@ -165,7 +165,7 @@ contains
             end do
         end do
 
-        deallocate(Pnts,Zt)
+        deallocate(Zt)
 
     end subroutine DEM_visual
 
