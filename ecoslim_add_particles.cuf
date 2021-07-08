@@ -5,21 +5,19 @@ module add_particles
     ! attributes(global) subroutine add_new_particles
 
     use curand_device
-    ! call curand_uniform
-    use mrand, only: h
-    ! curand states saved in global memory
+    use mrand, only: h   ! curand states saved in global memory
 contains
 attributes(global) subroutine add_init_particles( &
-    P,C,Saturation,Porosity,np_ic,nind,denh2o,outkk, &
+    P,C,Saturation,Porosity,np_ic,nind,denh2o,tout1, &
     nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
 
     implicit none
     real(8),intent(inout):: P(:,:), C(:,:,:,:)
     real(8),intent(in):: Saturation(:,:,:), Porosity(:,:,:), dz(:)
     integer,value:: np_ic, nind
-    integer,value:: outkk, nnx1, nny1, nz, ix1, iy1
+    integer,value:: tout1, nnx1, nny1, nz, ix1, iy1
     real(8),value:: dx, dy, denh2o
-    integer:: i, j, k, index, ij, ik, ii, Ploc(3)
+    integer:: i, j, k, index, ij, ik, ii
     real(8):: Z
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
@@ -46,22 +44,22 @@ attributes(global) subroutine add_init_particles( &
 
                 index = ii*np_ic - (ij - 1)
 
-                P(index,1) = float(i-1+ix1)*dx + curand_uniform(h(ii))*dx ! should use global
-                P(index,2) = float(j-1+iy1)*dy + curand_uniform(h(ii))*dy ! update that for random number
-                P(index,13+2*nind) = float(index)
+                P(index,1) = dble(i-1+ix1)*dx + curand_uniform(h(ii))*dx ! should use global
+                P(index,2) = dble(j-1+iy1)*dy + curand_uniform(h(ii))*dy ! update that for random number
+                P(index,13+2*nind) = dble(index)
                 P(index,14+2*nind) = P(index,1)
                 P(index,15+2*nind) = P(index,2)
-                P(index,17+2*nind) = outkk
+                P(index,17+2*nind) = tout1
 
                 Z = 0.0d0
-                do ik = 1, nz
+                do ik = 1, k
                     Z = Z + dz(ik)
                 end do
                 P(index,3) = Z - dz(k)*curand_uniform(h(ii))
                 P(index,16+2*nind) = P(index,3)
 
                 P(index,6) = dx*dy*dz(k)*(Porosity(i,j,k) &
-                             *Saturation(i,j,k))*denh2o*(1.0d0/float(np_ic))
+                             *Saturation(i,j,k))*denh2o*(1.0d0/dble(np_ic))
                 P(index,7) = 1.0d0
                 P(index,8) = 1.0d0  ! make particle active
 
@@ -80,20 +78,24 @@ attributes(global) subroutine add_init_particles( &
 
             enddo
         endif
+
+        if(C(3,i,j,k) > 0.d0)  C(2,i,j,k) = C(2,i,j,k) / C(3,i,j,k)
+        if(C(3,i,j,k) > 0.d0)  C(4,i,j,k) = C(4,i,j,k) / C(3,i,j,k)
+
     end if
 end subroutine add_init_particles
 
 attributes(global) subroutine river_init_particles( &
-    P,C,Saturation,Porosity,np_ic,np_active,pid,nind, &
-    nnx1,nny1,nz,ix1,iy1,dx,dy,dz,pfdt,denh2o,outkk)
+    P,C,Saturation,Porosity,np_ic,nind,denh2o,tout1, &
+    nnx1,nny1,nz,ix1,iy1,dx,dy,dz)
 
     implicit none
     real(8),intent(inout):: P(:,:), C(:,:,:,:)
     real(8),intent(in):: Saturation(:,:,:), Porosity(:,:,:), dz(:)
-    integer,value:: np_ic, np_active, nind
-    integer,value:: outkk, nnx1, nny1, nz, ix1, iy1
-    real(8),value:: dx, dy, pfdt, denh2o
-    integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
+    integer,value:: np_ic, nind
+    integer,value:: tout1, nnx1, nny1, nz, ix1, iy1
+    real(8),value:: dx, dy, denh2o
+    integer:: i, j, k, index, ij, ik, ii
     real(8):: Z
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
@@ -113,13 +115,13 @@ attributes(global) subroutine river_init_particles( &
 
             index = ii*abs(np_ic) - (ij - 1)
 
-            P(index,13+2*nind) = float(index)
+            P(index,13+2*nind) = dble(index)
             ! this is no use anymore and reserved for particle transfer
-            P(index,1) = float(i+ix1-1)*dx + curand_uniform(h(index))*dx
-            P(index,2) = float(j+iy1-1)*dy + curand_uniform(h(index))*dy
+            P(index,1) = dble(i+ix1-1)*dx + curand_uniform(h(index))*dx
+            P(index,2) = dble(j+iy1-1)*dy + curand_uniform(h(index))*dy
             P(index,14+2*nind) = P(index,1) ! Saving the initial location
             P(index,15+2*nind) = P(index,2)
-            P(index,17+2*nind) = outkk + 0.0 !setting insert time to the start time
+            P(index,17+2*nind) = tout1 + 0.0 !setting insert time to the start time
 
             Z = 0.0d0
             do ik = 1, k
@@ -129,7 +131,7 @@ attributes(global) subroutine river_init_particles( &
             P(index,3) = Z !-dz(k)*ran1(ir)
             P(index,16+2*nind) = P(index,3)
             P(index,6) = dx*dy*dz(k)*(Porosity(i,j,k)*Saturation(i,j,k)) &
-                         *denh2o*(1.0d0/float(np_ic))
+                         *denh2o*(1.0d0/dble(np_ic))
             P(index,7) = 1.0d0
             P(index,8) = 1.0d0
             ! set up intial concentrations
@@ -139,6 +141,9 @@ attributes(global) subroutine river_init_particles( &
             C(4,i,j,k) = C(4,i,j,k) + P(index,8)*P(index,7)*P(index,6)
             C(3,i,j,k) = C(3,i,j,k) + P(index,8)*P(index,6)
         end do
+
+        if(C(3,i,j,k) > 0.d0)  C(2,i,j,k) = C(2,i,j,k) / C(3,i,j,k)
+        if(C(3,i,j,k) > 0.d0)  C(4,i,j,k) = C(4,i,j,k) / C(3,i,j,k)
 
     end if
 
@@ -190,7 +195,7 @@ end subroutine scan_new_particles
 
 attributes(global) subroutine add_new_particles( &
     d_indices,P,EvapTrans,CLMvars,Ind,iflux_p_res,np_active,pid, &
-    nind,nnx1,nny1,nz,ix1,iy1,dx,dy,dz,pfdt,denh2o,kk,outkk)
+    nind,nnx1,nny1,nz,ix1,iy1,dx,dy,dz,pfdt,denh2o,kk,tout1)
     ! CLMvars is only CLMvars(i,j,11)
 
     implicit none
@@ -198,7 +203,7 @@ attributes(global) subroutine add_new_particles( &
     real(8),intent(in):: EvapTrans(:,:,:), CLMvars(:,:), Ind(:,:,:), dz(:)
     integer,intent(in):: d_indices(:)
     integer,value:: iflux_p_res, np_active, nind
-    integer,value:: kk, outkk, nnx1, nny1, nz
+    integer,value:: kk, tout1, nnx1, nny1, nz
     real(8),value:: dx, dy, pfdt, denh2o
     integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
     real(8):: Z
@@ -248,7 +253,7 @@ attributes(global) subroutine add_new_particles( &
                 end if
 
                 P(index,5) = 0.0d0
-                P(index,17+2*nind) = outkk + float((kk-1))*pfdt + P(index,4)
+                P(index,17+2*nind) = tout1 + float((kk-1))*pfdt + P(index,4)
                 P(index,6) = (1.0d0/float(abs(iflux_p_res)))*pfdt* &
                             EvapTrans(i,j,nz)*dx*dy*dz(k)*denh2o
 
