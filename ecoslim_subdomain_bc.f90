@@ -9,12 +9,12 @@ module subdomain_bound
     use variable_list, only: dx, dy, dz
     use variable_list, only: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
     use variable_list, only: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
-    use variable_list, only: loadf, restartf, exitedf, logf
+    use variable_list, only: loadf, restartf, exitedf, logf, ranknum
     use variable_list, only: fh1, fh2
     use variable_list, only: ix1, iy1, nnx1, nny1
     use variable_list, only: DEM, DEMname, fname, Pnts
     use variable_list, only: np, nind, np_active, pid
-    use variable_list, only: P
+    use variable_list, only: P, grid, Zone_de, Zonet_new
 
 contains
     subroutine global_xyz()
@@ -211,6 +211,30 @@ contains
                 stop
             end if
 
+            write(ranknum,'(i5.5)') rank
+            ! read topology
+            open(17,file='topology.'//trim(adjustl(ranknum)), FORM='unformatted',  &
+            access='stream')
+                read(17) ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
+            close(17)  ! Topology
+        else
+            open(19,file='manager_grid_zonet_new', FORM='unformatted',access='stream')
+                read(19) grid
+                read(19) Zonet_new
+            close(19)  ! manager
         end if
     end subroutine read_restarts
+
+    subroutine read_Zone_de()
+        implicit none
+
+        if (rank /= ppx*qqy) then
+            write(ranknum,'(i5.5)') rank
+            open(18,file='Zone_de.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
+                read(18) Zone_de
+            close(18)  ! Zone_de
+        endif
+
+    end subroutine read_Zone_de
+
 end module subdomain_bound

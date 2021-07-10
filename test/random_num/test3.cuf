@@ -1,0 +1,36 @@
+program test_rand
+
+    use cudafor
+    use mrand
+
+    implicit none
+    integer:: np, np_active, i, j
+    integer:: tPB = 256
+    integer:: rank
+    integer:: nx,ny,nz,nnx1,nny1
+    real(8),allocatable,device:: rnum_de(:,:)
+    real(8),allocatable,pinned:: rnum_h(:,:)
+
+    rank = 1
+    np = 1e8
+    np_active = 5e7
+    nx = 509
+    ny = 921
+    nz = 5
+    nnx1 = 100
+    nny1 = 200
+    np_ic = 2
+
+    allocate(h(np)) ! states
+    allocate(rnum_de(np),rnum_h(np))
+    ! used to print and check the generated random numbers
+    !
+
+    call createRand_init<<< ceiling(dble(np_active)/tPB),tPB >>>( &
+        nx,ny,nz,rank,np_ic,nnx1,nny1)
+
+    !rnum_h = rnum_de
+
+    !write(*,'(5(10(f13.8,1x),/))') ((rnum_h(i,j),j = 1,10),i=1,pfnt)
+
+end program test_rand

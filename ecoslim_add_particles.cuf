@@ -190,7 +190,8 @@ attributes(global) subroutine scan_new_particles( &
             temp = atomicAdd(PET_balance(2),pfdt*EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o)
             if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 0
         endif
-    end if !!! parobably need move to the end of the subroutine
+    end if
+
 end subroutine scan_new_particles
 
 attributes(global) subroutine add_new_particles( &
@@ -202,8 +203,8 @@ attributes(global) subroutine add_new_particles( &
     real(8),intent(inout):: P(:,:)
     real(8),intent(in):: EvapTrans(:,:,:), CLMvars(:,:), Ind(:,:,:), dz(:)
     integer,intent(in):: d_indices(:)
-    integer,value:: iflux_p_res, np_active, nind
-    integer,value:: kk, tout1, nnx1, nny1, nz
+    integer,value:: iflux_p_res, np_active, nind, pid
+    integer,value:: kk, tout1, nnx1, nny1, nz, ix1, iy1
     real(8),value:: dx, dy, pfdt, denh2o
     integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
     real(8):: Z
@@ -221,14 +222,14 @@ attributes(global) subroutine add_new_particles( &
         end if
         k = nz
 
-        if(EvapTrans(i,j,nz) > 0.d0) then
+        if(EvapTrans(i,j,k) > 0.d0) then
             do ij = 1, iflux_p_res
 
                 index = np_active + d_indices(ii)*iflux_p_res - (ij - 1)
 
-                P(index,1) = float(i-1)*dx + curand_uniform(h(index))*dx
-                P(index,2) = float(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
-                P(index,13+2*nind) = float(pid + d_indices(ii)*iflux_p_res - (ij - 1))
+                P(index,1) = dble(ix1+i-1)*dx + curand_uniform(h(index))*dx
+                P(index,2) = dble(iy1+j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
+                P(index,13+2*nind) = dble(pid + d_indices(ii)*iflux_p_res - (ij - 1))
                 P(index,14+2*nind) = P(index,1)
                 P(index,15+2*nind) = P(index,2)
 
@@ -253,9 +254,9 @@ attributes(global) subroutine add_new_particles( &
                 end if
 
                 P(index,5) = 0.0d0
-                P(index,17+2*nind) = tout1 + float((kk-1))*pfdt + P(index,4)
-                P(index,6) = (1.0d0/float(abs(iflux_p_res)))*pfdt* &
-                            EvapTrans(i,j,nz)*dx*dy*dz(k)*denh2o
+                P(index,17+2*nind) = tout1 + dble(kk-1)*pfdt + P(index,4)
+                P(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
+                            EvapTrans(i,j,k)*dx*dy*dz(k)*denh2o
 
                 if(CLMvars(i,j) > 0.d0) then !this is snowmelt
                     P(index,7) = 3.d0 ! Snow composition
@@ -269,6 +270,7 @@ attributes(global) subroutine add_new_particles( &
             enddo
         endif
     endif
+
 end subroutine add_new_particles
 
 end module add_particles

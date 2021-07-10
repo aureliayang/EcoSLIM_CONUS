@@ -2,7 +2,7 @@ module hdf5_file_read
     use HDF5
     ! use cudafor
     use variable_list, only: fname, dsetname
-    use variable_list, only: ix2, iy2, nnx2, nny2, nz
+    use variable_list, only: ix2, iy2, nnx2, nny2, nz, nzclm
 contains
     subroutine read_h5_file(data,flag)
         implicit none
@@ -36,6 +36,9 @@ contains
         elseif(flag == 4) then
             count  = [nnx2, nny2, 1]
             chunk_dims = [nnx2, nny2, 1]
+        elseif(flag == 5) then
+            count  = [nnx2, nny2, nzclm]
+            chunk_dims = [nnx2, nny2, nzclm]
         endif
 
         offset = [ix2, iy2, 0]
