@@ -8,16 +8,27 @@ program test_rand
     integer:: tPB = 256
     real(8),allocatable,device:: rnum_de(:,:)
     real(8),allocatable,pinned:: rnum_h(:,:)
+    real(8),allocatable:: mean(:),var(:)
 
-    pfnt = 5
+    pfnt = 5000000
     np = tPB
     allocate(rnum_de(pfnt,np),h(np))
     allocate(rnum_h(pfnt,np))
+    allocate(mean(np),var(np))
 
     call createRand_test<<<1,tPB>>>()
     call callRand_test<<<1,tPB>>>(rnum_de,pfnt)
     rnum_h = rnum_de
 
-    write(*,'(5(10(f13.8,1x),/))') ((rnum_h(i,j),j = 1,10),i=1,pfnt)
+    do i = 1, np
+
+        mean(i) = sum(rnum_h(:,i))/pfnt
+        var(i)  = sum((rnum_h(:,i)-mean(i))**2)/(pfnt-1)
+
+    end do
+
+    write(*,'(10(f13.8,1x))') mean(1:10)
+    write(*,'(10(f13.8,1x))') var(1:10)
+    ! write(*,'(10(10(f13.8,1x),/))') ((rnum_h(i,j),j = 1,10),i=1,pfnt)
 
 end program

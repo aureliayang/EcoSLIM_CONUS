@@ -300,7 +300,7 @@ end interface
         allocate(Zonet_old(-buff+1:nx+buff,-buff+1:ny+buff))
         allocate(Zonet_new(-buff+1:nx+buff,-buff+1:ny+buff))
         allocate(p_num(nx,ny),c_sum(max(nx,ny)),d_indices(np))
-        grid = 0; Zonet_new = -1
+        grid = 0; Zonet_new = -1; Zonet_new(1:nx,1:ny) = 0
         p_num = 1 ! check such an initialization. Checked and should be right.
 
     end if   ! set the manager
@@ -323,28 +323,30 @@ end interface
         call receive_Zone_de() ! this needs all the ranks, both manager and workers
 
     end if
+    ! for following, if there is [if (rank /= ppx*qqy)] in the subroutine, please
+    ! just keep it there now, and later we can find a better way.
 
-    if (rank /= ppx*qqy) then
-        ! for following, if there is [if (rank /= ppx*qqy)] in the subroutine, please
-        ! just keep it there now, and later we can find a better way.
+    if (np_ic == -1) then
+        ! if np_ic = -1 then we read a restart file
+        ! move restart here is due to we want to do the allocate of temp here which can keep
+        ! a clear structure, and then we can read the necessary files such as Ind etc.
+        ! But if we do allocate, it needs the subdomain dim etc., so we read restart info here.
 
-        if (np_ic == -1) then
-            ! if np_ic = -1 then we read a restart file
-            ! move restart here is due to we want to do the allocate of temp here which can keep
-            ! a clear structure, and then we can read the necessary files such as Ind etc.
-            ! But if we do allocate, it needs the subdomain dim etc., so we read restart info here.
+        call read_restarts()
+        ! this is in the subdomain_bound module, which is in the ecoslim_subdomain_bc file
 
-            call read_restarts ()
-            ! this is in the subdomain_bound module, which is in the ecoslim_subdomain_bc file
+        ! 1. read ix1 etc. on worker. specific files or in restarts with P
+        ! 2. read zones on workers   ???? copy to cpu
+        ! 3. read grid and Zonet_old on manager
+        call alloc_arrays_temp()
 
-            ! 1. read ix1 etc. on worker. specific files or in restarts with P
-            ! 2. read zones on workers   ???? copy to cpu
-            ! 3. read grid and Zonet_old on manager
-            call alloc_arrays_temp()
+        call read_Zone_de()
 
-        end if
+    end if
 
 !-------------------------------------
+    if (rank /= ppx*qqy) then
+
         call DEM_visual()
 
         call local_xyz()
@@ -454,7 +456,8 @@ end interface
 
             if(icwrite > 0) then
                 C = C_de
-                call vtk_write(Time_first,C,conc_header,nnx1,nny1,nz,0,n_constituents,Pnts,vtk_file)
+                call vtk_write(Time_first,C(:,1:nnx1,1:nny1,nz),conc_header, &
+                nnx1,nny1,nz,0,n_constituents,Pnts,vtk_file)
                 ! each rank visualize its own subdomain, have to check this later.
                 ! Time_first is no use any more.
             end if
@@ -481,6 +484,7 @@ end interface
             !     open(214,file=trim(runname)//'_total_particle_trace.3D')
             !     write(214,*) 'X Y Z TIME'
             ! end if ! ipwrite < 0
+            ! this write is originally in the particle loop. now particle loop is on GPU. This can not be reserved.
 
             open(13,file=trim(runname)//'_ET_output.txt')
             write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
@@ -545,7 +549,7 @@ end interface
                 if (clmfile) then
                     ! Read in CLM output file @RMM to do make this input
                     fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
-                    call read_h5_file(CLMvars,0)
+                    call read_h5_file(CLMvars,5)
                 end if
             end if
             !----------------------------------------
@@ -571,7 +575,8 @@ end interface
             Vz_de = Vz
             Saturation_de = Saturation
             EvapTrans_de  = EvapTrans
-            CLMvars_de    = CLMvars(:,:,11) ! probably this can be deallocated after adding of particles
+            CLMvars_de    = CLMvars(:,:,11)
+            ! probably this can be deallocated after adding of particles
             ! Now just think about the hourly add of particles.
             out_age_de  = out_age_cpu
             out_mass_de = out_mass_cpu
@@ -621,8 +626,8 @@ end interface
 
                     call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
                     tPB >>> (d_indices,P_de,EvapTrans_de,CLMvars_de,Ind_de, &
-                    iflux_p_res,np_active,pid,nind,nnx1,nny1,nz,dx,dy,dz,pfdt, &
-                    denh2o,outkk)
+                    iflux_p_res,np_active,pid,nind,nnx1,nny1,nz,ix1,iy1,dx, &
+                    dy,dz,pfdt,denh2o,tout1)
 
                     np_active = np_active + d_indices(nnx1*nny1) * iflux_p_res
                     pid = pid + d_indices(nnx1*nny1) * iflux_p_res
@@ -632,7 +637,7 @@ end interface
 
             ! this has to be checked later.
             ! call MPI_ALLReduce(MPI_IN_PLACE, PET_balance_da(kk,:), 2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
             PET_balance = PET_balance_de
             ! print to log file, or PET_balance can be a long array and do print at last
 
@@ -668,15 +673,15 @@ end interface
             !-------------------------------------
             ! for such reduce, we can use a specific MPI process to do.
             ! we can do this using cuda-aware MPI, and then copy back.
-            call MPI_ALLReduce(MPI_IN_PLACE, ET_age_cpu,  1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_cpu, 3,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, ET_np_cpu,   1,MPI_INTEGER,         MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_age_de,  1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_comp_de, 3,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_mass_de, 1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, ET_np_de,   1,MPI_INTEGER,         MPI_SUM,work_comm,ierr)
 
-            call MPI_ALLReduce(MPI_IN_PLACE, Out_age_cpu, 1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_cpu,3,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_cpu,1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-            call MPI_ALLReduce(MPI_IN_PLACE, Out_np_cpu,  1,MPI_INTEGER,         MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_age_de, 1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_comp_de,3,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_mass_de,1,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+            call MPI_ALLReduce(MPI_IN_PLACE, Out_np_de,  1,MPI_INTEGER,         MPI_SUM,work_comm,ierr)
 
             out_age_cpu    = out_age_de;    out_mass_cpu   = out_mass_de
             out_comp_cpu   = out_comp_de;   out_np_cpu     = out_np_de
@@ -814,17 +819,6 @@ end interface
             call vtk_write_points(P,np_active,np,kk,vtk_file, dx, dy,nx,ny, maxZ,dem)
             end if
 
-            if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
-                call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-                                MPI_INFO_NULL,fh2,ierr)
-                call MPI_FILE_WRITE(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
-                call MPI_FILE_WRITE(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
-                call MPI_FILE_WRITE(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
-                                    MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
-                call MPI_FILE_CLOSE(fh2, ierr)
-
-                ! output more, such as grid, zone_de etc.
-            end if
             ! if writing restart, we need to copy P from device to host, if not, we don't need copy.
 
             ! LB criteria: if the difference between max- and min-number of particles over some limitation
@@ -888,6 +882,38 @@ end interface
                 rank,np_ic,nnx1,nny1)
 
             end if
+        end if
+
+        if (mod(kk,(pft2-pft1+1)/5) == 0 )  then
+            if(rank /= ppx*qqy) then
+                call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
+                                MPI_INFO_NULL,fh2,ierr)
+                call MPI_FILE_WRITE(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+                call MPI_FILE_WRITE(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+                call MPI_FILE_WRITE(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
+                                    MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
+                call MPI_FILE_CLOSE(fh2, ierr)
+
+                write(ranknum,'(i5.5)') rank
+
+                open(17,file='topology.'//trim(adjustl(ranknum)), FORM='unformatted',  &
+                access='stream')
+                    write(17) ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
+                close(17)  ! Topology
+
+                ! Zone_cpu = Zone_de
+                open(18,file='Zone_de.'//trim(adjustl(ranknum)), FORM='unformatted',  &
+                access='stream')
+                    write(18) Zone_de
+                close(18)  ! Zone_de
+            else
+                ! grid and Zonet_new
+                open(19,file='manager_grid_zonet_new', FORM='unformatted',access='stream')
+                    write(19) grid
+                    write(19) Zonet_new
+                close(19)  ! manager
+            endif
+
         end if
     end do !! timesteps and cycles
 

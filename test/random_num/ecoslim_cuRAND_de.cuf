@@ -3,46 +3,62 @@ module mrand
     type(curandStateXORWOW),allocatable,device:: h(:)
 contains
 
-    attributes(global) subroutine createRand_init(nx,ny,nz,rank)
-        integer(8),value:: nx, ny, nz, rank
+    attributes(global) subroutine createRand_init(nx,ny,nz,rank, &
+    np_ic,nnx1,nny1)
+        implicit none
+        integer,value:: nx, ny, nz, rank, np_ic, nnx1, nny1
         integer(8):: seed, seq, offset
         integer:: ii
-            ii = threadIdx%x
-            seed = 123_8
-            seq = 0_8
-            offset = 3_8*ii + 3_8*ii*nx*ny*nz*rank
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        if(ii <= nnx1*nny1*nz)then
+            seed = 123_8 ! this can be any number you want
+            seq = 0_8 ! use this sequence
+            offset = 3_8*abs(np_ic)*(ii-1) + 3_8*abs(np_ic)*nx*ny*nz*rank
             call curand_init(seed, seq, offset, h(ii))
+        endif
+
+        ! 3_8*abs(np_ic) slots are reserved for each grid cell
+        ! 3_8*abs(np_ic)*nx*ny*nz slots are reserved for each rank
+
     end subroutine createRand_init
 
     attributes(global) subroutine createRand_loop(np,rank,pfnt)
-        integer(8),value:: np, rank, pfnt
+        implicit none
+        integer,value:: np, rank, pfnt
         integer(8):: seed, seq, offset
         integer:: ii
-            ii = threadIdx%x
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        if(ii <= np)then
             seed = 12345_8
             seq = 0_8
-            offset = 40_8*ii*pfnt + 40_8*ii*pfnt*np*rank
+            offset = 40_8*(ii-1)*pfnt + 40_8*pfnt*np*rank
             call curand_init(seed, seq, offset, h(ii))
+        endif
+
+        ! 40 slots are reserved for each (particle+grid-cell) per timestep
+        ! 40_8*pfnt*np slots are reserved for each rank
+
     end subroutine createRand_loop
 
     attributes(global) subroutine createRand_test()
-    ! integer(8),value:: nx, ny, nz, rank
-    integer(8):: seed, seq, offset
-    integer:: ii
+        integer(8):: seed, seq, offset
+        integer:: ii
         ii = threadIdx%x
         seed = 123_8
         seq = 0_8
-        offset = ii
+        offset = ii*2
         call curand_init(seed, seq, offset, h(ii))
     end subroutine createRand_test
 
     attributes(global) subroutine callRand_test(rnum,pfnt)
-    real(8),intent(out):: rnum(:,:)
-    integer,value:: pfnt
-    integer:: ii,j
+        real(8),intent(out):: rnum(:,:)
+        integer,value:: pfnt
+        integer:: ii,j
         ii = threadIdx%x
         do j = 1, pfnt
-            rnum(ii,j) = curand_uniform(h(ii))
+            rnum(j,ii) = curand_uniform(h(ii))
         end do
     end subroutine callRand_test
 

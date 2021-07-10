@@ -92,7 +92,7 @@ module variable_list
 
     integer:: i, j, k, l, ik, ji, ij, ii
 
-    character*200 filenum, filenumout, fname
+    character*200 filenum, filenumout, fname, ranknum
     character(9), parameter:: dsetname = 'hdf5_data'
     ! runname = SLIM runname
     ! filenum = ParFlow file number
@@ -184,7 +184,7 @@ module variable_list
 
     integer,allocatable,device:: d_isValid(:),d_indices(:),holes(:)
     real(8),allocatable,device:: P_send(:,:),P_recv(:,:)
-    integer,allocatable,device:: Zone_de(:,:),Zones_old(:,:)
+    integer,allocatable,managed:: Zone_de(:,:),Zones_old(:,:)
     ! old is old, using the new box to cut the old zone (Zones_old)
     ! new is new, using the old box to cut the new zone (Zone_de)
 
