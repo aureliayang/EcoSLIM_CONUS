@@ -3,6 +3,7 @@ module subdomain_bound
     ! subroutine local_xyz
     ! subroutine DEM_for_visual
     ! subroutine read_restarts
+    use cudafor
 
     use variable_list, only: ppx, qqy, rank, buff
     use variable_list, only: nx, ny, nz
@@ -72,6 +73,31 @@ contains
         endif
 
     end subroutine global_xyz
+
+    subroutine local_xyz()
+        implicit none
+        integer:: k
+
+        if (rank /= ppx*qqy) then
+            ! set up subdomain boundaries
+            Xmin = -dble(buff)*dx
+            Ymin = -dble(buff)*dy
+            Zmin = 0.0d0
+            Xmax = dble(nnx1)*dx + dble(buff)*dx
+            Ymax = dble(nny1)*dy + dble(buff)*dy
+            Zmax = 0.0d0
+            do k = 1, nz
+                Zmax = Zmax + dz(k)
+            end do
+            ! need output to log file
+            ! return the global and local info of the subdomain
+            ! add grid info to log file
+            ! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
+            ! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
+            ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        end if
+    end subroutine local_xyz
 
     subroutine read_restarts ()
         use mpi
