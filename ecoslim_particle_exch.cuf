@@ -6,10 +6,10 @@ module exchange_particles
     use variable_list, only: N_recv_all, N_send, neigh_list
     ! neigh_list is allocated after getting number of total GPUs
     ! N_recv_all is allocated or deallocated after initialization/update of grid
-    use variable_list, only: P_exit, P_de, C_de, d_isValid, d_indices, &
-    Zone_de, P_send, P_recv, holes
+    use variable_list, only: P_exit, P_send, P_recv, holes
+    use variable_list, only: P_de, C_de, d_isValid, d_indices, Zone_de
     use variable_list, only: dx,dy,dz_de,nz,mean_age_de,mean_comp_de,total_mass_de
-    use create_subdomain, only: ix1,iy1,nnx1,nny1,buff
+    use variable_list, only: ix1, iy1, nnx1, nny1, buff
 
 contains
     subroutine particle_exchange(rank,t_rank,nind,tPB,np_active)
