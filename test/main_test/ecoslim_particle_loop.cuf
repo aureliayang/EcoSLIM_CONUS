@@ -6,7 +6,6 @@ module particle_loop
     use mrand, only: h
     use variable_list, only: EvapTrans_de,Saturation_de,Porosity_de
     use variable_list, only: Zone_de,Ind_de,C_de,Vx_de,Vy_de,Vz_de
-    ! use variable_list, only: N_send
 
 contains
     attributes(global) subroutine particles_separation(P,d_isValid, &
@@ -42,7 +41,7 @@ contains
         et_age,et_mass,et_comp,et_np, &
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
-        dx,dy,pfdt,moldiff,denh2o,dtfrac,start,np_active, &
+        dx,dy,pfdt,moldiff,denh2o,dtfrac,offset,np_active, &
         nind,ix1,iy1,nnx1,nny1,nz,reflect,flag)
 
         implicit none
@@ -56,7 +55,7 @@ contains
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         real(8),value:: dx,dy,pfdt,moldiff,denh2o,dtfrac
-        integer,value:: start,np_active,nind,ix1,iy1,nnx1,nny1,nz,flag
+        integer,value:: offset,np_active,nind,ix1,iy1,nnx1,nny1,nz,flag
         logical,value:: reflect
 
         integer:: ii,k,Ploc(3),itemp
@@ -64,7 +63,7 @@ contains
         particledt,delta_time,et_flux,water_vol,advdt(3), &
         z1,z2,z3,Zr,temp,lock,Ltemp
         !--------------------------------------
-        ii = start + (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii = offset + (blockIdx%x - 1) * blockDim%x + threadIdx%x
         lock = 1.d0
         !--------------------------------------
         xgmin = xgmin - dble(ix1)*dx
@@ -74,7 +73,7 @@ contains
 
         delta_time = 0.d0
 
-        if(P(ii,8) == 1. .and. ii <= start + np_active) then
+        if(P(ii,8) == 1. .and. ii <= offset + np_active) then
 
             ! Transfer global to local
             P(ii,1) = P(ii,1) - dble(ix1)*dx
