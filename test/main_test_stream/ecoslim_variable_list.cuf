@@ -113,9 +113,7 @@ module variable_list
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
 
-    real(8):: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-    real(8):: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-    real(8):: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+    real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
     real(8):: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
 
     real(8):: Total_time1, Total_time2, t1, t2
@@ -128,13 +126,13 @@ module variable_list
     integer:: np_active_log, add_f
 
     real(8),allocatable,pinned:: P(:,:)
-    integer,allocatable,pinned:: N_send(:)
+    integer,allocatable,managed:: N_send(:)
     ! the same length as neigh_list, i.e., the total number of subdomains.
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
     integer,allocatable:: N_recv(:)
     ! for each subdomain, it has the number of neighbors
     ! sum(neigh_list) ??? pinned
-    integer:: N_exit, N_peri ! a scalar variable.
+    integer:: N_exit ! a scalar variable.
     real(8),allocatable,managed:: P_exit(:,:)
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.
@@ -276,6 +274,7 @@ contains
             allocate(grid(t_rank-1,4))
             allocate(neigh_listn(t_rank-1),neigh_listo(t_rank-1))
             allocate(neigh_list(t_rank-1),nump(t_rank-1))
+            allocate(N_send(t_rank-1)); N_send = 0
             allocate(d_isValid(np),d_indices(np),h(np))
 
             allocate(out_np_cpu(1),ET_np_cpu(1))

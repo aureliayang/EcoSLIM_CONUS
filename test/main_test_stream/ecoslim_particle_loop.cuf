@@ -9,72 +9,39 @@ module particle_loop
     ! use variable_list, only: N_send
 
 contains
-    attributes(global) subroutine particles_separation(P,d_isValid, &
-        xmin3,ymin3,xmax3,ymax3,np_active,nind,ix1,iy1,dx,dy)
-        implicit none
-        real(8),intent(inout):: P(:,:)
-        integer,intent(out):: d_isValid(:)
-        real(8),value:: xmin3,ymin3,xmax3,ymax3
-        integer,value:: np_active,nind,ix1,iy1
-        real(8),value:: dx,dy
-        integer:: ii
-
-        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        if (ii <= np_active) then
-            ! Transfer global to local
-            P(ii,1) = P(ii,1) - dble(ix1)*dx
-            P(ii,2) = P(ii,2) - dble(iy1)*dy
-
-            d_isValid(ii) = 1
-            if(P(ii,1) < xmin3 .or. P(ii,2) < ymin3 .or. P(ii,1) >= xmax3 &
-                .or. P(ii,2) >= ymax3) then
-                d_isValid(ii) = 0
-            end if
-
-            ! Transfer local coordinates to global
-            P(ii,1) = P(ii,1) + dble(ix1)*dx
-            P(ii,2) = P(ii,2) + dble(iy1)*dy
-        end if
-    end subroutine particles_separation
-
     attributes(global) subroutine particles_independent( &
-        P,dz,out_age,out_mass,out_comp,out_np, &
-        et_age,et_mass,et_comp,et_np, &
-        xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-        xmin,ymin,zmin,xmax,ymax,zmax, &
-        dx,dy,pfdt,moldiff,denh2o,dtfrac,start,np_active, &
-        nind,ix1,iy1,nnx1,nny1,nz,reflect,flag)
+    P,dz,out_age,out_mass,out_comp,et_age,et_mass,et_comp,out_np,et_np, &
+    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax,xmin,ymin,zmin,xmax,ymax,zmax, &
+    dx,dy,pfdt,moldiff,denh2o,dtfrac,np_active,nind, &
+    ix1,iy1,buff,nnx1,nny1,nz,rank,reflect)
 
-        implicit none
+    implicit none
 
-        real(8),intent(inout):: P(:,:)
-        real(8),intent(in):: dz(:)
-        real(8),intent(inout):: out_age(:),out_mass(:),out_comp(:)
-        real(8),intent(inout):: et_age(:),et_mass(:),et_comp(:)
-        integer,intent(inout):: out_np(:),et_np(:)
+    real(8),intent(inout):: P(:,:)
+    real(8),intent(in):: dz(:)
+    real(8),intent(inout):: out_age(:),out_mass(:),out_comp(:)
+    real(8),intent(inout):: et_age(:),et_mass(:),et_comp(:)
+    integer,intent(inout):: out_np(:),et_np(:)
 
-        real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
-        real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
-        real(8),value:: dx,dy,pfdt,moldiff,denh2o,dtfrac
-        integer,value:: start,np_active,nind,ix1,iy1,nnx1,nny1,nz,flag
-        logical,value:: reflect
+    real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
+    real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
+    real(8),value:: dx,dy,pfdt,moldiff,denh2o,dtfrac
+    integer,value:: np_active,nind,ix1,iy1,buff,nnx1,nny1,nz,rank
+    logical,value:: reflect
+    ! zmin and zmax are the same to zgmin and zgmax
+    ! xmin,ymin,xmax,ymax are those with buffer Zone
 
-        integer:: ii,k,Ploc(3),itemp
-        real(8):: Clocx,Clocy,Clocz,Vpx,Vpy,Vpz,Z, &
-        particledt,delta_time,et_flux,water_vol,advdt(3), &
-        z1,z2,z3,Zr,temp,lock,Ltemp
-        !--------------------------------------
-        ii = start + (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    integer:: ii,k,Ploc(3),itemp
+    real(8):: Clocx,Clocy,Clocz,Vpx,Vpy,Vpz,Z, &
+    particledt,delta_time,et_flux,water_vol,advdt(3), &
+    z1,z2,z3,Zr,temp,lock,Ltemp
+    !--------------------------------------
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         lock = 1.d0
-        !--------------------------------------
-        xgmin = xgmin - dble(ix1)*dx
-        ygmin = ygmin - dble(iy1)*dy
-        xgmax = xgmax - dble(ix1)*dx
-        ygmax = ygmax - dble(iy1)*dy
-
+    !--------------------------------------
         delta_time = 0.d0
 
-        if(P(ii,8) == 1. .and. ii <= start + np_active) then
+        if(P(ii,8) == 1. .and. ii <= np_active) then
 
             ! Transfer global to local
             P(ii,1) = P(ii,1) - dble(ix1)*dx
@@ -90,8 +57,14 @@ contains
                 ! FLOOR(A) returns the greatest integer less than or equal to X.
                 Ploc(1) = floor(P(ii,1) / dx)
                 Ploc(2) = floor(P(ii,2) / dy)
+                ! The right side is not included. Hence if a particle is on the right
+                ! boundary, there will be problem. Particularly, after the decomposition,
+                ! the particle indeed can reach the boundary.
                 ! if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
                 ! if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
+                ! no matter inner and outer BCs, if the particle is on upper BC, it is
+                ! out of domain while if it is on lower BC, it is still in the domain.
+                ! this does not include the z direction.
 
                 Z = 0.d0
                 do k = 1, nz
@@ -101,6 +74,7 @@ contains
                         exit
                     end if
                 end do
+                ! The upper is inculded, no over-bound problem.
 
                 ! check to make sure particles are in central part of the domain and if not
                 ! apply some boundary condition to them
@@ -169,7 +143,9 @@ contains
 
                 ! calculate particle dt
                 ! check each direction independently
-                advdt = pfdt
+                advdt(1) = pfdt
+                advdt(2) = pfdt
+                advdt(3) = pfdt
                 if (Vpx /= 0.) advdt(1) = abs(dtfrac*(dx/Vpx))
                 if (Vpy /= 0.) advdt(2) = abs(dtfrac*(dy/Vpy))
                 if (Vpz /= 0.) advdt(3) = dtfrac*(dz(Ploc(3)+1)/abs(Vpz))
@@ -273,26 +249,24 @@ contains
                     end  if
                 end if
 
-                ! if (reflect) then
-                ! ! we can choose to reflect the particle or not if it is out of
-                ! ! the whole modeling domain. g means the golbal boundary.
-                ! ! currently, we should keep reflect true.
-                ! ! simple reflection boundary
-                !     if (P(ii,3)          >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
-                !     if (P(ii,1) + ix1*dx >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) + ix1*dx - Xgmax) - ix1*dx
-                !     if (P(ii,2) + iy1*dy >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) + iy1*dy - Ygmax) - iy1*dy
-                !     if (P(ii,2) + iy1*dy <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - (P(ii,2) + iy1*dy)) - iy1*dy
-                !     if (P(ii,3)          <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
-                !     if (P(ii,1) + ix1*dx <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - (P(ii,1) + ix1*dx)) - ix1*dx
-                ! end if
+                if (reflect) then
+                ! we can choose to reflect the particle or not if it is out of
+                ! the whole modeling domain. g means the golbal boundary.
+                ! currently, we should keep reflect true.
+                ! simple reflection boundary
+                    if (P(ii,3)          >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
+                    if (P(ii,1) + ix1*dx >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) + ix1*dx - Xgmax) - ix1*dx
+                    if (P(ii,2) + iy1*dy >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) + iy1*dy - Ygmax) - iy1*dy
+                    if (P(ii,2) + iy1*dy <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - (P(ii,2) + iy1*dy)) - iy1*dy
+                    if (P(ii,3)          <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
+                    if (P(ii,1) + ix1*dx <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - (P(ii,1) + ix1*dx)) - ix1*dx
+                end if
 
-                if ((P(ii,1) <  Xmin).or.(P(ii,2) <  Ymin).or.(P(ii,3) < Zmin).or. &
-                    (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) > Zmax).or. &
-                    (P(ii,1) <  Xgmax).or.(P(ii,2) <  Ygmax).or.(P(ii,3) < Zgmax).or. &
-                    (P(ii,1) >= Xgmax).or.(P(ii,2) >= Ygmax).or.(P(ii,3) > Zgmax)) then
+                if ((P(ii,1) < Xmin).or.(P(ii,2) < Ymin).or.(P(ii,3) < Zmin).or. &
+                    (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) > Zmax)) then
                     ! unavoidable particle loss, this should be written into the log file later.
                     ! flag particle as inactive
-                    P(ii, 8) = 0.d0
+                    P(ii,8) = 0.d0
                     ! flag as exiting via loss
                     P(ii,10) = 3.d0
                     goto 999
@@ -305,6 +279,8 @@ contains
             ! Find the "adjacent" "cell corresponding to the particle's location
             Ploc(1) = floor(P(ii,1) / dx)
             Ploc(2) = floor(P(ii,2) / dy)
+            ! if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
+            ! if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
 
             !Z = 0.d0
             !do k = 1, nz
@@ -316,19 +292,22 @@ contains
             !end do
 
             ! Zone/neighbor identification for cuda-aware transfer.
+            ! since 0 and 1 are reserved for active and inactive particles,
+            ! we add 10 to ranks. Otherwise, 0 and 1 are hard to be distinguished.
             ! keep an eye for ET particles
             P(ii,13+2*nind) = -1.
-            if(P(ii,10) /= 3.) then ! otherwise, particle is out of domain
+            if(P(ii,10) /= 3.) then ! otherwise, zone is probably out of boundary
                 if(Zone_de(Ploc(1)+1,Ploc(2)+1) /= rank) then
                     if(P(ii,8) == 1. .or. (P(ii,8) == 0. .and. P(ii,10) == 2.)) &
                     P(ii,13+2*nind) = Zone_de(Ploc(1)+1,Ploc(2)+1)
+                    ! temp = atomicAdd(N_send(Zone_de(Ploc(1)+1,Ploc(2)+1)+1),idnint(lock))
                 end if
             endif
-            ! Hence, particles which will be sent to neighbors has been labeled
+            ! Hence, the active particles which will be sent to neighbors has been labeled
 
             ! Transfer local coordinates to global
-            P(ii,1) = P(ii,1) + dble(ix1)*dx
-            P(ii,2) = P(ii,2) + dble(iy1)*dy
+            P(ii,1) = P(ii,1) + ix1*dx
+            P(ii,2) = P(ii,2) + iy1*dy
 
         end if
 

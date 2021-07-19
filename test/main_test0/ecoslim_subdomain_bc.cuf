@@ -20,7 +20,7 @@ module subdomain_bound
 contains
     subroutine global_xyz()
         ! get the boundary of the whole domain.
-        ! set the names of log files
+        ! set the name of log files
         ! open loadf (fh1) and output the domain boundary to loadf
 
         ! loadf (fh1) looks like the log file, recodring all the warning info
@@ -71,6 +71,7 @@ contains
             MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
         endif
+
     end subroutine global_xyz
 
     subroutine local_xyz()

@@ -1,0 +1,5 @@
+[00] host: della-i14g11, device: 00
+[01] host: della-i14g11, device: 01
+[02] host: della-i14g12, device: 00
+[03] host: della-i14g12, device: 01
+[04] host: della-i14g13, device: 00

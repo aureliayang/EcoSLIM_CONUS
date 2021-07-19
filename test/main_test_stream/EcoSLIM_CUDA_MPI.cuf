@@ -35,7 +35,6 @@ use compact_array
 
 implicit none
 integer(8),pinned,allocatable:: p_num_cpu(:,:)
-integer:: np_temp
 ! real(8):: PET_balance_cpu(2)
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
@@ -511,8 +510,7 @@ integer:: np_temp
         neigh_list = d_isValid(1:t_rank-1)
         print *, 'ok5'
         if(sum(neigh_list) > 0) then
-            allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
-            N_send = 0; N_recv = 0
+            allocate(N_recv(sum(neigh_list)))
         end if
         ! don't have to do this every timestep, only after the update of decomposition
 
@@ -639,39 +637,14 @@ integer:: np_temp
             ! print to log file, or PET_balance can be a long array and do print at last
 
             print *, rank, 'ok7', PET_balance
-
-            call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
-                P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,nind,ix1,iy1,dx,dy)
-            call thrustscan(d_isValid,np_active,d_indices)
-            N_peri = np_active - d_indices(np_active)
-            allocate(holes(N_peri))
-            call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,np_active)
-            call select2np_active<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,P_de,np_active)
-            call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,P_de,np_active)
-            np_temp = d_indices(np_active); deallocate(holes)
-            call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                P_de,np_temp,N_peri)
-
-            ! peripheric particles
-            call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB,0,str1>>> ( &
-                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-                dx,dy,pfdt,moldiff,denh2o,dtfrac,np_temp,N_peri, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,1)
-            ! interior particles
-            call particles_independent<<<ceiling(dble(np_temp)/tPB),tPB,0,str2>>> ( &
-                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                dx,dy,pfdt,moldiff,denh2o,dtfrac,0,np_temp, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,2)
-
+                        ! particle loop here
+            call particles_independent <<< ceiling(dble(np_active)/tPB),tPB >>> ( &
+                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,et_age_de,et_mass_de, &
+                et_comp_de,out_np_de,et_np_de,xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                xmin,ymin,zmin,xmax,ymax,zmax,dx,dy,pfdt,moldiff,denh2o,dtfrac, &
+                np_active,nind,ix1,iy1,buff,nnx1,nny1,nz,rank,reflect)
+                ! P_de is initialized either after allocation of P, or
+                ! read restart files
             print *, rank, 'ok8'
 
         end if

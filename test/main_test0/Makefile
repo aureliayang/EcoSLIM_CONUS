@@ -6,5 +6,4 @@ test: -I$HDF5DIR/include -L$HDF5DIR/lib64 -rpath $HDF5DIR/lib64 ecoslim_cthrusts
 ecoslim_cthrustscan.o: ecoslim_cthrustscan.cu
 	nvcc -c $^ -o $@
 clean:
-	rm *.o *.mod a.out Read_check.* topo* zone* grid* \
-	slurm* *.bin Load* Log* P_init* read* Eco*.txt
+	rm *.o *.mod test test*.txt topo* zone* grid* slurm* *.bin Load* Log* P_init* read* Eco*.txt

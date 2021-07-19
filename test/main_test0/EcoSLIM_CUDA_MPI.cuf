@@ -24,7 +24,7 @@ use utilities
 use particle_loop
 use mpiDeviceUtil
 use variable_list
-! use hdf5_file_read
+use hdf5_file_read
 ! use hdf5_file_write
 use subdomain_bound
 use create_subdomain
@@ -35,18 +35,20 @@ use compact_array
 
 implicit none
 integer(8),pinned,allocatable:: p_num_cpu(:,:)
-integer:: np_temp
-! real(8):: PET_balance_cpu(2)
+real(8):: PET_balance_cpu(2)
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
-    ! t_tank = ppx*qqy + 1. ppx*qqy is the total number of subdomains,
-    ! and is also be the index number of manager rank. rank number of workers is 0 to ppx*qqy.
-    ! one more rank for DDC, so the number of subdomains is t_rank-1
+    ! t_tank = ppx*qqy + 1
+    ! ppx*qqy can be the total number of subdomains
+    ! ppx*qqy can also be the number of manage rank
+    ! rank number is 0 to ppx*qqy
+    ! one more rank for DDC, so the number of sudomains is t_rank-1
     ! be careful about this rank when doing everything
+    ! build new communicators for communication
 
-    ! call open_hdf5_interface()
+    call open_hdf5_interface()
 
 !--------------------------------------------------------------------
     ! Get and set unique device
@@ -64,7 +66,7 @@ integer:: np_temp
     call MPI_FILE_CLOSE(fh0, ierr)
 
 !--------------------------------------------------------------------
-    ! how to do timing is also a new question when asyn later.
+    ! how to do timing is also a new question due to asyn later.
     ! Set up timing
     Total_time1 = 0.d0
     Total_time2 = 0.d0
@@ -77,8 +79,8 @@ integer:: np_temp
 
 !--------------------------------------------------------------------
     ! Read inputs, set up domain, write the log file
-    ! no need to exclude the manager rank since only several scalar variables are read
-    ! and these scalar variables have already been on the mananger rank due to declaration
+    ! no need to exclude the manage rank since only several scalar variables are read
+    ! and these scalar variables have already been on the manange rank due to declaration
 !--------------------------------------------------------------------
     ! open SLIM input .txt file
     open (10,file='slimin.txt')
@@ -242,18 +244,18 @@ integer:: np_temp
     ! end of SLIM input
     close(10)
 
-    print *, 'Read ok1'
-    ! build new communicators for communication
+    print *, 'ok1'
     call MPI_COMM_GROUP(MPI_COMM_WORLD, world_group, ierr)
     manage_ranks = ppx*qqy ! only one rank used to manage
     call MPI_GROUP_EXCL(world_group, 1, manage_ranks, work_group, ierr)
     call MPI_GROUP_INCL(world_group, 1, manage_ranks, manage_group, ierr)
     call MPI_COMM_CREATE(MPI_COMM_WORLD, work_group, work_comm, ierr)
     call MPI_COMM_CREATE(MPI_COMM_WORLD, manage_group, manage_comm, ierr)
+    PET_balance_cpu = 1.d0
 
     ! debug
     write(ranknum,'(i5.5)') rank
-    open(10,file='Read_check.'//trim(adjustl(ranknum)))
+    open(10,file='read.'//trim(adjustl(ranknum)))
         write(10,*) runname
         write(10,*) pname
         write(10,*) DEMname
@@ -275,8 +277,8 @@ integer:: np_temp
         write(10,*) n_cycle
         write(10,*) add_f
         write(10,*) ipwrite        ! controls an ASCII, .3D particle file not recommended due to poor performance
-        write(10,*) ibinpntswrite  ! controls VTK, binary output of particle locations and attributes
-        write(10,*) etwrite        ! controls ASCII ET output
+        write(10,*) ibinpntswrite  !  controls VTK, binary output of particle locations and attributes
+        write(10,*) etwrite        !  controls ASCII ET output
         write(10,*) icwrite        ! controls VTK, binary grid based output where particle masses, concentrations,
         write(10,*) V_mult
         write(10,*) clmtrans
@@ -300,7 +302,7 @@ integer:: np_temp
         ! allocate(p_num_cpu(nx,ny))
         ! p_num_cpu = 1_8 ! check such an initialization. Checked and should be right.
         p_num = 1
-        ! p_num_cpu = 0
+        !p_num_cpu = 0
         ! p_num_cpu = p_num
         ! write(*,'(8(9(i3,1x),/))') ((p_num_cpu(i,j),i=1,nx),j=1,ny)
         ! write(*,'(10(11(i3,1x),/))') ((Zonet_old(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
@@ -308,11 +310,11 @@ integer:: np_temp
         ! write(*,'(4(4(i3,1x),/))') ((grid(i,j),i=1,ppx*qqy),j=1,4)
 
     end if   ! set the manager
-!--------------------------------------------------------------------
+
     call global_xyz() ! on workers
+
     ! restart file info inside, so have to call it before restart.
     call alloc_arrays_const() ! on workers, and P array needs nind
-    ! the above subroutines will work when setting manager.
 
     if(np_ic /= -1) then
 
@@ -323,47 +325,48 @@ integer:: np_temp
         ! for init, we don't have to build p_sum on each rank, just use that for
         ! the whole domain with init value of 1.
         ! if restart, no need to do this part, directly read necessary info from restart files
-            if(rank /= ppx*qqy)then
-                open(10,file='grid.'//trim(adjustl(ranknum)))
-                    write(10,'(4(4(i3,1x),/))') ((grid(i,j),j=1,4),i=1,ppx*qqy)
-                close(10)
-            else
-                open(10,file='grid.'//trim(adjustl(ranknum)))
-                    write(10,'(10(11(i3,1x),/))') ((Zonet_old(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
-                    write(10,'(10(11(i3,1x),/))') ((Zonet_new(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
-                    write(10,'(4(4(i3,1x),/))') ((grid(i,j),j=1,4),i=1,ppx*qqy)
-                close(10)
-            endif
+        if(rank /= ppx*qqy)then
+            ! write(ranknum,'(i5.5)') rank
+            open(10,file='grid.'//trim(adjustl(ranknum)))
+                write(10,'(4(4(i3,1x),/))') ((grid(i,j),j=1,4),i=1,ppx*qqy)
+            close(10)
+        else
+            open(10,file='grid.'//trim(adjustl(ranknum)))
+                write(10,'(10(11(i3,1x),/))') ((Zonet_old(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
+                write(10,'(10(11(i3,1x),/))') ((Zonet_new(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
+                write(10,'(4(4(i3,1x),/))') ((grid(i,j),j=1,4),i=1,ppx*qqy)
+            close(10)
+        endif
 
         call copy_grid() ! doing this on workers
-            open(10,file='topology.'//trim(adjustl(ranknum)))
-                write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
-            close(10)
-
+        open(10,file='topology.'//trim(adjustl(ranknum)))
+        write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
+        close(10)
         call alloc_arrays_temp() ! doing this on workers
-            if(rank /= ppx*qqy)then
-                open(10,file='Zone_de_before.'//trim(adjustl(ranknum)))
-                    write(10,*) Zone_de
-                close(10)
-            endif
-
+        if(rank /= ppx*qqy)then
+            open(10,file='zone_de.'//trim(adjustl(ranknum)))
+                write(10,*) Zone_de
+            close(10)
+        endif
         call receive_Zone_de() ! this needs all the ranks, both manager and workers
-            if(rank /= ppx*qqy)then
-                open(10,file='Zone_de_after.'//trim(adjustl(ranknum)))
-                    write(10,*) Zone_de
-                close(10)
-            endif
+
+        if(rank /= ppx*qqy)then
+            open(10,file='zone_de.'//trim(adjustl(ranknum)))
+                write(10,*) Zone_de
+            close(10)
+        endif
+
     end if
     ! for following, if there is [if (rank /= ppx*qqy)] in the subroutine, please
     ! just keep it there now, and later we can find a better way.
 
     if(rank /= ppx*qqy)then
-        open(10,file='Restart_before.'//trim(adjustl(ranknum)))
+        open(10,file='restartb.'//trim(adjustl(ranknum)))
             write(10,'(8(i3,1x))') ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
             write(10,'(19(f15.3,1x))') P(1,:)
         close(10)
     else
-        open(10,file='Restart_before.'//trim(adjustl(ranknum)))
+        open(10,file='restartb.'//trim(adjustl(ranknum)))
             write(10,'(10(11(i3,1x),/))') ((Zonet_new(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
             write(10,*) grid
         close(10)
@@ -380,17 +383,17 @@ integer:: np_temp
 
         ! 1. read ix1 etc. on worker. specific files or in restarts with P
         ! 2. read zones on workers   ???? copy to cpu
-        ! 3. read grid and Zonet_old on manager??? Zonet_new
+        ! 3. read grid and Zonet_old on manager
         call alloc_arrays_temp()
 
         if(rank /= ppx*qqy)then
-            open(10,file='Restart_after.'//trim(adjustl(ranknum)))
+            open(10,file='restarta.'//trim(adjustl(ranknum)))
                 write(10,'(8(i3,1x))') ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
                 write(10,'(19(f15.3,1x))') P(1,:)
-                write(10,*) Zone_de
+                write(10,*) zone_de
             close(10)
         else
-            open(10,file='Restart_after.'//trim(adjustl(ranknum)))
+            open(10,file='restarta.'//trim(adjustl(ranknum)))
                 write(10,'(10(11(i3,1x),/))') ((Zonet_new(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
                 write(10,*) grid
             close(10)
@@ -398,8 +401,8 @@ integer:: np_temp
 
         call read_Zone_de()
         if(rank /= ppx*qqy)then
-            open(10,file='Restart_after2_Zone_de.'//trim(adjustl(ranknum)))
-                write(10,*) Zone_de
+            open(10,file='restarta2.'//trim(adjustl(ranknum)))
+                write(10,*) zone_de
             close(10)
         endif
     end if
@@ -510,15 +513,12 @@ integer:: np_temp
         print *, 'ok4'
         neigh_list = d_isValid(1:t_rank-1)
         print *, 'ok5'
-        if(sum(neigh_list) > 0) then
-            allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
-            N_send = 0; N_recv = 0
-        end if
+        if(sum(neigh_list) > 0) allocate(N_recv_all(sum(neigh_list)))
         ! don't have to do this every timestep, only after the update of decomposition
 
         open(10,file='neighbor.'//trim(adjustl(ranknum)))
             write(10,*) neigh_list
-            write(10,*) N_recv
+            write(10,*) N_recv_all
         close(10)
 
         ! Intialize cuRand device API and this part need to check through again.
@@ -639,44 +639,21 @@ integer:: np_temp
             ! print to log file, or PET_balance can be a long array and do print at last
 
             print *, rank, 'ok7', PET_balance
-
-            call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
-                P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,nind,ix1,iy1,dx,dy)
-            call thrustscan(d_isValid,np_active,d_indices)
-            N_peri = np_active - d_indices(np_active)
-            allocate(holes(N_peri))
-            call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,np_active)
-            call select2np_active<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,P_de,np_active)
-            call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,P_de,np_active)
-            np_temp = d_indices(np_active); deallocate(holes)
-            call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                P_de,np_temp,N_peri)
-
-            ! peripheric particles
-            call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB,0,str1>>> ( &
-                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                        ! particle loop here
+            call particles_independent <<< ceiling(dble(np_active)/tPB),tPB >>> ( &
+                P_de,dz_de,out_age_de,out_mass_de,out_comp_de, &
+                et_age_de,et_mass_de,et_comp_de,out_np_de,et_np_de, &
                 xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-                dx,dy,pfdt,moldiff,denh2o,dtfrac,np_temp,N_peri, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,1)
-            ! interior particles
-            call particles_independent<<<ceiling(dble(np_temp)/tPB),tPB,0,str2>>> ( &
-                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                dx,dy,pfdt,moldiff,denh2o,dtfrac,0,np_temp, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,2)
-
+                xmin,ymin,zmin,xmax,ymax,zmax, &
+                dx,dy,pfdt,moldiff,denh2o,dtfrac, &
+                kk,np_active,nind,ix1,iy1,buff,nnx1,nny1,nz,rank,reflect)
+                ! P_de is initialized either after allocation of P, or
+                ! read restart files
             print *, rank, 'ok8'
 
         end if
 
-        if (mod(kk,(pft2-pft1+1)) == 0)  then
+        if (mod(kk,(pft2-pft1+1)) == 0 )  then
             if(rank /= ppx*qqy) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
                                 MPI_INFO_NULL,fh2,ierr)
@@ -706,7 +683,7 @@ integer:: np_temp
 
     9090 continue
 
-    ! call close_hdf5_interface()
+    call close_hdf5_interface()
     call MPI_FINALIZE(ierr)
 
 end program EcoSLIM
