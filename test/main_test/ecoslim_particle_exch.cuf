@@ -3,7 +3,7 @@ module exchange_particles
     use thrust
     use cudafor
     use compact_array
-    use variable_list, only: N_recv, N_send, neigh_list, N_exit, N_peri
+    use variable_list, only: N_recv, N_send, N_exit, N_peri, neigh_list
     ! N_exit is a cpu scalar
     ! neigh_list is allocated after getting number of total GPUs.
     ! it is 1 if neighbor exists while 0 if neighbor doesn't exist.
@@ -15,7 +15,6 @@ module exchange_particles
     use variable_list, only: dx, dy, dz_de, nz, np
     use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
     use variable_list, only: ix1, iy1, nnx1, nny1, buff
-    use variable_list, only: str1, str2 ! CUDA Streams
     use variable_list, only: rank, t_rank, nind, tPB, work_comm
 
 contains
@@ -42,30 +41,28 @@ contains
         do i = 0, t_rank-2 ! go through to send particles
             if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
                 nc1 = nc1 + 1 ! the number of neighbors
-                call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB,0,str1>>>( &
+                call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                     P_de(np_temp+1:np_temp+N_peri,13+2*nind),d_isValid,N_peri,i)
                 ! get d_isValid, set it 0 where the particle will be sent to neighbor i
-                call thrustscan(str1,d_isValid,N_peri,d_indices)
+                call thrustscan(d_isValid,N_peri,d_indices)
                 ! do prefix-sum and get d_indices
-                istat = cudaStreamSynchronize(str1)
                 N_send(nc1) = N_peri - d_indices(N_peri)
                 call MPI_ISEND(N_send(nc1),1,MPI_INTEGER,i,40,work_comm,rq1(nc1),ierr)
                 ! each neighbor use different sending buffer, no wait
                 if(N_send(nc1) > 0) then ! gpu number
                     nc3 = nc3 + 1 ! only the neighbor with particles
                     allocate(holes(N_send(nc1)))
-                    call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB,0,str1>>>( &
+                    call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                         holes,d_indices,d_isValid,N_peri)
                     sum_send = sum(N_send(1:nc1-1)) ! have sent before this one
-                    call select2end<<<ceiling(dble(N_peri)/tPB),tPB,0,str1>>>( &
+                    call select2end<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                         d_indices,d_isValid,P_de(np_temp+1:np_temp+N_peri,:), &
                         N_peri,sum_send,np)
                     left  = np - sum(N_send(1:nc1-1)) + 1
                     right = np - sum(N_send(1:nc1))
-                    istat = cudaStreamSynchronize(str1)
                     call MPI_ISEND(P_de(left:right,:),N_send(nc1)*nattri, &
                         MPI_DOUBLE_PRECISION,i,41,work_comm,rq3(nc3),ierr)
-                    call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB,0,str1>>>( &
+                    call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                         holes,d_indices,d_isValid,P_de(np_temp+1:np_temp+N_peri,:),N_peri)
                     N_peri = d_indices(N_peri); deallocate(holes)
                 end if

@@ -1,11 +1,4 @@
 module compact_array
-    ! 1 attributes(global) subroutine compaction_copy
-    ! 2 attributes(global) subroutine prepare_holes
-    ! 3 attributes(global) subroutine compaction_inplace
-    ! 4 attributes(global) subroutine prepare_neighbor
-    ! 5 attributes(global) subroutine prepare_exit
-    ! 6 attributes(global) subroutine connect_recv
-    ! 7 attributes(global) subroutine scan_zone
     use cudafor
     use variable_list, only: Zone_de
 
