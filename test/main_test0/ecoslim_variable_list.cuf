@@ -28,11 +28,11 @@ module variable_list
     ! P(np,16+nind*2) = Partical Initial Z coordinate [L]
     ! P(np,17+nind*2) = Time that particle was added [T]
 
-!--------------------------------------------------------------------
+    !--------------------------------------------------------------------
     use mpi
     use cudafor
     use mrand, only: h
-!--------------------------------------------------------------------
+    !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
     integer:: world_group, work_group, manage_group, manage_ranks(1)
@@ -108,14 +108,12 @@ module variable_list
     ! If V_mult = -1, backward tracking
     ! density of water (M/L3), molecular diffusion (L2/T), fractionation
 
-    logical clmtrans, clmfile, reflect  ! reflect has not been read
+    logical clmtrans, clmfile, reflect !reflect has not been read
     ! logical for mode of operation with CLM, will add particles with P-ET > 0
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
 
-    real(8):: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-    real(8):: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-    real(8):: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+    real(8):: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
     real(8):: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
 
     real(8):: Total_time1, Total_time2, t1, t2
@@ -128,16 +126,11 @@ module variable_list
     integer:: np_active_log, add_f
 
     real(8),allocatable,pinned:: P(:,:)
-    integer,allocatable,pinned:: N_send(:)
-    ! the same length as neigh_list, i.e., the total number of subdomains.
-    ! it is assembled on GPU in particle loop and used in exchange on CPU.
-    integer,allocatable:: N_recv(:)
-    ! for each subdomain, it has the number of neighbors
-    ! sum(neigh_list) ??? pinned
-    integer:: N_exit, N_peri ! a scalar variable.
-    real(8),allocatable,managed:: P_exit(:,:)
-    ! It is assembled on GPU and is written into binary file each timestep.
-    ! it is allocated in particle exchange.
+    integer:: N_send !single host value
+    integer,allocatable:: N_recv_all(:) !sum(neigh_list) ??? pinned
+    real(8),allocatable,pinned:: P_exit(:,:)
+    integer,allocatable,pinned:: neigh_list(:) ! t_rank, and should be initilized at the very beginning
+    integer,allocatable,pinned:: neigh_listo(:), neigh_listn(:)
     integer,allocatable,pinned:: out_np_cpu(:),ET_np_cpu(:)
     real(8),allocatable,pinned:: out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
     real(8),allocatable,pinned:: ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
@@ -167,7 +160,7 @@ module variable_list
     integer,allocatable:: nump(:) ! gather active particles to jusdge if DDC
     integer:: decom = 0
 
-!-------------------------------------
+    !-------------------------------------
     ! GPU variables
     real(8),allocatable,device:: P_de(:,:)
     ! the particle array, not sure if the one on host is necessary
@@ -190,30 +183,19 @@ module variable_list
     real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),mean_mass_de(:),total_mass_de(:)
 
     integer,allocatable,device:: d_isValid(:),d_indices(:),holes(:)
-    ! real(8),allocatable,managed:: P_send(:,:),P_recv(:,:)
+    real(8),allocatable,device:: P_send(:,:),P_recv(:,:)
     integer,allocatable,managed:: Zone_de(:,:),Zones_old(:,:)
-    ! Zone_de has to be written to restart files, so we use managed.
     ! old is old, using the new box to cut the old zone (Zones_old)
     ! new is new, using the old box to cut the new zone (Zone_de)
-    ! Zones_old is allocated in the zone exchange subroutine
 
     integer,allocatable,device:: p_num(:,:), c_sum(:)
-    ! it should use integer(8) for CONUS !!!
-    ! p_sum on workers needs to be deallocated
-    ! c_sum is only on manager
-    integer,allocatable,managed:: Zonet_old(:,:), Zonet_new(:,:)
-    ! only on rank ppx*qqy. Zonet_new is written into restart files.
+    integer,allocatable,managed:: Zonet_old(:,:), Zonet_new(:,:) ! only on rank ppx*qqy
     integer,allocatable,managed:: grid(:,:), grid_old(:,:)
     ! grid is on GPU, and should be initialized each time doing DDC as
     ! grid = 0
     ! grid(1,1) = 0;  grid(1,2) = 0
     ! grid(1,3) = nx; grid(1,4) = ny
-    ! it is also written into restart files.
 
-    integer,allocatable,managed:: neigh_list(:)
-    ! t_rank-1, and should be initilized at the very beginning
-    integer,allocatable,managed:: neigh_listo(:), neigh_listn(:)
-!-------------------------------------
 contains
     subroutine alloc_arrays_temp()
         implicit none
@@ -272,7 +254,7 @@ contains
         implicit none
 
         if (rank /= ppx*qqy) then
-            reflect = .false.
+
             allocate(grid(t_rank-1,4))
             allocate(neigh_listn(t_rank-1),neigh_listo(t_rank-1))
             allocate(neigh_list(t_rank-1),nump(t_rank-1))

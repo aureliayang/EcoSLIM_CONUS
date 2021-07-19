@@ -40,6 +40,7 @@ contains
             endif
             if(iy1+nny1 == ny) nny2 = nny2 - buff
         end if
+
     end subroutine copy_grid
 
     subroutine receive_Zone_de()

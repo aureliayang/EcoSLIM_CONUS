@@ -1,0 +1,133 @@
+module exchange_particles
+    ! subroutine particle_exchange
+    use thrust
+    use cudafor
+    use compact_array
+    use variable_list, only: N_recv, N_send, neigh_list, N_exit
+    ! N_exit is a cpu scalar
+    ! neigh_list is allocated after getting number of total GPUs.
+    ! it is 1 if neighbor exists while 0 if neighbor doesn't exist.
+    ! N_send has the same length of neigh_list and was built in particle loop.
+    ! N_recv is allocated or deallocated after initialization/update of grid.
+    ! N_recv has the length of its neighbors and has been initialized as 0.
+    use variable_list, only: holes, P_exit
+    use variable_list, only: P_de, d_isValid, d_indices, C_de
+    use variable_list, only: dx, dy, dz_de, nz, np
+    use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
+    use variable_list, only: ix1, iy1, nnx1, nny1, buff
+
+contains
+    subroutine particle_exchange(rank,t_rank,nind,tPB,np_active,work_comm)
+        use mpi
+        implicit none
+        integer,intent(in):: rank, t_rank, nind, tPB, work_comm
+        integer,intent(inout):: np_active
+        integer:: i, j, ierr, status(MPI_STATUS_SIZE,t_rank-1)
+        integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank-1), &
+                  rq2(t_rank-1), rq3(t_rank-1), rq4(t_rank-1)
+        integer:: np_temp, left, right, nattri, sum_recv, sum_send
+        ! we have to send and receive numbers first
+        ! otherwise, when receive, we have to wait the receive of particle-number
+        ! it has two-fold of meanings: 1. waiting the communication itself (copy to recv buff)
+        ! 2. probably the number has not been sent by its neighbor yet since its neighbor
+        ! is doing the sending one by one.
+        ! but here, in order to send numbers first, we count them first in the particle
+        ! loop which will consume extra time. Extra time means it can also be obtained
+        ! in the thrustscan. But thrustscan can only be done one by one since d_indices
+        ! is repeatedly used, so we can't get the number of all neighbors at one time.
+
+        nattri = 17 + 2*nind
+
+        nc1 = 0; nc3 = 0
+        do i = 0, t_rank-2 ! go through to send particles
+            if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
+                nc1 = nc1 + 1 ! the number of neighbors
+                call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                P_de(:,13+2*nind),d_isValid,np_active,i)
+                ! get d_isValid, set it 0 where the particle will be sent to neighbor i
+                call thrustscan(d_isValid,np_active,d_indices)
+                ! do prefix-sum and get d_indices
+                N_send(i+1) = np_active - d_indices(np_active)
+                if(N_send(i+1) > 0) then ! gpu number
+                    nc3 = nc3 + 1 ! only the neighbor with particles
+                    call MPI_ISEND(N_send(i+1),1,MPI_INTEGER,i,40,work_comm,rq1(nc1),ierr)
+                    ! each neighbor use different sending buffer, no wait
+                    allocate(holes(N_send(i+1)))
+                    call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                    holes,d_indices,d_isValid,np_active)
+                    sum_send = sum(N_send(1:i))
+                    call compaction_inplace1<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                    holes,d_indices,d_isValid,P_de,np_active,nattri,sum_send,np)
+                    left  = np-sum(N_send(1:i+1))+1
+                    right = np-sum(N_send(1:i))
+                    call MPI_ISEND(P_de(left:right,:),N_send(i+1)*(17+nind*2), &
+                    MPI_DOUBLE_PRECISION,i,41,work_comm,rq3(nc3),ierr)
+                    np_active = d_indices(np_active); deallocate(holes)
+                end if
+            end if
+        end do
+
+        nc2 = 0
+        do i = 0, t_rank-2
+            if(neigh_list(i+1) > 0) then
+                nc2 = nc2 + 1 !neighbor number
+                call MPI_IRECV(N_recv(nc2),1,MPI_INTEGER,i,40,work_comm,rq2(nc2),ierr)
+            end if
+        end do
+        !-----------------------------------------
+        ! receive part.
+        !-----------------------------------------
+        nc4 = 0; nc5 = 0; np_temp = np_active
+        call MPI_WAITALL(nc2,rq2(1:nc2),status(:,1:nc2),ierr)
+        do i = 0, t_rank-2
+            if(neigh_list(i+1) > 0) then
+                nc4 = nc4 + 1
+                if(N_recv(nc4) > 0) then
+                    nc5 = nc5 + 1
+                    left  = np_temp + sum(N_recv(1:nc4-1))+1
+                    right = np_temp + sum(N_recv(1:nc4))
+                    call MPI_IRECV(P_de(left:right,:),N_recv(nc4)*(17+nind*2), &
+                    MPI_DOUBLE_PRECISION,i,41,work_comm,rq4(nc5),ierr)
+                end if
+            end if
+        end do
+
+        !-----------------------------------------
+        ! then connect received particles
+        if(nc5 > 0) then !recv happened
+            call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
+            ! if receive happened, we wait
+            sum_recv = sum(N_recv)
+            call connect_recv<<<ceiling(dble(sum(N_recv))/tPB),tPB>>>( &
+            P_de,np_temp,np_active,sum_recv,nattri)
+            np_active = np_active + sum(N_recv)
+        endif
+
+        ! call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
+        ! P_de,dx,dy,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
+        ! mean_age_de,mean_comp_de,total_mass_de,np_active)
+
+        ! ! then separate inactive particles
+        ! call prepare_exit<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+        ! P_de(:,8),d_isValid,np_active)
+        ! call thrustscan(d_isValid,np_active,d_indices)
+        ! ! active and ET-inactive particles in overlap zone are sent
+        ! ! out of domain, all outfolw-inactive, received ET-inactive are scanned here
+        ! N_exit = np_active - d_indices(np_active)
+
+        ! if(N_exit > 0) then
+
+        !     allocate(holes(N_exit),P_exit(N_exit))
+        !     ! P_exit has to be deallocated after the use in main
+        !     call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+        !     holes,d_indices,d_isValid,np_active)
+        !     call compaction_inplace2<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+        !     holes,d_indices,d_isValid,P_de,P_exit,np_active,17+nind*2)
+        !     ! update the slots after np_active
+        !     np_active = d_indices(np_active)
+        !     deallocate(holes)
+!
+        ! end if
+    end subroutine particle_exchange
+
+end module exchange_particles
