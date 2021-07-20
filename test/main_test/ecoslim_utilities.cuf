@@ -5,7 +5,7 @@ module utilities
     ! subroutine combine_p_num
     ! attributes(global) subroutine build_p_num
     ! subroutine receive_Zone_de
-
+    use mpi
     use cudafor
     use variable_list, only: nx, ny
     use variable_list, only: buff, ppx, qqy, rank, status
