@@ -35,6 +35,7 @@ use compact_array
 
 implicit none
 integer(8),pinned,allocatable:: p_num_cpu(:,:)
+integer:: request2
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -347,7 +348,8 @@ integer(8),pinned,allocatable:: p_num_cpu(:,:)
                 close(10)
             endif
 
-        call receive_Zone_de() ! this needs all the ranks, both manager and workers
+        call receive_Zone_de(request2) ! this needs all the ranks, both manager and workers
+        if(rank /= ppx*qqy) call MPI_WAIT(request2,status,ierr)
             if(rank /= ppx*qqy)then
                 open(10,file='Zone_de_after.'//trim(adjustl(ranknum)))
                     write(10,*) Zone_de
