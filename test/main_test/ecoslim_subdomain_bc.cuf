@@ -123,10 +123,10 @@ contains
             end do
 
             open(10,file='Local_range.'//trim(adjustl(ranknum)))
-                write(10,'(6(f5.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-                write(10,'(6(f5.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-                write(10,'(6(f5.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-                write(10,'(6(f5.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+                write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+                write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
+                write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
+                write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
             close(10)
 
         end if
