@@ -286,7 +286,24 @@ integer(8),pinned,allocatable:: p_num_cpu(:,:)
     close(10)
 
 !--------------------------------------------------------------------
+    if(rank == ppx*qqy) then
 
+        allocate(grid(ppx*qqy,4),grid_old(ppx*qqy,4))
+        allocate(Zonet_old(-buff+1:nx+buff,-buff+1:ny+buff))
+        allocate(Zonet_new(-buff+1:nx+buff,-buff+1:ny+buff))
+        allocate(p_num(nx,ny),c_sum(max(nx,ny)),d_indices(np))
+        grid = 0; Zonet_new = -1; Zonet_new(1:nx,1:ny) = 0
+        ! allocate(p_num_cpu(nx,ny))
+        ! p_num_cpu = 1_8 ! check such an initialization. Checked and should be right.
+        p_num = 1
+        ! p_num_cpu = 0
+        ! p_num_cpu = p_num
+        ! write(*,'(8(9(i3,1x),/))') ((p_num_cpu(i,j),i=1,nx),j=1,ny)
+        ! write(*,'(10(11(i3,1x),/))') ((Zonet_old(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
+        ! write(*,'(10(11(i3,1x),/))') ((Zonet_new(i,j),i=-buff+1,nx+buff),j=-buff+1,ny+buff)
+        ! write(*,'(4(4(i3,1x),/))') ((grid(i,j),i=1,ppx*qqy),j=1,4)
+
+    end if   ! set the manager
 
 
     9090 continue

@@ -7,7 +7,7 @@ test      ! SLIM run name, path to PF-CLM next, followed by DEM
 4                !nCLMsoil
 2                !ppx
 2                !qqy
--1                !particles per cell at start of simulation
+1                !particles per cell at start of simulation
 3000             !np Total
 1000             !dx
 1000             !dy, dz follows
