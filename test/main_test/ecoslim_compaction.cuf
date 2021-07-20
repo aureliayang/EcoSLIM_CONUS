@@ -31,8 +31,8 @@ contains
         end if
     end subroutine prepare_holes
 !3--------------------------------------------------------------------
-    attributes(global) subroutine select2end(d_indices,d_isValid,&
-        d_in,numElements,N_send,np)
+    attributes(global) subroutine select2end(holes, &
+        d_in,offset,hole_size,sumsend,np)
         !original:        1 0 1 1 0 0 1 0  d_isValid
         !index(or ii):    1 2 3 4 5 6 7 8  ii
         !prefix sum:      1 1 2 3 3 3 4 4  d_indices
@@ -40,15 +40,16 @@ contains
 
         implicit none
         real(8),intent(inout):: d_in(:,:)
-        integer,intent(in):: d_indices(:),d_isValid(:)
-        integer:: ii, temp
-        integer,value:: numElements, N_send, np
+        integer,intent(in):: holes(:)
+        integer:: ii, temp1, temp2
+        integer,value:: offset, hole_size, sumsend, np
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-        if(ii <= numElements .and. d_isValid(ii) == 0) then
-            temp = np - N_send - (ii-d_indices(ii)) + 1
-            d_in(temp,:) = d_in(ii,:)
+        if(ii <= hole_size) then
+            temp1 = np - sumsend - ii + 1
+            temp2 = offset + holes(ii)
+            d_in(temp1,:) = d_in(temp2,:)
         end if
 
     end subroutine select2end
@@ -94,25 +95,27 @@ contains
         end if
     end subroutine compaction_inplace2
 
-    attributes(global) subroutine select2np_active(d_indices,d_isValid,&
-        d_in,numElements)
+    attributes(global) subroutine select2np_active(holes, &
+        d_in,numElements,hole_size)
 
         implicit none
         real(8),intent(inout):: d_in(:,:)
-        integer,intent(in):: d_indices(:),d_isValid(:)
-        integer,value:: numElements
-        integer:: ii
+        integer,intent(in):: holes(:)
+        integer,value:: numElements,hole_size
+        integer:: ii, temp1, temp2
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-        if(ii <= numElements .and. d_isValid(ii) == 0) then
-            d_in(numElements+ii-d_indices(ii),:) = d_in(ii,:)
+        if(ii <= hole_size) then
+            temp1 = numElements+ii
+            temp2 = holes(ii)
+            d_in(temp1,:) = d_in(temp2,:)
         end if
 
     end subroutine select2np_active
 
     attributes(global) subroutine compaction_inplace(holes,d_indices,d_isValid,&
-        d_in,numElements)
+        d_in,offset,numElements)
         !original:        1 0 1 1 0 0 1 0  d_isValid
         !index(or ii):    1 2 3 4 5 6 7 8  ii
         !prefix sum:      1 1 2 3 3 3 4 4  d_indices
@@ -129,8 +132,8 @@ contains
         !dimension is determined by np_active - d_indices(np_active)
         !np_active is numElements
         !holes is a temporary array that just needs dynamic allocation on cpu
-        integer:: ii, ii2   !global index in the array
-        integer,value:: numElements
+        integer:: ii, ii2, temp1, temp2   !global index in the array
+        integer,value:: offset, numElements
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
@@ -139,7 +142,9 @@ contains
 
         if(ii <= numElements .and. d_isValid(ii) > 0 .and. &
             holes(ii2) <= d_indices(numElements)) then
-            d_in(holes(ii2),:) = d_in(ii,:)
+            temp1 = offset+holes(ii2)
+            temp2 = offset+ii
+            d_in(temp1,:) = d_in(temp2,:)
         end if
 
     end subroutine compaction_inplace
@@ -175,7 +180,7 @@ contains
         implicit none
         real(8),intent(inout):: d_in(:,:)
         integer,value:: numElements, N_recv
-        integer:: ii,j   !global index in the array
+        integer:: ii   !global index in the array
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 

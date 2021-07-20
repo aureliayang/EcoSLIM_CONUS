@@ -134,7 +134,7 @@ module variable_list
     integer,allocatable:: N_recv(:)
     ! for each subdomain, it has the number of neighbors
     ! sum(neigh_list) ??? pinned
-    integer:: N_exit, N_peri ! a scalar variable.
+    integer:: N_exit, N_peri, N_inte ! a scalar variable.
     real(8),allocatable,managed:: P_exit(:,:)
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.

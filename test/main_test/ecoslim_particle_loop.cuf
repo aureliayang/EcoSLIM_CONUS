@@ -1,4 +1,5 @@
 module particle_loop
+    ! attributes(global) subroutine particles_separation
     ! attributes(global) subroutine particles_independent
     ! attributes(global) subroutine Update_C_Array
     use cudafor
@@ -42,7 +43,7 @@ contains
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
         dx,dy,pfdt,moldiff,denh2o,dtfrac,offset,np_active, &
-        nind,ix1,iy1,nnx1,nny1,nz,reflect,flag)
+        nind,ix1,iy1,nnx1,nny1,nz,reflect,flag,rank)
 
         implicit none
 
@@ -55,7 +56,8 @@ contains
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         real(8),value:: dx,dy,pfdt,moldiff,denh2o,dtfrac
-        integer,value:: offset,np_active,nind,ix1,iy1,nnx1,nny1,nz,flag
+        integer,value:: np_active,nind,ix1,iy1,nnx1,nny1,nz
+        integer,value:: offset,rank,flag
         logical,value:: reflect
 
         integer:: ii,k,Ploc(3),itemp

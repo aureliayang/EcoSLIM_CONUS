@@ -9,7 +9,9 @@ module subdomain_bound
     use variable_list, only: nx, ny, nz
     use variable_list, only: dx, dy, dz
     use variable_list, only: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-    use variable_list, only: Xmin, Xmax, Ymin, Ymax, Zmin, Zmax
+    use variable_list, only: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
+    use variable_list, only: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
+    use variable_list, only: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
     use variable_list, only: loadf, restartf, exitedf, logf, ranknum
     use variable_list, only: fh1, fh2
     use variable_list, only: ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
@@ -78,23 +80,55 @@ contains
         integer:: k
 
         if (rank /= ppx*qqy) then
+
             ! set up subdomain boundaries
-            Xmin = -dble(buff)*dx
-            Ymin = -dble(buff)*dy
-            Zmin = 0.0d0
-            Xmax = dble(nnx1)*dx + dble(buff)*dx
-            Ymax = dble(nny1)*dy + dble(buff)*dy
-            Zmax = 0.0d0
+            Xmin1 = 0.0d0
+            Ymin1 = 0.0d0
+            Zmin1 = 0.0d0
+            Xmax1 = dble(nnx1)*dx
+            Ymax1 = dble(nny1)*dy
+            Zmax1 = 0.0d0
             do k = 1, nz
-                Zmax = Zmax + dz(k)
+                Zmax1 = Zmax1 + dz(k)
             end do
-            ! need output to log file
-            ! return the global and local info of the subdomain
-            ! add grid info to log file
-            ! write(message,'(a,a,i5,a,4(i10,1x),a)') new_line(' '),'rank:',rank, &
-            ! ', Gridinfo (ix1,iy1,nnx1,nny1):',grid(rank+1,1:4),new_line(' ')
-            ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+            Xmin2 = -dble(buff)*dx
+            Ymin2 = -dble(buff)*dy
+            Zmin2 = 0.0d0
+            Xmax2 = dble(nnx1)*dx + dble(buff)*dx
+            Ymax2 = dble(nny1)*dy + dble(buff)*dy
+            Zmax2 = 0.0d0
+            do k = 1, nz
+                Zmax2 = Zmax2 + dz(k)
+            end do
+
+            Xmin3 = dble(buff)*dx
+            Ymin3 = dble(buff)*dy
+            Zmin3 = 0.0d0
+            Xmax3 = dble(nnx1)*dx - dble(buff)*dx
+            Ymax3 = dble(nny1)*dy - dble(buff)*dy
+            Zmax3 = 0.0d0
+            do k = 1, nz
+                Zmax3 = Zmax3 + dz(k)
+            end do
+
+            Xgmin = Xgmin - dble(ix1)*dx
+            Ygmin = Ygmin - dble(iy1)*dy
+            Zgmin = 0.0d0
+            Xgmax = Xgmax - dble(ix1)*dx
+            Ygmax = Ygmax - dble(iy1)*dy
+            Zgmax = 0.0d0
+            do k = 1, nz
+                Zgmax = Zgmax + dz(k)
+            end do
+
+            open(10,file='Local_range.'//trim(adjustl(ranknum)))
+                write(10,'(6(f5.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+                write(10,'(6(f5.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
+                write(10,'(6(f5.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
+                write(10,'(6(f5.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+            close(10)
+
         end if
     end subroutine local_xyz
 
