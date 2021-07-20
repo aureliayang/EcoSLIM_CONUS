@@ -43,7 +43,7 @@ contains
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
         dx,dy,pfdt,moldiff,denh2o,dtfrac,offset,np_active, &
-        nind,ix1,iy1,nnx1,nny1,nz,reflect,flag,rank)
+        nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
 
         implicit none
 
@@ -57,7 +57,7 @@ contains
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         real(8),value:: dx,dy,pfdt,moldiff,denh2o,dtfrac
         integer,value:: np_active,nind,ix1,iy1,nnx1,nny1,nz
-        integer,value:: offset,rank,flag
+        integer,value:: offset,rank
         logical,value:: reflect
 
         integer:: ii,k,Ploc(3),itemp
@@ -68,10 +68,10 @@ contains
         ii = offset + (blockIdx%x - 1) * blockDim%x + threadIdx%x
         lock = 1.d0
         !--------------------------------------
-        xgmin = xgmin - dble(ix1)*dx
-        ygmin = ygmin - dble(iy1)*dy
-        xgmax = xgmax - dble(ix1)*dx
-        ygmax = ygmax - dble(iy1)*dy
+        ! xgmin = xgmin - dble(ix1)*dx
+        ! ygmin = ygmin - dble(iy1)*dy
+        ! xgmax = xgmax - dble(ix1)*dx
+        ! ygmax = ygmax - dble(iy1)*dy
 
         delta_time = 0.d0
 
