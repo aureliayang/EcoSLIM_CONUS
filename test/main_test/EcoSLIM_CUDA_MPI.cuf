@@ -358,8 +358,62 @@ integer:: request2
     end if
     ! for following, if there is [if (rank /= ppx*qqy)] in the subroutine, please
     ! just keep it there now, and later we can find a better way.
+!--------------------------------------------------------------------
+    if(rank /= ppx*qqy)then
+        call local_xyz()
 
+        if(rank == 0) then
+            flush(11)
+            close(11)
+        endif
 
+        Porosity = 0.3d0
+
+        if(np_ic /= -1) then
+            Saturation = 0.8d0
+            call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
+                rank,np_ic,nnx1,nny1)
+        endif
+
+        print *, 'ok2'
+        dz_de  = dz2 ! I can't understand why dz doesn't work.
+        Ind_de = Ind
+        Porosity_de   = Porosity
+        Saturation_de = Saturation
+        P_de = P
+
+        open(10,file='Variable_init.'//trim(adjustl(ranknum)))
+            write(10,*) dz2
+            write(10,*) Ind
+            write(10,*) Porosity
+            write(10,*) Saturation
+            write(10,'(19(f5.2,1x))') ((P(i,j),j=1,19),i=1,10)
+        close(10)
+
+        ! Define initial particles' locations and mass
+        if (np_ic > 0)  then
+            np_active = 0
+            pid = 0
+            if (np_active + np_ic*nnx1*nny1*nz >= np ) then
+                write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
+                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+                write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
+                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+
+                goto 9090
+            endif
+
+            call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
+            tPB >>> (P_de,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dx,dy,dz_de)
+
+            np_active = np_ic*nnx1*nny1*nz
+            pid = np_ic*nnx1*nny1*nz
+
+        end if
+    end if
 
     9090 continue
 

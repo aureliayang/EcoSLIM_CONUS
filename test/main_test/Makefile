@@ -30,6 +30,8 @@ clean:
 	topology.* \
 	Zone_de_before.* \
 	Zone_de_after.* \
-	Load*
+	Load* \
+	Local* \
+	Variable_init* \
 
 
