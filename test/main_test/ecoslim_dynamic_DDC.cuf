@@ -31,7 +31,8 @@ contains
         implicit none
         integer:: i, j, dir, nlev, n
         integer:: max_dim, ierr
-        integer:: c_sum_cpu(9),indices_cpu(9)
+        integer(8):: c_sum_cpu(9)
+        integer:: indices_cpu(9)
 
         if (rank == ppx*qqy) then ! at least, this if condition doesn't conflict
 
@@ -44,7 +45,7 @@ contains
             grid(1,4) = ny
             Zonet_new = -1
             Zonet_new(1:nx,1:ny) = 0
-            write(*,'(4(4(i3,1x),/))') grid
+            write(*,'(a,4(4(i3,1x),/))') 'on manager',((grid(i,j),i=1,4),j=1,ppx*qqy)
 
             dir = 1
             if(qqy > ppx) dir = -1
@@ -73,9 +74,9 @@ contains
                 !!! is much more than the other direction???
                 n = n/2
                 c_sum_cpu = c_sum
-                write(*,'(9(i3,1x))') c_sum_cpu
+                write(*,'(a,9(i3,1x))') 'c_sum',c_sum_cpu
                 indices_cpu = d_indices(1:9)
-                write(*,'(9(i3,1x))') indices_cpu
+                write(*,'(a,9(i3,1x))') 'd_indices',indices_cpu
                 write(*,'(4(4(i3,1x),/))') grid
             end do
         endif

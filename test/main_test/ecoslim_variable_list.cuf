@@ -197,7 +197,7 @@ module variable_list
     ! new is new, using the old box to cut the new zone (Zone_de)
     ! Zones_old is allocated in the zone exchange subroutine
 
-    integer,allocatable,device:: p_num(:,:), c_sum(:)
+    integer(8),allocatable,device:: p_num(:,:), c_sum(:)
     ! it should use integer(8) for CONUS !!!
     ! p_sum on workers needs to be deallocated
     ! c_sum is only on manager
