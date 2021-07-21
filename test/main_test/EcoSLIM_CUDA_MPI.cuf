@@ -641,6 +641,12 @@ integer:: request2
 
             call particle_exchange()
 
+            print *, rank, 'ok8'
+
+            ! call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
+            ! P_de,dx,dy,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
+            ! mean_age_de,mean_comp_de,total_mass_de,np_active)
+
         end if
     end do ! timesteps and cycles
 

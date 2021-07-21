@@ -96,33 +96,31 @@ contains
         !-----------------------------------------
         N_peri = N_peri + sum(N_recv)
         np_active = N_inte + N_peri
+
         if(nc5 > 0) call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
-
-        ! call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
-        ! P_de,dx,dy,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
-        ! mean_age_de,mean_comp_de,total_mass_de,np_active)
-
         ! then separate inactive particles
         call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-        P_de(:,8),d_isValid,np_active,0)
+            P_de(:,8),d_isValid,np_active,0)
         call thrustscan(d_isValid,np_active,d_indices)
         ! active and ET-inactive particles in overlap zone are sent
         ! out of domain, all outfolw-inactive, received ET-inactive are scanned here
         N_exit = np_active - d_indices(np_active)
 
-        ! if(N_exit > 0) then
+        if(N_exit > 0) then
 
-        !     allocate(holes(N_exit),P_exit(N_exit))
-        !     ! P_exit has to be deallocated after the use in main
-        !     call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-        !     holes,d_indices,d_isValid,np_active)
-        !     call compaction_inplace2<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-        !     holes,d_indices,d_isValid,P_de,P_exit,np_active,17+nind*2)
-        !     ! update the slots after np_active
-        !     np_active = d_indices(np_active)
-        !     deallocate(holes)
-!
-        ! end if
+            allocate(holes(N_exit),P_exit(N_exit,17+2*nind))
+            ! P_exit has to be deallocated after the use in main
+            call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                holes,d_indices,d_isValid,np_active)
+            call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(&
+                holes,P_de,P_exit,N_exit)
+            call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                holes,d_indices,d_isValid,P_de,0,np_active)
+            ! update the slots after np_active
+            np_active = d_indices(np_active)
+            deallocate(holes,P_exit)
+
+        end if
     end subroutine particle_exchange
 
 end module exchange_particles
