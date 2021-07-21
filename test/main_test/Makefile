@@ -33,5 +33,10 @@ clean:
 	Load* \
 	Local* \
 	Variable_init* \
+	P_init.* \
+	Neighbor.* \
+	Exited_particles.* \
+	Log_particles.* \
+
 
 

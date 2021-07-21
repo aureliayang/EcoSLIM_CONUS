@@ -35,6 +35,7 @@ use compact_array
 
 implicit none
 integer(8),pinned,allocatable:: p_num_cpu(:,:)
+type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
 integer:: request2
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
@@ -371,11 +372,16 @@ integer:: request2
 
         if(np_ic /= -1) then
             Saturation = 0.8d0
-            call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>>(nx,ny,nz, &
+                allocate(h_cpu(np))
+                h_cpu = h
+                write(*,*) rank,'h_before',h_cpu(1)
+            call createRand_init<<<ceiling(dble(nnx1*nny1*nz)/tPB),tPB>>>(nx,ny,nz, &
                 rank,np_ic,nnx1,nny1)
+                h_cpu = h
+                write(*,*) rank,'h_after',h_cpu(1)
         endif
 
-        print *, 'ok2'
+        print *, 'ok3'
         dz_de  = dz2 ! I can't understand why dz doesn't work.
         Ind_de = Ind
         Porosity_de   = Porosity
@@ -413,7 +419,69 @@ integer:: request2
             pid = np_ic*nnx1*nny1*nz
 
         end if
+            open(10,file='P_init.'//trim(adjustl(ranknum)))
+                write(10,*) np_active
+                write(10,*) pid
+                P = P_de
+                write(10,'(200(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+            close(10)
+
+        !--------------------------------------------------------------------
+            ! keep the following output as it is. we can figure out a better way to handle them later.
+            call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh4,ierr)
+
+            write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
+            call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+
+            write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
+                                    ETOut NP_PrecipIn NP_ETOut NP_QOut NP_active_old NP_filtered', new_line(' ')
+            call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+
+            ! open exited particle file and write header
+            call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh3,ierr)
+            print *, 'ok4'
+            if(rank == 0) then
+
+                ! if(ipwrite < 0) then
+                ! ! open/create/write the 3D output file which will write particles out each timestemp, very slowly in parallel
+                !     open(214,file=trim(runname)//'_total_particle_trace.3D')
+                !     write(214,*) 'X Y Z TIME'
+                ! end if ! ipwrite < 0
+                ! this write is originally in the particle loop. now particle loop is on GPU. This can not be reserved.
+
+                open(13,file=trim(runname)//'_ET_output.txt')
+                write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
+
+                open(15,file=trim(runname)//'_flow_output.txt')
+                write(15,*) 'TIME Out_age Out_comp1 outcomp2 outcomp3 Out_mass Out_NP'
+
+                open(16,file=trim(runname)//'_PET_balance.txt')
+                write(16,*) 'TIME P[kg] ET[kg]'
+
+            endif
+
+            call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+            tPB>>>(nnx1,nny1,buff,neigh_list,rank,t_rank-1)
+            ! ix2, iy2, nnx2, and nny2 are only used for reading files
+                print *, 'ok5'
+            if(sum(neigh_list) > 0) then
+                allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
+                N_send = 0; N_recv = 0
+            end if
+            ! don't have to do this every timestep, only after the update of decomposition
+
+            open(10,file='Neighbor.'//trim(adjustl(ranknum)))
+                write(10,*) neigh_list
+                write(10,*) N_recv
+            close(10)
+
+            ! Intialize cuRand device API and this part need to check through again.
+            call createRand_loop<<< ceiling(dble(np_active)/tPB),tPB >>>(np, rank, pfnt)
     end if
+    print *, 'ok6'
+!--------------------------------------------------------------------
+
+
 
     9090 continue
 
