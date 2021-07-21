@@ -289,7 +289,7 @@ contains
 
                 if ((P(ii,1) <  Xmin).or.(P(ii,2) <  Ymin).or.(P(ii,3) < Zmin).or. &
                     (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) > Zmax).or. &
-                    (P(ii,1) <  Xgmax).or.(P(ii,2) <  Ygmax).or.(P(ii,3) < Zgmax).or. &
+                    (P(ii,1) <  Xgmin).or.(P(ii,2) <  Ygmin).or.(P(ii,3) < Zgmin).or. &
                     (P(ii,1) >= Xgmax).or.(P(ii,2) >= Ygmax).or.(P(ii,3) > Zgmax)) then
                     ! unavoidable particle loss, this should be written into the log file later.
                     ! flag particle as inactive

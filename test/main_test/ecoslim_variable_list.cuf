@@ -169,7 +169,7 @@ module variable_list
 
 !-------------------------------------
     ! GPU variables
-    real(8),allocatable,device:: P_de(:,:)
+    real(8),allocatable,managed:: P_de(:,:)
     ! the particle array, not sure if the one on host is necessary
     real(8),allocatable,device:: C_de(:,:,:,:)
     real(8),allocatable,device:: Vx_de(:,:,:)

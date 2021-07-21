@@ -39,6 +39,7 @@ clean:
 	Log_particles.* \
 	P_new.* \
 	P_separa.* \
+	P_peri.* \
 
 
 

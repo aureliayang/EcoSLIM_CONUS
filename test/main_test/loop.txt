@@ -55,7 +55,7 @@ do kk = outkk, pfnt
 
 
 
-        call particle_exchange()
+
 
         ! interior particles
         call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
