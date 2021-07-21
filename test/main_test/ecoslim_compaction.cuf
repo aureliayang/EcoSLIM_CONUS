@@ -54,46 +54,23 @@ contains
 
     end subroutine select2end
 
-    attributes(global) subroutine compaction_inplace2(holes,d_indices,d_isValid,&
-                                                     d_in,d_out,numElements,n_attri)
-        !original:        1 0 1 1 0 0 1 0  d_isValid
-        !index(or ii):    1 2 3 4 5 6 7 8  ii
-        !prefix sum:      1 1 2 3 3 3 4 4  d_indices
-        !ii-d_indices:    0 1 1 1 2 3 3 4
-        !N-sum(index):    3 3 2 1 1 1 0 0  d_indices(numElements)-d_indices
-        !N-sum(index)+1:  4 4 3 2 2 2 1 1  ii2
-        !numElements:     8
-        !holes:           2 5 6 8
-        !holes index:     1 2 3 4
+    attributes(global) subroutine select2exit(holes, &
+        d_in,d_out,hole_size)
 
         implicit none
-        real(8),intent(inout):: d_in(:,:)
+        real(8),intent(in):: d_in(:,:)
         real(8),intent(out):: d_out(:,:)
-        integer,intent(in):: holes(:),d_indices(:),d_isValid(:)
-        !dimension is determined by np_active - d_indices(np_active)
-        !np_active is numElements
-        !holes is a temporary array that just needs dynamic allocation on cpu
-        integer:: ii, ii2, j   !global index in the array
-        integer,value:: numElements, n_attri
+        integer,intent(in):: holes(:)
+        integer:: ii   !global index in the array
+        integer,value:: hole_size
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-        if(ii <= numElements) &
-        ii2 = d_indices(numElements) - d_indices(ii) + 1
-
-        if(ii <= numElements .and. d_isValid(ii) == 0) then
-            do j = 1, n_attri
-                d_out(ii-d_indices(ii),j) = d_in(ii,j)
-            enddo
+        if(ii <= hole_size) then
+            d_out(ii,:) = d_in(holes(ii),:)
         end if
 
-        if(ii <= numElements .and. d_isValid(ii) > 0 .and. &
-        holes(ii2) <= d_indices(numElements)) then
-            do j = 1, n_attri
-                d_in(holes(ii2),j) = d_in(ii,j)
-            enddo
-        end if
-    end subroutine compaction_inplace2
+    end subroutine select2exit
 
     attributes(global) subroutine select2np_active(holes, &
         d_in,numElements,hole_size)
