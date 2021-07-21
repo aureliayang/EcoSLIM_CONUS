@@ -66,7 +66,6 @@ do kk = outkk, pfnt
             dx,dy,pfdt,moldiff,denh2o,dtfrac,0,N_inte, &
             nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
 
-        print *, rank, 'ok8'
     end if
 
 
