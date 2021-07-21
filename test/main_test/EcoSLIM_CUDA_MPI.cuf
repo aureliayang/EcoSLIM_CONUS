@@ -614,7 +614,12 @@ integer:: request2
                 P_de,N_inte,N_peri)
 
             print *, 'rank',rank,N_peri,N_inte
-
+            open(10,file='P_separa.'//trim(adjustl(ranknum)))
+                write(10,*) np_active
+                write(10,*) pid
+                P = P_de
+                write(10,'(200(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+            close(10)
         end if
     end do ! timesteps and cycles
 
