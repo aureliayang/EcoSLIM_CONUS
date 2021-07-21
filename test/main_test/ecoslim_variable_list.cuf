@@ -131,9 +131,7 @@ module variable_list
     integer,allocatable,pinned:: N_send(:)
     ! the same length as neigh_list, i.e., the total number of subdomains.
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
-    integer,allocatable:: N_recv(:)
-    ! for each subdomain, it has the number of neighbors
-    ! sum(neigh_list) ??? pinned
+    integer,allocatable:: N_recv(:) ! for each subdomain, it has the number of neighbors
     integer:: N_exit, N_peri, N_inte ! a scalar variable.
     real(8),allocatable,managed:: P_exit(:,:)
     ! It is assembled on GPU and is written into binary file each timestep.
@@ -213,6 +211,9 @@ module variable_list
     integer,allocatable,managed:: neigh_list(:)
     ! t_rank-1, and should be initilized at the very beginning
     integer,allocatable,managed:: neigh_listo(:), neigh_listn(:)
+
+    integer,allocatable:: status2(:,:), rq4(:)
+    integer:: nc5
 !-------------------------------------
 contains
     subroutine alloc_arrays_temp()
@@ -277,6 +278,7 @@ contains
             allocate(neigh_listn(t_rank-1),neigh_listo(t_rank-1))
             allocate(neigh_list(t_rank-1),nump(t_rank-1))
             allocate(d_isValid(np),d_indices(np),h(np))
+            allocate(status2(MPI_STATUS_SIZE,t_rank-1),rq4(t_rank-1))
 
             allocate(out_np_cpu(1),ET_np_cpu(1))
             allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
