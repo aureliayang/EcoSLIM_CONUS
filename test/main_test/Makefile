@@ -38,6 +38,7 @@ clean:
 	Exited_particles.* \
 	Log_particles.* \
 	P_new.* \
+	P_separa.* \
 
 
 
