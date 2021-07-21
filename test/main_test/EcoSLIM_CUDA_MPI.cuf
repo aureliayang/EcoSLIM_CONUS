@@ -31,7 +31,7 @@ use create_subdomain
 use add_particles
 use compact_array
 ! use exchange_zone
-! use exchange_particles
+use exchange_particles
 
 implicit none
 integer(8),pinned,allocatable:: p_num_cpu(:,:)
@@ -491,7 +491,7 @@ integer:: request2
             pfkk = pfkk + 1
             ! Read the velocities computed by ParFlow
             write(filenum,'(i5.5)') pfkk
-            Vx = 1.d-1
+            Vx = 80
             Vy = 0.d0
             Vz = 0.d0
             Saturation = 0.8d0
