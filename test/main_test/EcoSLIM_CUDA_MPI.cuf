@@ -419,7 +419,7 @@ integer:: request2
             pid = np_ic*nnx1*nny1*nz
 
         end if
-            open(10,file='P_init.'//trim(adjustl(ranknum)))
+            open(10,file='P_init.'//trim(adjustl(ranknum))//'.txt')
                 write(10,*) np_active
                 write(10,*) pid
                 P = P_de
@@ -491,9 +491,9 @@ integer:: request2
             pfkk = pfkk + 1
             ! Read the velocities computed by ParFlow
             write(filenum,'(i5.5)') pfkk
-            Vx = 1.d-2
-            Vy = 1.d-2
-            Vz = 1.d-2
+            Vx = 1.d-1
+            Vy = 0.d0
+            Vz = 0.d0
             Saturation = 0.8d0
 
             if (clmtrans) then
@@ -586,7 +586,7 @@ integer:: request2
                 end if
             end if
 
-            open(10,file='P_new.'//trim(adjustl(ranknum)))
+            open(10,file='P_new.'//trim(adjustl(ranknum))//'.txt')
                 write(10,*) np_active
                 write(10,*) pid
                 P = P_de
@@ -614,13 +614,15 @@ integer:: request2
                 P_de,N_inte,N_peri)
 
             print *, 'rank',rank,N_peri,N_inte
-            open(10,file='P_separa.'//trim(adjustl(ranknum)))
+            open(10,file='P_separa.'//trim(adjustl(ranknum))//'.txt')
                 write(10,*) np_active
                 write(10,*) pid
                 P = P_de
                 write(10,'(200(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
             close(10)
 
+            print *, rank,'rank',xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
+            print *, rank,'rank',xmin2,ymin2,zmin2,xmax2,ymax2,zmax2
             ! peripheric particles
             call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
             P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
@@ -630,12 +632,14 @@ integer:: request2
             dx,dy,pfdt,moldiff,denh2o,dtfrac,N_inte,N_peri, &
             nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
 
-            open(10,file='P_peri.'//trim(adjustl(ranknum)))
+            open(10,file='P_peri.'//trim(adjustl(ranknum))//'.txt')
             write(10,*) np_active
             write(10,*) pid
             P = P_de
             write(10,'(200(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
             close(10)
+
+            call particle_exchange()
 
         end if
     end do ! timesteps and cycles
