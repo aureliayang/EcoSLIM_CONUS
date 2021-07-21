@@ -63,10 +63,10 @@ contains
         integer:: ii,k,Ploc(3),itemp
         real(8):: Clocx,Clocy,Clocz,Vpx,Vpy,Vpz,Z, &
         particledt,delta_time,et_flux,water_vol,advdt(3), &
-        z1,z2,z3,Zr,temp,lock,Ltemp
+        z1,z2,z3,Zr,temp,one,Ltemp
         !--------------------------------------
         ii = offset + (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        lock = 1.d0
+        one = 1.d0
         !--------------------------------------
         ! xgmin = xgmin - dble(ix1)*dx
         ! ygmin = ygmin - dble(iy1)*dy
@@ -128,7 +128,7 @@ contains
                         temp = atomicAdd(Out_comp(3), P(ii,6))
                     end if
 
-                    temp = atomicAdd(Out_np(1), idnint(lock))
+                    temp = atomicAdd(Out_np(1), idnint(one))
 
                     ! flag particle as inactive
                     P(ii,8) = 0.d0
@@ -211,12 +211,12 @@ contains
                         temp = atomicAdd(ET_comp(3), P(ii,6))
                     end if
 
-                    temp = atomicAdd(ET_np(1), idnint(lock))
+                    temp = atomicAdd(ET_np(1), idnint(one))
 
                     ! outputting spatially distributed ET information
                     ! here it is a problem, probably have to be done after transfer.
                     ! can keep it here but only for the area except overlap Zone
-                    ! temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+                    ! temp = atomicAdd(C(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),one)
 
                     ! temp = atomicAdd(C(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6)) ! particle mass added to ET
 
@@ -345,10 +345,10 @@ contains
         integer,value:: nnx1,nny1,nz,ix1,iy1,buff,np_active
         real(8),value:: dx,dy
         integer:: Ploc(3), ii, k
-        real(8):: lock, Z, temp
+        real(8):: one, Z, temp
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        lock = 1.d0
+        one = 1.d0
 
         if(ii < np_active) then
 
@@ -372,7 +372,7 @@ contains
             end do
 
             if(P(ii,8) == 0. .and. P(ii,10) == 2.) then
-                temp = atomicAdd(C_de(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),lock)
+                temp = atomicAdd(C_de(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),one)
                 temp = atomicAdd(C_de(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,6))  ! particle mass added to ET
                 temp = atomicAdd(C_de(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,4)*P(ii,6))  ! mass weighted age
                 temp = atomicAdd(C_de(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P(ii,7)*P(ii,6))  ! mass weighted contribution
