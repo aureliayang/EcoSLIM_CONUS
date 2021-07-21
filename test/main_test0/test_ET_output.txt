@@ -1,1 +1,0 @@
- TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np
