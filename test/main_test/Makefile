@@ -40,6 +40,7 @@ clean:
 	P_new.* \
 	P_separa.* \
 	P_peri.* \
+	Send_Recv.* \
 
 
 

@@ -17,7 +17,7 @@ module exchange_particles
     use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
     use variable_list, only: ix1, iy1, nnx1, nny1, buff
     use variable_list, only: rank, t_rank, nind, tPB, work_comm
-    use variable_list, only: np_active
+    use variable_list, only: np_active, ranknum
 
 contains
     subroutine particle_exchange(nc5,rq4,status)
@@ -37,7 +37,15 @@ contains
         ! in the thrustscan. But thrustscan can only be done one by one since d_indices
         ! is repeatedly used, so we can't get the number of all neighbors at one time.
 
+        open(10,file='Send_Recv.'//trim(adjustl(ranknum))//'.txt')
+        !write(10,*) np_active
+        !write(10,*) pid
+        !P = P_de
+        !write(10,'(200(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+
+
         nattri = 17 + 2*nind
+        N_send = 0; N_recv = 0
         nc1 = 0; nc3 = 0
         do i = 0, t_rank-2 ! go through to send particles
             if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
@@ -49,6 +57,8 @@ contains
                 ! do prefix-sum and get d_indices
                 N_send(nc1) = N_peri - d_indices(N_peri)
                 call MPI_ISEND(N_send(nc1),1,MPI_INTEGER,i,40,work_comm,rq1(nc1),ierr)
+                write(10,*) 'rank',rank,'ierr',ierr,'i',i
+                write(10,*) 'N_send',N_send
                 ! each neighbor use different sending buffer, no wait
                 if(N_send(nc1) > 0) then ! gpu number
                     nc3 = nc3 + 1 ! only the neighbor with particles
@@ -62,6 +72,8 @@ contains
                     right = np - sum(N_send(1:nc1-1))
                     call MPI_ISEND(P_de(left:right,:),N_send(nc1)*nattri, &
                         MPI_DOUBLE_PRECISION,i,41,work_comm,rq3(nc3),ierr)
+                    write(10,*) 'rank',rank,'ierr',ierr,'i',i
+                    write(10,*) 'P',P_de(left:right,:)
                     call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                         holes,d_indices,d_isValid,P_de,N_inte,N_peri)
                     N_peri = d_indices(N_peri); deallocate(holes)
@@ -79,6 +91,8 @@ contains
             end if
         end do
         call MPI_WAITALL(nc2,rq2(1:nc2),status(:,1:nc2),ierr)
+        write(10,*) 'rank',rank,'ierr',ierr,'i',i
+        write(10,*) 'N_recv',N_recv
         nc4 = 0; nc5 = 0
         do i = 0, t_rank-2
             if(neigh_list(i+1) > 0) then
@@ -89,6 +103,8 @@ contains
                     right = N_inte + N_peri + sum(N_recv(1:nc4))
                     call MPI_IRECV(P_de(left:right,:),N_recv(nc4)*nattri, &
                     MPI_DOUBLE_PRECISION,i,41,work_comm,rq4(nc5),ierr)
+                    write(10,*) 'rank',rank,'ierr',ierr,'i',i
+                    write(10,*) 'P',P_de(left:right,:)
                 end if
             end if
         end do
@@ -96,6 +112,7 @@ contains
         N_peri = N_peri + sum(N_recv)
         np_active = N_inte + N_peri
 
+        close(10)
     end subroutine particle_exchange
 
 end module exchange_particles
