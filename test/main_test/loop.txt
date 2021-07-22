@@ -51,23 +51,6 @@
 
 
 do kk = outkk, pfnt
-    if (rank /= ppx*qqy) then
-
-
-
-
-
-        ! interior particles
-        call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
-            P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-            et_age_de,et_mass_de,et_comp_de,et_np_de, &
-            xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-            xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-            dx,dy,pfdt,moldiff,denh2o,dtfrac,0,N_inte, &
-            nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
-
-    end if
-
 
     if (mod(kk,(pft2-pft1+1)) == 0)  then
         if(rank /= ppx*qqy) then
