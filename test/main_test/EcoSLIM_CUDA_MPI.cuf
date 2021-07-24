@@ -24,7 +24,7 @@ use utilities
 use particle_loop
 use mpiDeviceUtil
 use variable_list
-! use hdf5_file_read
+use hdf5_file_read
 ! use hdf5_file_write
 use subdomain_bound
 use create_subdomain
@@ -46,7 +46,7 @@ integer:: request2
     ! one more rank for DDC, so the number of subdomains is t_rank-1
     ! be careful about this rank when doing everything
 
-    ! call open_hdf5_interface()
+    call open_hdf5_interface()
 !--------------------------------------------------------------------
     ! Get and set unique device
     call assignDevice(deviceID)
@@ -368,10 +368,19 @@ integer:: request2
             close(11)
         endif
 
-        Porosity = 0.3d0
+        ! Porosity = 0.3d0
+        ! Read porosity values
+        fname=trim(adjustl(pname))//'.out.porosity.h5'
+        call read_h5_file(Porosity,0)
 
         if(np_ic /= -1) then
-            Saturation = 0.8d0
+
+            ! Saturation = 0.8d0
+            pfkk = pft1 - 1
+            write(filenum,'(i5.5)') pfkk
+            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Saturation,0)
+
                 allocate(h_cpu(np))
                 h_cpu = h
                 write(*,*) rank,'h_before',h_cpu(1)
@@ -489,20 +498,32 @@ integer:: request2
             if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
             ! adjust the file counters
             pfkk = pfkk + 1
+
             ! Read the velocities computed by ParFlow
+
             write(filenum,'(i5.5)') pfkk
-            Vx = 80
-            Vy = 0.d0
-            Vz = 0.d0
-            Saturation = 0.8d0
+
+            fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vx,1)
+
+            fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vy,2)
+
+            fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vz,3)
+
+            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Saturation,0)
 
             if (clmtrans) then
                 ! Read in the Evap_Trans
-                EvapTrans = 0.d0
-                EvapTrans(2,:,5) = 1.d-8
+                fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
+                call read_h5_file(EvapTrans,0)
 
                 if (clmfile) then
-                    CLMvars = 0.d0
+                    ! Read in CLM output file @RMM to do make this input
+                    fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
+                    call read_h5_file(CLMvars,5)
                 end if
             end if
 
@@ -684,7 +705,7 @@ integer:: request2
 
     9090 continue
 
-    ! call close_hdf5_interface()
+    call close_hdf5_interface()
     call MPI_FINALIZE(ierr)
 
 end program EcoSLIM
