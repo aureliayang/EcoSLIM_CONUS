@@ -63,7 +63,7 @@ contains
         call h5screate_simple_f(rank_hdf5, chunk_dims, memspace, error)
         ! memspace doesn't have the location information.
 
-        call h5dread_f(dset_id, H5T_NATIVE_INTEGER, data, chunk_dims, error, &
+        call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, data, chunk_dims, error, &
                        memspace, dataspace)
 
         ! Close everything opened.
