@@ -1,0 +1,234 @@
+ Start Time:                 10/ 1/1998  0: 0: 0
+ End Time:                   10/ 1/1999  0: 0: 0
+ Timestep (sec):                   3600
+ CLM startcode:                       2
+ CLM IC Source:                       2
+ Number of Columns:                  41
+ Number of Rows:                     41
+ Veg Class Scheme:                    2
+ Number of Veg Classes:              18
+ Maximum tile per grid:               1
+ Min area for tile (%):              0.0500000000
+ Undefined Value:                -9999.0000000000
+ Total Model Tiles:                1681
+ Veg Tile Spec File:         drv_vegm.alluv.dat  
+ Veg Type Parameter Values:  drv_vegp.dat        
+ CLM 1D Met input file:      narr_1hr.dat        
+ CLM 1D Output File:         clm_out.txt         
+ CLM 1D Para Output File:    clm_para_out.dat    
+ CLM active restart file:    clm.rst.            
+ 
+ Number of Soil Layers               10
+ Max number of snow layers            5
+ Critical Rain/Snow Temp:            2.5000000000
+ 
+ Average Latitude:                  34.7500000000
+ Average Longitude:                -98.1400000000
+ Average Wind Obs. Height           10.0000000000
+ Average Temp Obs. Height:           2.0000000000
+ Average Humid Obs. Height:          2.0000000000
+ Average Max Allowed Dew             0.1000000000
+ Average Veg Index                   9.8851873885
+ Average Aero Rough Length           0.0599643070
+ Average Displacement Height         0.5095181440
+ Average Leaf Dimension              0.0400000000
+ Average Stem Area Index             3.1582391434
+ Average High WTable Fract:          0.3000000000
+ Average Max Transp 100%Veg:        10.0000000000
+ Average Wilting Point:        -150000.0000000000
+ Average Irr Snow Sat:               0.0330000000
+ Average Imp Porosity:               0.0500000000
+ Average Ponding Depth:             10.0000000000
+ Average Vert Scale Factor:          0.0250000000
+ Average KSAT Scale decreas:         0.5000000000
+ Average Soil Color:                 2.0000000000
+ Average Soil Rough Length:          0.0100000000
+ Average Snow Rough Length:          0.0024000000
+ Average Under Canopy DCoef:         0.0025000000
+ 
+ Note: IC values below are after first model timestep
+ 
+ Average Initial Surf Temp:        299.8664182149
+ Average Initial Leaf Temp:        288.7139849740
+ Average Initial Snow Water:         0.0000000000
+ Average Initial Snow Age:           0.0000000000
+ Average Initial Snow Depth:         0.0000000000
+ Average Initial Intercept:          0.0000000002
+ Average LayT to SurfT Fact:         0.3400000000
+ Average Crank Nichol Fact:          0.5000000000
+ Average Num of Snow Layers:         0.0000000000
+ Maximum leaf area index             3.3872694825
+ Minimum leaf area index             0.6240333135
+ Restrict min of soil poten   -100000000.000000     
+ ROOTA                               2.5074360500
+ ROOTB                               2.1386079714
+ 
+Average Hydro Cond at Sat   lay:   1         0.0000000000
+Average Soil Void Fract     lay:   1         0.3986496133
+Average Min Soil Suction    lay:   1       468.1661328878
+Percent SAND                lay:   1         0.1600000000
+Percent CLAY                lay:   1         0.2600000000
+Clapp and Horn "b" para     lay:   1         7.0439999402
+Heat cap of soil soilds     lay:   1   2287095.2401842815
+Thermal conduct of soil min lay:   1         2.6722505635
+Thermal conduct sat soil    lay:   1         2.1358882577
+Thermal conduct dry soil    lay:   1         0.2422384648
+Average Depth Soil          lay:   1         1.0000000000
+Average Thick Soil          lay:   1         2.0000000000
+Average Init Temp           lay:   1       299.8664182149
+Average Init Water          lay:   1       444.6658865918
+Average Init Ice            lay:   1         0.0000000000
+Root Fraction               lay:   1         0.9371021669
+ 
+Average Hydro Cond at Sat   lay:   2         0.0000000000
+Average Soil Void Fract     lay:   2         0.4000000000
+Average Min Soil Suction    lay:   2       468.1661328878
+Percent SAND                lay:   2         0.1600000000
+Percent CLAY                lay:   2         0.2600000000
+Clapp and Horn "b" para     lay:   2         7.0439999402
+Heat cap of soil soilds     lay:   2   2287095.2401842815
+Thermal conduct of soil min lay:   2         2.6722505635
+Thermal conduct sat soil    lay:   2         2.1341606960
+Thermal conduct dry soil    lay:   2         0.2422384648
+Average Depth Soil          lay:   2         3.0000000000
+Average Thick Soil          lay:   2         2.0000000000
+Average Init Temp           lay:   2       299.9999651204
+Average Init Water          lay:   2       543.2321260133
+Average Init Ice            lay:   2         0.0000000000
+Root Fraction               lay:   2         0.0547235511
+ 
+Average Hydro Cond at Sat   lay:   3         0.0000000000
+Average Soil Void Fract     lay:   3         0.4000000000
+Average Min Soil Suction    lay:   3       468.1661328878
+Percent SAND                lay:   3         0.1600000000
+Percent CLAY                lay:   3         0.2600000000
+Clapp and Horn "b" para     lay:   3         7.0439999402
+Heat cap of soil soilds     lay:   3   2287095.2401842815
+Thermal conduct of soil min lay:   3         2.6722505635
+Thermal conduct sat soil    lay:   3         2.1341606960
+Thermal conduct dry soil    lay:   3         0.2422384648
+Average Depth Soil          lay:   3         5.0000000000
+Average Thick Soil          lay:   3         2.0000000000
+Average Init Temp           lay:   3       299.9999999896
+Average Init Water          lay:   3       591.5759793413
+Average Init Ice            lay:   3         0.0000000000
+Root Fraction               lay:   3         0.0070704184
+ 
+Average Hydro Cond at Sat   lay:   4         0.0000000000
+Average Soil Void Fract     lay:   4         0.4000000000
+Average Min Soil Suction    lay:   4       468.1661328878
+Percent SAND                lay:   4         0.1600000000
+Percent CLAY                lay:   4         0.2600000000
+Clapp and Horn "b" para     lay:   4         7.0439999402
+Heat cap of soil soilds     lay:   4   2287095.2401842815
+Thermal conduct of soil min lay:   4         2.6722505635
+Thermal conduct sat soil    lay:   4         2.1341606960
+Thermal conduct dry soil    lay:   4         0.2422384648
+Average Depth Soil          lay:   4         7.0000000000
+Average Thick Soil          lay:   4         2.0000000000
+Average Init Temp           lay:   4       300.0000000000
+Average Init Water          lay:   4       632.0521788842
+Average Init Ice            lay:   4         0.0000000000
+Root Fraction               lay:   4         0.0009544905
+ 
+Average Hydro Cond at Sat   lay:   5         0.0000000000
+Average Soil Void Fract     lay:   5         0.4000000000
+Average Min Soil Suction    lay:   5       468.1661328878
+Percent SAND                lay:   5         0.1600000000
+Percent CLAY                lay:   5         0.2600000000
+Clapp and Horn "b" para     lay:   5         7.0439999402
+Heat cap of soil soilds     lay:   5   2287095.2401842815
+Thermal conduct of soil min lay:   5         2.6722505635
+Thermal conduct sat soil    lay:   5         2.1341606960
+Thermal conduct dry soil    lay:   5         0.2422384648
+Average Depth Soil          lay:   5         9.0000000000
+Average Thick Soil          lay:   5         2.0000000000
+Average Init Temp           lay:   5       300.0000000000
+Average Init Water          lay:   5       664.5628991438
+Average Init Ice            lay:   5         0.0000000000
+Root Fraction               lay:   5         0.0001291578
+ 
+Average Hydro Cond at Sat   lay:   6         0.0000000000
+Average Soil Void Fract     lay:   6         0.4000000000
+Average Min Soil Suction    lay:   6       468.1661328878
+Percent SAND                lay:   6         0.1600000000
+Percent CLAY                lay:   6         0.2600000000
+Clapp and Horn "b" para     lay:   6         7.0439999402
+Heat cap of soil soilds     lay:   6   2287095.2401842815
+Thermal conduct of soil min lay:   6         2.6722505635
+Thermal conduct sat soil    lay:   6         2.1341606960
+Thermal conduct dry soil    lay:   6         0.2422384648
+Average Depth Soil          lay:   6        11.0000000000
+Average Thick Soil          lay:   6         2.0000000000
+Average Init Temp           lay:   6       300.0000000000
+Average Init Water          lay:   6       695.8773404738
+Average Init Ice            lay:   6         0.0000000000
+Root Fraction               lay:   6         0.0000174794
+ 
+Average Hydro Cond at Sat   lay:   7         0.0000000000
+Average Soil Void Fract     lay:   7         0.4000000000
+Average Min Soil Suction    lay:   7       468.1661328878
+Percent SAND                lay:   7         0.1600000000
+Percent CLAY                lay:   7         0.2600000000
+Clapp and Horn "b" para     lay:   7         7.0439999402
+Heat cap of soil soilds     lay:   7   2287095.2401842815
+Thermal conduct of soil min lay:   7         2.6722505635
+Thermal conduct sat soil    lay:   7         2.1341606960
+Thermal conduct dry soil    lay:   7         0.2422384648
+Average Depth Soil          lay:   7        13.0000000000
+Average Thick Soil          lay:   7         2.0000000000
+Average Init Temp           lay:   7       300.0000000000
+Average Init Water          lay:   7       722.8160843950
+Average Init Ice            lay:   7         0.0000000000
+Root Fraction               lay:   7         0.0000023656
+ 
+Average Hydro Cond at Sat   lay:   8         0.0000000000
+Average Soil Void Fract     lay:   8         0.4000000000
+Average Min Soil Suction    lay:   8       468.1661328878
+Percent SAND                lay:   8         0.1600000000
+Percent CLAY                lay:   8         0.2600000000
+Clapp and Horn "b" para     lay:   8         7.0439999402
+Heat cap of soil soilds     lay:   8   2287095.2401842815
+Thermal conduct of soil min lay:   8         2.6722505635
+Thermal conduct sat soil    lay:   8         2.1341606960
+Thermal conduct dry soil    lay:   8         0.2422384648
+Average Depth Soil          lay:   8        15.0000000000
+Average Thick Soil          lay:   8         2.0000000000
+Average Init Temp           lay:   8       300.0000000000
+Average Init Water          lay:   8       745.7371690405
+Average Init Ice            lay:   8         0.0000000000
+Root Fraction               lay:   8         0.0000003201
+ 
+Average Hydro Cond at Sat   lay:   9         0.0000000000
+Average Soil Void Fract     lay:   9         0.4000000000
+Average Min Soil Suction    lay:   9       468.1661328878
+Percent SAND                lay:   9         0.1600000000
+Percent CLAY                lay:   9         0.2600000000
+Clapp and Horn "b" para     lay:   9         7.0439999402
+Heat cap of soil soilds     lay:   9   2287095.2401842815
+Thermal conduct of soil min lay:   9         2.6722505635
+Thermal conduct sat soil    lay:   9         2.1341606960
+Thermal conduct dry soil    lay:   9         0.2422384648
+Average Depth Soil          lay:   9        17.0000000000
+Average Thick Soil          lay:   9         2.0000000000
+Average Init Temp           lay:   9       300.0000000000
+Average Init Water          lay:   9       761.0685467328
+Average Init Ice            lay:   9         0.0000000000
+Root Fraction               lay:   9         0.0000000433
+ 
+Average Hydro Cond at Sat   lay:  10         0.0000000000
+Average Soil Void Fract     lay:  10         0.4000000000
+Average Min Soil Suction    lay:  10       468.1661328878
+Percent SAND                lay:  10         0.1600000000
+Percent CLAY                lay:  10         0.2600000000
+Clapp and Horn "b" para     lay:  10         7.0439999402
+Heat cap of soil soilds     lay:  10   2287095.2401842815
+Thermal conduct of soil min lay:  10         2.6722505635
+Thermal conduct sat soil    lay:  10         2.1341606960
+Thermal conduct dry soil    lay:  10         0.2422384648
+Average Depth Soil          lay:  10        19.0000000000
+Average Thick Soil          lay:  10         2.0000000000
+Average Init Temp           lay:  10       300.0000000000
+Average Init Water          lay:  10       772.7522048280
+Average Init Ice            lay:  10         0.0000000000
+Root Fraction               lay:  10         0.0000000068

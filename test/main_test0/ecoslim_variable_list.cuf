@@ -1,0 +1,338 @@
+module variable_list
+
+    ! subroutine allocate_arrays_temp
+    ! subroutine allocate_arrays_const
+    ! subroutine deallocate_temp
+
+    ! P = Particle array [np,attributes]
+    ! np = Number of particles
+    ! P(np,1) = X coordinate [L]
+    ! P(np,2) = Y coordinate [L]
+    ! P(np,3) = Z coordinate [L]
+    ! P(np,4) = Particle residence time [T]
+    ! P(np,5) = Saturated particle residence time [T]
+    ! P(np,6) = Particle mass; assigned via preciptiation or snowmelt rate (Evap_Trans*density*volume*dT)
+    ! P(np,7) = Particle source (1=IC, 2=rain, 3=snowmelt, 4=irrigation...)
+    ! P(np,8) = Particle Status (1=active, 0=inactive)
+    ! P(np,9) = concentration
+    ! P(np,10) = Exit status (1=outflow, 2=ET...)
+
+    ! P(np,11) = Length of flow path [L]
+    ! P(np,12) = Length of saturated flow path [L]
+    ! P(np,13:(12+nind)) = Length of flow path in indicator i [L]
+    ! P(np,(13+nind):(12+nind*2)) = particle age in indicator i [T]
+
+    ! P(np,13+nind*2) = Particle Number (This is a unique integer identifier for the particle)
+    ! P(np,14+nind*2) = Partical Initial X coordinate [L]
+    ! P(np,15+nind*2) = Partical Initial Y coordinate [L]
+    ! P(np,16+nind*2) = Partical Initial Z coordinate [L]
+    ! P(np,17+nind*2) = Time that particle was added [T]
+
+!--------------------------------------------------------------------
+    use mpi
+    use cudafor
+    use mrand, only: h
+!--------------------------------------------------------------------
+    integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
+
+    integer:: world_group, work_group, manage_group, manage_ranks(1)
+
+    integer:: work_comm, manage_comm
+
+    character(len=MPI_MAX_PROCESSOR_NAME):: hostname
+
+    integer:: deviceID, namelength
+
+    integer(MPI_OFFSET_KIND):: offset
+
+    character(200):: message
+
+    character(200):: runname, pname, DEMname, vtk_file, Indname
+
+    integer:: nx, ny, nz, nzclm, nCLMsoil
+    ! number of cells in the domain and cells+1 in x, y, and z directions
+
+    integer:: ppx, qqy ! split in x and y directions
+    ! limit to 2^n in this code
+
+    integer:: np_ic, np
+
+    integer:: n_constituents
+    ! number of timesteps ParFlow; numer of C vectors written for VTK output
+
+    CHARACTER(20),allocatable:: conc_header(:)
+    ! name for variables written in the C array above.  Dimensioned as l above.
+
+    real(8):: dx, dy, pfdt
+
+    integer:: pft1, pft2, tout1, pfnt, n_cycle
+    ! parflow start and stop file numbers number of ParFlow timesteps
+    ! flag specifying the number for the first output write (0= start with pft1)
+    ! number of timestep cycles
+
+    integer:: kk, pfkk, outkk
+    ! Counter for the file numbers starts at pft1
+    ! Counter for the output writing
+
+    integer:: ipwrite, ibinpntswrite, etwrite, icwrite
+
+    real(8),allocatable:: Time_Next(:)
+    ! Vector of real times at which ParFlow dumps outputs
+
+    real(8):: Time_first
+    ! initial timestep for Parflow ((pft1-1)*pfdt)
+
+    integer:: iflux_p_res, np_active, i_added_particles
+    ! number of particles for intial pulse IC, total, and running active
+
+    real(8),allocatable:: DEM(:,:) ! DEM and grid points for concentration output
+    real(8),allocatable:: Pnts(:,:) ! use in vtk
+
+    integer:: nind, pid
+
+    integer:: i, j, k, l, ik, ji, ij, ii
+
+    character*200 filenum, filenumout, fname, ranknum
+    character(9), parameter:: dsetname = 'hdf5_data'
+    ! runname = SLIM runname
+    ! filenum = ParFlow file number
+    ! filenumout = File number for Ecoslim writing
+    ! pname = ParFlow output runname
+    ! fname = Full name of a ParFlow's output
+    ! vtk_file = concentration file
+    ! DEMname = DEM file name
+
+    real(8):: V_mult, dtfrac, denh2o, moldiff
+    ! Multiplier for forward/backward particle tracking
+    ! If V_mult = 1, forward tracking
+    ! If V_mult = -1, backward tracking
+    ! density of water (M/L3), molecular diffusion (L2/T), fractionation
+
+    logical clmtrans, clmfile, reflect  ! reflect has not been read
+    ! logical for mode of operation with CLM, will add particles with P-ET > 0
+    ! will remove particles if ET > 0
+    ! clmfile governs reading of the full CLM output, not just evaptrans
+
+    real(8):: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
+    real(8):: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
+    real(8):: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+    real(8):: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+
+    real(8):: Total_time1, Total_time2, t1, t2
+    real(8):: sort_time, IO_time_read, IO_time_write, parallel_time
+    ! integers for writing C or point based output
+
+    integer,parameter:: tPB = 256 ! block size, is it the larger the better?
+    integer:: fh0, fh1, fh2, fh3, fh4
+    character(200):: loadf, restartf, exitedf, logf
+    integer:: np_active_log, add_f
+
+    real(8),allocatable,pinned:: P(:,:)
+    integer,allocatable,pinned:: N_send(:)
+    ! the same length as neigh_list, i.e., the total number of subdomains.
+    ! it is assembled on GPU in particle loop and used in exchange on CPU.
+    integer,allocatable:: N_recv(:) ! for each subdomain, it has the number of neighbors
+    integer:: N_exit, N_peri, N_inte ! a scalar variable.
+    real(8),allocatable,managed:: P_exit(:,:)
+    ! It is assembled on GPU and is written into binary file each timestep.
+    ! it is allocated in particle exchange.
+    integer,allocatable,pinned:: out_np_cpu(:),ET_np_cpu(:)
+    real(8),allocatable,pinned:: out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
+    real(8),allocatable,pinned:: ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
+    real(8),allocatable,pinned:: PET_balance(:),PET_balance_da(:)
+    real(8),allocatable,pinned:: mean_age(:), mean_comp(:), mean_mass(:), total_mass(:)
+
+    real(8),allocatable,pinned:: Saturation(:,:,:)    ! Saturation (read from ParFlow)
+    real(8),allocatable,pinned:: Porosity(:,:,:)      ! Porosity (read from ParFlow)
+    real(8),allocatable,pinned:: EvapTrans(:,:,:)     ! CLM EvapTrans (read from ParFlow, [1/T] units)
+    real(8),allocatable:: EvapTrans_da(:,:,:)
+    real(8),allocatable,pinned:: CLMvars(:,:,:)     ! CLM Output (read from ParFlow, following single file
+                                                  ! CLM output as specified in the manual)
+    real(8),allocatable,pinned:: Ind(:,:,:)
+    real(8),allocatable,pinned:: Vx(:,:,:), Vy(:,:,:), Vz(:,:,:)
+    ! Vx = Velocity x-direction [nx+1,ny,nz] -- ParFlow output
+    ! Vy = Velocity y-direction [nx,ny+1,nz] -- ParFlow output
+    ! Vz = Velocity z-direction [nx,ny,nz+1] -- ParFlow output
+
+    real(8),allocatable,pinned:: C(:,:,:,:)
+    ! Concentration array, in i,j,k with l (first index) as consituent or
+    ! property. These are set by user at runtime using input
+    real(8),allocatable,pinned:: dz(:), dz2(:)
+
+    integer,parameter:: buff = 1  ! Buffer can be specified by user, for GW 1km or 2km is enough
+    integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2  ! this is the old
+    integer:: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
+    integer,allocatable:: nump(:) ! gather active particles to jusdge if DDC
+    integer:: decom = 0
+
+!-------------------------------------
+    ! GPU variables
+    real(8),allocatable,managed:: P_de(:,:)
+    ! the particle array, not sure if the one on host is necessary
+    real(8),allocatable,device:: C_de(:,:,:,:)
+    real(8),allocatable,device:: Vx_de(:,:,:)
+    real(8),allocatable,device:: Vy_de(:,:,:)
+    real(8),allocatable,device:: Vz_de(:,:,:)
+    real(8),allocatable,device:: dz_de(:)
+    real(8),allocatable,device:: Ind_de(:,:,:)
+    real(8),allocatable,device:: Saturation_de(:,:,:)
+    real(8),allocatable,device:: Porosity_de(:,:,:)
+    real(8),allocatable,device:: EvapTrans_de(:,:,:)
+    real(8),allocatable,device:: CLMvars_de(:,:)
+    real(8),allocatable,device:: PET_balance_de(:),PET_balance_da_de(:)
+    ! initialization of PET_balance
+
+    integer,allocatable,device:: out_np_de(:),ET_np_de(:)
+    real(8),allocatable,device:: out_age_de(:),out_mass_de(:),out_comp_de(:)
+    real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
+    real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),mean_mass_de(:),total_mass_de(:)
+
+    integer,allocatable,device:: d_isValid(:),d_indices(:),holes(:)
+    ! real(8),allocatable,managed:: P_send(:,:),P_recv(:,:)
+    integer,allocatable,managed:: Zone_de(:,:),Zones_old(:,:)
+    ! Zone_de has to be written to restart files, so we use managed.
+    ! old is old, using the new box to cut the old zone (Zones_old)
+    ! new is new, using the old box to cut the new zone (Zone_de)
+    ! Zones_old is allocated in the zone exchange subroutine
+
+    integer(8),allocatable,device:: p_num(:,:), c_sum(:)
+    ! it should use integer(8) for CONUS !!!
+    ! p_sum on workers needs to be deallocated
+    ! c_sum is only on manager
+    integer,allocatable,managed:: Zonet_old(:,:), Zonet_new(:,:)
+    ! only on rank ppx*qqy. Zonet_new is written into restart files.
+    integer,allocatable,managed:: grid(:,:), grid_old(:,:)
+    ! grid is on GPU, and should be initialized each time doing DDC as
+    ! grid = 0
+    ! grid(1,1) = 0;  grid(1,2) = 0
+    ! grid(1,3) = nx; grid(1,4) = ny
+    ! it is also written into restart files.
+
+    integer,allocatable,managed:: neigh_list(:)
+    ! t_rank-1, and should be initilized at the very beginning
+    integer,allocatable,managed:: neigh_listo(:), neigh_listn(:)
+
+    integer,allocatable:: status2(:,:), rq4(:)
+    integer:: nc5
+!-------------------------------------
+contains
+    subroutine alloc_arrays_temp()
+        implicit none
+        !--------------------------------------------------------------------
+        ! allocate arrays
+        if (rank /= ppx*qqy) then
+            allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+
+            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+                     Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+                     Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1))
+
+            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                       Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                      EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+
+            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
+            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+
+            ! Intialize everything to Zero
+            Vx = 0.0d0
+            Vy = 0.0d0
+            Vz = 0.0d0
+            Saturation = 0.0d0
+            Porosity = 0.0d0
+            EvapTrans = 0.0d0
+            EvapTrans_da = 0.0d0
+            C = 0.0d0
+            Ind = 1.0d0
+            ! Ind is initialized when reading it.
+            ! CLMvars is initialized when reading it.
+            ! DEM is initialized when reading it.
+
+            !-------------------------------------
+            ! allocate arrays on GPU
+            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
+                     Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
+                     Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1), &
+                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                     Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                     EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                     CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
+                     Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+
+            Zone_de = -1
+
+            allocate(p_num(nnx1,nny1))
+        end if
+    end subroutine alloc_arrays_temp
+
+    subroutine alloc_arrays_const()
+        implicit none
+
+        if (rank /= ppx*qqy) then
+            reflect = .false.
+            allocate(grid(t_rank-1,4))
+            allocate(neigh_listn(t_rank-1),neigh_listo(t_rank-1))
+            allocate(neigh_list(t_rank-1),nump(t_rank-1))
+            allocate(d_isValid(np),d_indices(np),h(np))
+            allocate(status2(MPI_STATUS_SIZE,t_rank-1),rq4(t_rank-1))
+
+            allocate(out_np_cpu(1),ET_np_cpu(1))
+            allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
+            allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
+            allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
+
+            allocate(out_np_de(1),ET_np_de(1))
+            allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
+            allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+            allocate(mean_age_de(1),mean_comp_de(1),mean_mass_de(1),total_mass_de(1))
+
+            allocate(conc_header(n_constituents))
+            ! Set up output options for VTK grid output
+            ! icwrite = 1
+            vtk_file=trim(runname)//'_cgrid'  ! duplicated with the latter output?
+            conc_header(1) = 'Concentration'
+            conc_header(2) = 'Age'
+            conc_header(3) = 'Mass'
+            conc_header(4) = 'Comp'
+            conc_header(5) = 'Delta'
+            conc_header(6) = 'ET_Npart'
+            conc_header(7) = 'ET_Mass'
+            conc_header(8) = 'ET_Age'
+            conc_header(9) = 'ET_Comp'
+
+            allocate(PET_balance(2),PET_balance_da(2))
+            allocate(PET_balance_de(2),PET_balance_da_de(2))
+            PET_balance = 0.0d0
+            PET_balance_da = 0.0d0
+
+            allocate(P(np,17+nind*2))
+            P = 0.d0    ! clear out all particle attributes
+            P(1:np,7:9) = 1.d0
+            ! make all particles active to start with and original from 1 = GW/IC
+            ! this is necessary since we need P array for restart.
+
+        endif
+
+    end subroutine alloc_arrays_const
+
+    subroutine deallocate_temp()
+        implicit none
+
+        if (rank /= ppx*qqy) then
+            deallocate(Vx_de,Vy_de,Vz_de,C_de,Ind_de,Saturation_de, &
+            Porosity_de,EvapTrans_de,CLMvars_de,p_num)
+            ! zone_de will be deallocated in exchange zone after the use
+            deallocate(Vx,Vy,Vz,C,Ind,Saturation,Porosity,EvapTrans, &
+            EvapTrans_da,CLMvars,DEM,Pnts)
+            ! Pnts is allocated in DEM_visual. It is used in vtk write and
+            ! it has to be deallocated and re-allocated once the topology of
+            ! the modeling domain is changed.
+        endif
+
+    end subroutine deallocate_temp
+
+end module variable_list
