@@ -10,12 +10,12 @@ module particle_loop
 
 contains
     attributes(global) subroutine particles_separation(P,d_isValid, &
-        xmin3,ymin3,xmax3,ymax3,np_active,nind,ix1,iy1,dx,dy)
+        xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1,dx,dy)
         implicit none
         real(8),intent(inout):: P(:,:)
         integer,intent(out):: d_isValid(:)
         real(8),value:: xmin3,ymin3,xmax3,ymax3
-        integer,value:: np_active,nind,ix1,iy1
+        integer,value:: np_active,ix1,iy1
         real(8),value:: dx,dy
         integer:: ii
 

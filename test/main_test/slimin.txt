@@ -3,8 +3,8 @@ test      ! SLIM run name, path to PF-CLM next, followed by DEM
 " "
 9                !nx
 8                !ny
-5                !nz
-4                !nCLMsoil
+1                !nz
+1                !nCLMsoil
 2                !ppx
 2                !qqy
 1                !particles per cell at start of simulation
