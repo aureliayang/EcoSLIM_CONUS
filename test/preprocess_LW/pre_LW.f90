@@ -23,7 +23,7 @@
      INTEGER :: error         ! Error flag
 
      INTEGER(HSIZE_T), DIMENSION(3) :: count = (/4,3,1/)  ! Size of hyperslab
-     INTEGER(HSIZE_T), DIMENSION(3) :: offset = (/0,0,49/) ! Hyperslab offset
+     INTEGER(HSIZE_T), DIMENSION(3) :: offset = (/0,0,9/) ! Hyperslab offset
      INTEGER(HSIZE_T), DIMENSION(3) :: stride = (/1,1,1/) ! Hyperslab stride
      INTEGER(HSIZE_T), DIMENSION(3) :: block = (/1,1,1/)  ! Hyperslab block size
      real(8):: sdata(4,3,1)
@@ -32,19 +32,22 @@
      ny = 41
      nz = 50
      pname = './Outputs/LW'
-     varn = 'satur.'
+     varn = 'porosity'
 
      allocate(data(nx,ny,nz))
 
-     do pfkk = 0, 10
+     do pfkk = 1, 10
 
         write(filenum,'(i5.5)') pfkk
-        pfbname=trim(adjustl(pname))//'.out.'//trim(adjustl(varn))//trim(adjustl(filenum))//'.pfb'
+        !pfbname=trim(adjustl(pname))//'.out.'//trim(adjustl(varn))//trim(adjustl(filenum))//'.pfb'
+        pfbname=trim(adjustl(pname))//'.out.'//trim(adjustl(varn))//'.pfb'
         call pfb_read(data,pfbname,nx,ny,nz)
-        filename='./h5_files/LW.out.'//trim(adjustl(varn))//trim(adjustl(filenum))//'.h5'
+        !filename='./h5_files/LW.out.'//trim(adjustl(varn))//trim(adjustl(filenum))//'.h5'
+        filename='./h5_files/LW.out.'//trim(adjustl(varn))//'.h5'
 
         print *, 'pfkk', pfkk
-        print *, data(1:4,1:3,50)
+        print *, 'pfb_read'
+        print *, data(1:4,1:3,10)
 
         CALL h5open_f(error)
         CALL h5fcreate_f(filename, H5F_ACC_TRUNC_F, file_id, error)
@@ -74,7 +77,7 @@
 
         CALL h5dread_f(dset_id, H5T_NATIVE_DOUBLE, sdata, data_dims, error, &
                         memspace, dataspace)
-
+        print *, 'hdf5_read'
         print *, sdata
 
         CALL h5sclose_f(dataspace, error)
