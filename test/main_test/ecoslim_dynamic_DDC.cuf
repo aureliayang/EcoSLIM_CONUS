@@ -11,7 +11,7 @@ module create_subdomain
 
     use variable_list, only: p_num, c_sum
     use variable_list, only: d_indices
-    use variable_list, only: nx, ny, ppx, qqy, tPB, rank
+    use variable_list, only: nx, ny, ppx, qqy, tPB, rank, t_rank,ierr
     use variable_list, only: grid_old, grid
     ! grid is on each rank while grid_old is only on ppx*qqy
     use variable_list, only: Zonet_old, Zonet_new
@@ -29,12 +29,12 @@ contains
 
         use mpi
         implicit none
-        integer:: i, j, dir, nlev, n
-        integer:: max_dim, ierr
+        integer:: i, j, dir, nlev, n,k
+        integer:: max_dim !, ierr
         integer(8):: c_sum_cpu(9)
         integer:: indices_cpu(9)
 
-        if (rank == ppx*qqy) then ! at least, this if condition doesn't conflict
+        !if (rank == ppx*qqy) then ! at least, this if condition doesn't conflict
 
             grid_old  = grid
             Zonet_old = Zonet_new
@@ -45,7 +45,7 @@ contains
             grid(1,4) = ny
             Zonet_new = -1
             Zonet_new(1:nx,1:ny) = 0
-            write(*,'(a,4(4(i3,1x),/))') 'on manager',((grid(i,j),i=1,4),j=1,ppx*qqy)
+            ! write(*,'(a,4(4(i3,1x),/))') 'on manager',((grid(i,j),i=1,4),j=1,ppx*qqy)
 
             dir = 1
             if(qqy > ppx) dir = -1
@@ -68,21 +68,28 @@ contains
                         max_dim = max(ppx*qqy,grid(j,3)*grid(j,4))
                         call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j)
                     endif
+
+                    do k = 0, t_rank-1
+                        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+                        if(k == rank) then
+                            c_sum_cpu = c_sum
+                            write(*,'(i3,a,9(i3,1x))') rank,'c_sum',c_sum_cpu
+                            indices_cpu = d_indices(1:9)
+                            write(*,'(a,9(i3,1x))') 'd_indices',indices_cpu
+                            write(*,'(4(4(i3,1x),/))') grid
+                        endif
+                    enddo
+
                 end do
                 if(min(ppx,qqy) > 1) dir = -dir ! if means at least split once (i.e., 2)
                 !!! for this subroutine, you should think about if split in one direction
                 !!! is much more than the other direction???
                 n = n/2
-                c_sum_cpu = c_sum
-                write(*,'(a,9(i3,1x))') 'c_sum',c_sum_cpu
-                indices_cpu = d_indices(1:9)
-                write(*,'(a,9(i3,1x))') 'd_indices',indices_cpu
-                write(*,'(4(4(i3,1x),/))') grid
             end do
-        endif
+        !endif
 
         ! bcast grid array and then copy to ix1n etc. on workers
-        call MPI_BCAST(grid,ppx*qqy*4,MPI_INTEGER,ppx*qqy,MPI_COMM_WORLD,ierr)
+        ! call MPI_BCAST(grid,ppx*qqy*4,MPI_INTEGER,ppx*qqy,MPI_COMM_WORLD,ierr)
 
     end subroutine gridinfo
 

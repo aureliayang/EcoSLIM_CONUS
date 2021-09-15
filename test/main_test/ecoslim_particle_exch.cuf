@@ -3,30 +3,41 @@ module exchange_particles
     use thrust
     use cudafor
     use compact_array
-    use variable_list, only: N_recv, N_send, N_exit, N_peri, N_inte
+    use particle_loop
+    use variable_list, only: N_recv, N_send, N_peri, N_inte
     use variable_list, only: neigh_list
-    ! N_exit is a cpu scalar
     ! neigh_list is allocated after getting number of total GPUs.
     ! it is 1 if neighbor exists while 0 if neighbor doesn't exist.
     ! N_send has the same length of neigh_list and was built one by one.
     ! N_recv is allocated or deallocated after initialization/update of grid.
     ! N_recv has the length of its neighbors and has been initialized as 0.
-    use variable_list, only: holes, P_exit
-    use variable_list, only: P_de, d_isValid, d_indices, C_de
-    use variable_list, only: dx, dy, dz_de, nz, np
-    use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
-    use variable_list, only: ix1, iy1, nnx1, nny1, buff
-    use variable_list, only: rank, t_rank, nind, tPB, work_comm
+    use variable_list, only: holes, P_send, P_recv, P
+    use variable_list, only: P_de, d_isValid, d_indices
+    use variable_list, only: dx, dy, dz_de, nz
+    ! use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
+    use variable_list, only: ix1, iy1, nnx1, nny1, buff, reflect
+    use variable_list, only: rank, t_rank, nind, tPB
     use variable_list, only: np_active, ranknum
+
+    use variable_list, only: out_age_de,out_mass_de,out_comp_de,out_np_de
+    use variable_list, only: et_age_de,et_mass_de,et_comp_de,et_np_de
+    use variable_list, only: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
+    use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
+    use variable_list, only: pfdt,moldiff,denh2o,dtfrac
+
 
 contains
     subroutine particle_exchange(nc5,rq4,status)
         use mpi
         implicit none
-        integer:: i, j, ierr, status(MPI_STATUS_SIZE,t_rank-1)
-        integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank-1), &
-                  rq2(t_rank-1), rq3(t_rank-1), rq4(t_rank-1)
-        integer:: left, right, nattri, sum_recv, sum_send, istat
+        integer:: i, j, ierr, status(MPI_STATUS_SIZE,t_rank)
+        integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank), &
+                  rq2(t_rank), rq3(t_rank), rq4(t_rank)
+        integer:: left, right, nattri, sum_recv, sum_send
+        integer:: ik, jk, status2(MPI_STATUS_SIZE), number
+        ! integer:: d_indices_cpu(200),d_isValid_cpu(200)
+        ! integer,allocatable::holes_cpu(:)
+        ! real(8):: P_cpu(19*4)
         ! we have to send and receive numbers first
         ! otherwise, when receive, we have to wait the receive of particle-number
         ! it has two-fold of meanings: 1. waiting the communication itself (copy to recv buff)
@@ -38,79 +49,111 @@ contains
         ! is repeatedly used, so we can't get the number of all neighbors at one time.
 
         open(10,file='Send_Recv.'//trim(adjustl(ranknum))//'.txt')
-        !write(10,*) np_active
-        !write(10,*) pid
-        !P = P_de
-        !write(10,'(200(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
 
+            nattri = 17 + 2*nind
+            N_send = 0; N_recv = 0
+            nc1 = 0; nc3 = 0
+            do i = 0, t_rank-1 ! go through to send particles
 
-        nattri = 17 + 2*nind
-        N_send = 0; N_recv = 0
-        nc1 = 0; nc3 = 0
-        do i = 0, t_rank-2 ! go through to send particles
-            if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
-                nc1 = nc1 + 1 ! the number of neighbors
-                call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                    P_de(N_inte+1:N_inte+N_peri,13+2*nind),d_isValid,N_peri,i)
-                ! get d_isValid, set it 0 where the particle will be sent to neighbor i
-                call thrustscan(d_isValid,N_peri,d_indices)
-                ! do prefix-sum and get d_indices
-                N_send(nc1) = N_peri - d_indices(N_peri)
-                call MPI_ISEND(N_send(nc1),1,MPI_INTEGER,i,40,work_comm,rq1(nc1),ierr)
-                write(10,*) 'rank',rank,'ierr',ierr,'i',i
-                write(10,*) 'N_send',N_send
-                ! each neighbor use different sending buffer, no wait
-                if(N_send(nc1) > 0) then ! gpu number
-                    nc3 = nc3 + 1 ! only the neighbor with particles
-                    allocate(holes(N_send(nc1)))
-                    call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                        holes,d_indices,d_isValid,N_peri)
-                    sum_send = sum(N_send(1:nc1-1)) ! have sent before this one
-                    call select2end<<<ceiling(dble(N_peri)/tPB),tPB>>>(holes, &
-                        P_de,N_inte,N_send(nc1),sum_send,np)
-                    left  = np - sum(N_send(1:nc1)) + 1
-                    right = np - sum(N_send(1:nc1-1))
-                    call MPI_ISEND(P_de(left:right,:),N_send(nc1)*nattri, &
-                        MPI_DOUBLE_PRECISION,i,41,work_comm,rq3(nc3),ierr)
-                    write(10,*) 'rank',rank,'ierr',ierr,'i',i
-                    write(10,*) 'P',P_de(left:right,:)
-                    call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                        holes,d_indices,d_isValid,P_de,N_inte,N_peri)
-                    N_peri = d_indices(N_peri); deallocate(holes)
+                if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
+                    nc1 = nc1 + 1 ! the number of neighbors
+                    call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                        P_de(N_inte+1:N_inte+N_peri,13+2*nind),d_isValid,N_peri,i)
+                    ! get d_isValid, set it 0 where the particle will be sent to neighbor i
+                    call thrustscan(d_isValid,N_peri,d_indices)
+                    ! do prefix-sum and get d_indices
+                    N_send(nc1) = N_peri - d_indices(N_peri)
+                    call MPI_ISEND(N_send(nc1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,rq1(nc1),ierr)
+
+                    write(10,'(3(a,i3,1x))') 'rank',rank,'ierr',ierr,'i',i
+                    write(10,*) 'N_send',N_send
+
+                    ! each neighbor use different sending buffer, no wait
+                    if(N_send(nc1) > 0) then ! gpu number
+                        nc3 = nc3 + 1 ! only the neighbor with particles
+                        allocate(holes(N_send(nc1)))
+                        call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                            holes,d_indices,d_isValid,N_peri)
+                        sum_send = sum(N_send(1:nc1-1)) ! have sent before this one
+                        call select2end<<<ceiling(dble(N_send(nc1))/tPB),tPB>>>(holes, &
+                            P_de,P_send,N_inte,N_send(nc1),sum_send,nattri)
+                        left  = sum_send*nattri + 1
+                        right = sum(N_send(1:nc1))*nattri
+                        call MPI_ISEND(P_send(left:right),N_send(nc1)*nattri, &
+                            MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq3(nc3),ierr)
+                        ! number = N_send(nc1)*2
+                        ! call MPI_ISEND(P_de(left:right,1:2),number, &
+                        !     MPI_double_precision,i,41,MPI_COMM_WORLD,rq3(nc3),ierr)
+                        ! write(10,'(3(a,1x,i3))') 'rank',rank,'ierr',ierr,'i',i
+                        ! P_cpu = P_send
+                        ! write(10,'(200(19(f20.5,1x),/))') P_cpu
+                        call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                            holes,d_indices,d_isValid,P_de,N_inte,N_peri)
+                        N_peri = d_indices(N_peri); deallocate(holes)
+                    end if
                 end if
-            end if
-        end do
-        !-----------------------------------------
-        ! receive part.
-        !-----------------------------------------
-        nc2 = 0
-        do i = 0, t_rank-2
-            if(neigh_list(i+1) > 0) then
-                nc2 = nc2 + 1 !neighbor number
-                call MPI_IRECV(N_recv(nc2),1,MPI_INTEGER,i,40,work_comm,rq2(nc2),ierr)
-            end if
-        end do
-        call MPI_WAITALL(nc2,rq2(1:nc2),status(:,1:nc2),ierr)
-        write(10,*) 'rank',rank,'ierr',ierr,'i',i
-        write(10,*) 'N_recv',N_recv
-        nc4 = 0; nc5 = 0
-        do i = 0, t_rank-2
-            if(neigh_list(i+1) > 0) then
-                nc4 = nc4 + 1
-                if(N_recv(nc4) > 0) then
-                    nc5 = nc5 + 1
-                    left  = N_inte + N_peri + sum(N_recv(1:nc4-1)) + 1
-                    right = N_inte + N_peri + sum(N_recv(1:nc4))
-                    call MPI_IRECV(P_de(left:right,:),N_recv(nc4)*nattri, &
-                    MPI_DOUBLE_PRECISION,i,41,work_comm,rq4(nc5),ierr)
-                    write(10,*) 'rank',rank,'ierr',ierr,'i',i
-                    write(10,*) 'P',P_de(left:right,:)
+            end do
+            np_active = N_inte + N_peri
+            !-----------------------------------------
+            ! receive part.
+            !-----------------------------------------
+            nc2 = 0
+            do i = 0, t_rank-1
+                if(neigh_list(i+1) > 0) then
+                    nc2 = nc2 + 1 !neighbor number
+                    call MPI_IRECV(N_recv(nc2),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,rq2(nc2),ierr)
                 end if
-            end if
-        end do
-        !-----------------------------------------
-        N_peri = N_peri + sum(N_recv)
-        np_active = N_inte + N_peri
+            end do
+            call MPI_WAITALL(nc2,rq2(1:nc2),status(:,1:nc2),ierr)
+
+            write(10,'(3(a,i3,1x))') 'rank',rank,'ierr',ierr,'i',i
+            write(10,*) 'N_recv',N_recv
+
+            nc4 = 0; nc5 = 0
+            do i = 0, t_rank-1
+                if(neigh_list(i+1) > 0) then
+                    nc4 = nc4 + 1
+                    if(N_recv(nc4) > 0) then
+                        nc5 = nc5 + 1
+                        left  = sum(N_recv(1:nc4-1))*nattri + 1
+                        right = sum(N_recv(1:nc4))*nattri
+                        call MPI_IRECV(P_recv(left:right),N_recv(nc4)*nattri, &
+                            MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq4(nc5),ierr)
+                        ! number = N_recv(nc4)*2
+                        ! call MPI_IRECV(P_de(left:right,1:2),number, &
+                        ! MPI_double_precision,i,41,MPI_COMM_WORLD,rq4(nc5),ierr)
+                        ! write(10,*) 'rank',rank,'ierr',ierr,'i',i
+                        ! P_cpu = P_recv
+                        ! write(10,'(200(19(f20.5,1x),/))') P_cpu
+                    end if
+                end if
+            end do
+
+            ! interior particles
+            call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                dx,dy,pfdt,moldiff,denh2o,dtfrac,0,N_inte, &
+                nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            !-----------------------------------------
+            ! N_peri = N_peri + sum(N_recv)
+            if(nc5 > 0) then
+                call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
+                ! P_cpu = P_recv(1:19*4)
+                ! write(10,'(200(19(f20.5,1x),/))') P_cpu
+                ! write(10,*) np_active
+                ! write(10,'(200(19(f20.5,1x),/))') ((P_de(ik,jk),jk=1,nattri),ik=1,30)
+                sum_recv = sum(N_recv)
+                call unpack_recv<<<ceiling(dble(sum_recv)/tPB),tPB>>>( &
+                    P_recv,P_de,np_active,sum_recv,nattri)
+            endif
+
+            P = P_de
+            write(10,'(200(19(f20.5,1x),/))') ((P(ik,jk),jk=1,nattri),ik=1,np_active+sum_recv)
+            ! P_de(np_active+1,:)=P_cpu(1:19)
+            ! write(10,'(200(19(f20.5,1x),/))') ((P_de(ik,jk),jk=1,nattri),ik=1,30)
 
         close(10)
     end subroutine particle_exchange

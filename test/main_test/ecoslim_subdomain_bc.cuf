@@ -35,8 +35,6 @@ contains
         character(200):: message
         integer:: k, ierr
 
-        if (rank /= ppx*qqy) then
-
             ! set up domain boundaries
             Xgmin = 0.0d0
             Ygmin = 0.0d0
@@ -72,14 +70,13 @@ contains
             call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
             MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-        endif
     end subroutine global_xyz
 
     subroutine local_xyz()
         implicit none
         integer:: k
 
-        if (rank /= ppx*qqy) then
+        ! if (rank /= ppx*qqy) then
 
             ! set up subdomain boundaries
             Xmin1 = 0.0d0
@@ -121,15 +118,7 @@ contains
             do k = 1, nz
                 Zgmax = Zgmax + dz(k)
             end do
-
-            open(10,file='Local_range.'//trim(adjustl(ranknum)))
-                write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-                write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-                write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-                write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
-            close(10)
-
-        end if
+        ! end if
     end subroutine local_xyz
 
     subroutine read_restarts ()
@@ -179,10 +168,10 @@ contains
                 read(17) ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
             close(17)  ! Topology
         else
-            open(19,file='manager_grid_zonet_new', FORM='unformatted',access='stream')
-                read(19) grid
-                read(19) Zonet_new
-            close(19)  ! manager
+            !open(19,file='manager_grid_zonet_new', FORM='unformatted',access='stream')
+            !    read(19) grid
+            !    read(19) Zonet_new
+            !close(19)  ! manager
         end if
     end subroutine read_restarts
 
@@ -192,7 +181,7 @@ contains
         if (rank /= ppx*qqy) then
             write(ranknum,'(i5.5)') rank
             open(18,file='Zone_de_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
-                read(18) Zone_de
+                ! read(18) Zone_de
             close(18)  ! Zone_de
         endif
 

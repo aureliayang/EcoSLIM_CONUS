@@ -35,9 +35,9 @@ module variable_list
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
-    integer:: world_group, work_group, manage_group, manage_ranks(1)
+    ! integer:: world_group, work_group, manage_group, manage_ranks(1)
 
-    integer:: work_comm, manage_comm
+    ! integer:: work_comm, manage_comm
 
     character(len=MPI_MAX_PROCESSOR_NAME):: hostname
 
@@ -131,9 +131,10 @@ module variable_list
     integer,allocatable,pinned:: N_send(:)
     ! the same length as neigh_list, i.e., the total number of subdomains.
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
-    integer,allocatable:: N_recv(:) ! for each subdomain, it has the number of neighbors
+    integer,allocatable,pinned:: N_recv(:) ! for each subdomain, it has the number of neighbors
     integer:: N_exit, N_peri, N_inte ! a scalar variable.
     real(8),allocatable,managed:: P_exit(:,:)
+    real(8),allocatable,device:: P_send(:),P_recv(:)
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.
     integer,allocatable,pinned:: out_np_cpu(:),ET_np_cpu(:)
@@ -167,7 +168,7 @@ module variable_list
 
 !-------------------------------------
     ! GPU variables
-    real(8),allocatable,managed:: P_de(:,:)
+    real(8),allocatable,device:: P_de(:,:)
     ! the particle array, not sure if the one on host is necessary
     real(8),allocatable,device:: C_de(:,:,:,:)
     real(8),allocatable,device:: Vx_de(:,:,:)
@@ -220,7 +221,7 @@ contains
         implicit none
         !--------------------------------------------------------------------
         ! allocate arrays
-        if (rank /= ppx*qqy) then
+        !if (rank /= ppx*qqy) then
             allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
 
             allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
@@ -265,57 +266,55 @@ contains
 
             Zone_de = -1
 
-            allocate(p_num(nnx1,nny1))
-        end if
+            ! allocate(p_num(nnx1,nny1))
+        ! end if
     end subroutine alloc_arrays_temp
 
     subroutine alloc_arrays_const()
         implicit none
 
-        if (rank /= ppx*qqy) then
-            reflect = .false.
-            allocate(grid(t_rank-1,4))
-            allocate(neigh_listn(t_rank-1),neigh_listo(t_rank-1))
-            allocate(neigh_list(t_rank-1),nump(t_rank-1))
-            allocate(d_isValid(np),d_indices(np),h(np))
-            allocate(status2(MPI_STATUS_SIZE,t_rank-1),rq4(t_rank-1))
+        reflect = .false.
+        allocate(grid(t_rank,4),grid_old(ppx*qqy,4))
+        allocate(neigh_listn(t_rank),neigh_listo(t_rank))
+        allocate(neigh_list(t_rank),nump(t_rank))
+        allocate(d_isValid(np),d_indices(np),h(np))
+        allocate(status2(MPI_STATUS_SIZE,t_rank),rq4(t_rank))
 
-            allocate(out_np_cpu(1),ET_np_cpu(1))
-            allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
-            allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
-            allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
+        allocate(out_np_cpu(1),ET_np_cpu(1))
+        allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
+        allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
+        allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
 
-            allocate(out_np_de(1),ET_np_de(1))
-            allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
-            allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
-            allocate(mean_age_de(1),mean_comp_de(1),mean_mass_de(1),total_mass_de(1))
+        allocate(out_np_de(1),ET_np_de(1))
+        allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
+        allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
+        allocate(mean_age_de(1),mean_comp_de(1),mean_mass_de(1),total_mass_de(1))
 
-            allocate(conc_header(n_constituents))
-            ! Set up output options for VTK grid output
-            ! icwrite = 1
-            vtk_file=trim(runname)//'_cgrid'  ! duplicated with the latter output?
-            conc_header(1) = 'Concentration'
-            conc_header(2) = 'Age'
-            conc_header(3) = 'Mass'
-            conc_header(4) = 'Comp'
-            conc_header(5) = 'Delta'
-            conc_header(6) = 'ET_Npart'
-            conc_header(7) = 'ET_Mass'
-            conc_header(8) = 'ET_Age'
-            conc_header(9) = 'ET_Comp'
+        allocate(conc_header(n_constituents))
+        ! Set up output options for VTK grid output
+        ! icwrite = 1
+        vtk_file=trim(runname)//'_cgrid'  ! duplicated with the latter output?
+        conc_header(1) = 'Concentration'
+        conc_header(2) = 'Age'
+        conc_header(3) = 'Mass'
+        conc_header(4) = 'Comp'
+        conc_header(5) = 'Delta'
+        conc_header(6) = 'ET_Npart'
+        conc_header(7) = 'ET_Mass'
+        conc_header(8) = 'ET_Age'
+        conc_header(9) = 'ET_Comp'
 
-            allocate(PET_balance(2),PET_balance_da(2))
-            allocate(PET_balance_de(2),PET_balance_da_de(2))
-            PET_balance = 0.0d0
-            PET_balance_da = 0.0d0
+        allocate(PET_balance(2),PET_balance_da(2))
+        allocate(PET_balance_de(2),PET_balance_da_de(2))
+        PET_balance = 0.0d0
+        PET_balance_da = 0.0d0
 
-            allocate(P(np,17+nind*2))
-            P = 0.d0    ! clear out all particle attributes
-            P(1:np,7:9) = 1.d0
-            ! make all particles active to start with and original from 1 = GW/IC
-            ! this is necessary since we need P array for restart.
-
-        endif
+        allocate(P(np,17+nind*2))
+        P = 0.d0    ! clear out all particle attributes
+        P(1:np,7:9) = 1.d0
+        ! make all particles active to start with and original from 1 = GW/IC
+        ! this is necessary since we need P array for restart.
+        allocate(P_send(200*(17+nind*2)),P_recv(200*(17+nind*2)))
 
     end subroutine alloc_arrays_const
 

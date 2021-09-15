@@ -1,8 +1,0 @@
- rank            2 ierr            0 i            0
- N_send            0            0            0
- rank            2 ierr            0 i            1
- N_send            0            0            0
- rank            2 ierr            0 i            3
- N_send            0            0            0
- rank            2 ierr            0 i            4
- N_recv            0            0            0
