@@ -192,7 +192,7 @@ attributes(global) subroutine add_new_particles( &
                 end if
 
                 P(index,5) = 0.0d0
-                P(index,17+2*nind) = tout1 + dble(kk-1)*pfdt + P(index,4)
+                P(index,17+2*nind) = dble(kk-1)*pfdt + P(index,4)
                 P(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
                             EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o
 

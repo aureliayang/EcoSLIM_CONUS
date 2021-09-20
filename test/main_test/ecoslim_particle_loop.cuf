@@ -73,9 +73,9 @@ contains
         ! xgmax = xgmax - dble(ix1)*dx
         ! ygmax = ygmax - dble(iy1)*dy
 
-        delta_time = 0.d0
-
         if(P(ii,8) == 1. .and. ii <= offset + np_active) then
+
+            delta_time = 0.d0
 
             ! Transfer global to local
             P(ii,1) = P(ii,1) - dble(ix1)*dx
@@ -274,18 +274,18 @@ contains
                     end  if
                 end if
 
-                ! if (reflect) then
-                ! ! we can choose to reflect the particle or not if it is out of
-                ! ! the whole modeling domain. g means the golbal boundary.
-                ! ! currently, we should keep reflect true.
-                ! ! simple reflection boundary
-                !     if (P(ii,3)          >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
-                !     if (P(ii,1) + ix1*dx >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) + ix1*dx - Xgmax) - ix1*dx
-                !     if (P(ii,2) + iy1*dy >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) + iy1*dy - Ygmax) - iy1*dy
-                !     if (P(ii,2) + iy1*dy <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - (P(ii,2) + iy1*dy)) - iy1*dy
-                !     if (P(ii,3)          <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
-                !     if (P(ii,1) + ix1*dx <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - (P(ii,1) + ix1*dx)) - ix1*dx
-                ! end if
+                if (reflect) then
+                ! we can choose to reflect the particle or not if it is out of
+                ! the whole modeling domain. g means the golbal boundary.
+                ! currently, we should keep reflect true.
+                ! simple reflection boundary
+                    if (P(ii,3) >= Zgmax) P(ii,3) = Zgmax- (P(ii,3) - Zgmax)
+                    if (P(ii,1) >= Xgmax) P(ii,1) = Xgmax- (P(ii,1) - Xgmax)
+                    if (P(ii,2) >= Ygmax) P(ii,2) = Ygmax- (P(ii,2) - Ygmax)
+                    if (P(ii,2) <= Ygmin) P(ii,2) = Ygmin+ (Ygmin - P(ii,2))
+                    if (P(ii,3) <= Zgmin) P(ii,3) = Zgmin+ (Zgmin - P(ii,3))
+                    if (P(ii,1) <= Xgmin) P(ii,1) = Xgmin+ (Xgmin - P(ii,1))
+                end if
 
                 if ((P(ii,1) <  Xmin).or.(P(ii,2) <  Ymin).or.(P(ii,3) < Zmin).or. &
                     (P(ii,1) >= Xmax).or.(P(ii,2) >= Ymax).or.(P(ii,3) > Zmax).or. &
@@ -350,7 +350,7 @@ contains
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         one = 1.d0
 
-        if(ii < np_active) then
+        if(ii <= np_active) then
 
             ! Transfer global to local
             P(ii,1) = P(ii,1) - dble(ix1)*dx

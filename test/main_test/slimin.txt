@@ -1,22 +1,22 @@
-test      ! SLIM run name, path to PF-CLM next, followed by DEM
-"./test"
+SLIM_hillslope_LW_shrub      ! SLIM run name, path to PF-CLM next, followed by DEM
+"../hillslope_clm_LW_shrub/hillslope_clm_LW_shrub"
 " "
-9                !nx
-8                !ny
-1                !nz
-1                !nCLMsoil
-2                !ppx
-2                !qqy
-1                !particles per cell at start of simulation
-3000             !np Total
-1000             !dx
-1000             !dy, dz follows
-100 1. 0.6 0.3 0.1
-1.0             !ParFlow DT
-1               !Parflow t1: ParFlow file number to start from (initial condition is pft1-1)
-5               !Parflow t2: (last year of a 5y run)
+20                !nx
+5                 !ny
+20                !nz
+10                !nCLMsoil
+1                 !ppx
+1                 !qqy
+1                 !particles per cell at start of simulation
+30000             !np Total
+5                 !dx
+0.2               !dy, dz follows
+0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.1
+1.0               !ParFlow DT
+35041             !Parflow t1: ParFlow file number to start from (initial condition is pft1-1)
+35069             !Parflow t2: (last year of a 5y run)
 0               !EcoSLIM output start counter 0=pft1-1
-2               !Time Sequence Repeat [n_cycle*(pft2-pft1)] 20 year EcoSLIM run
+1               !Time Sequence Repeat [n_cycle*(pft2-pft1)] 20 year EcoSLIM run
 24              !add_f, either 1 or 24
 0               !ipwrite frequency, controls an ASCII, .3D particle file not recommended due to poor performance
 0               !ibinpntswrite frequency, controls VTK, binary output of particle locations and attributes
