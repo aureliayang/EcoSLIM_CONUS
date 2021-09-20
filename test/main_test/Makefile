@@ -10,7 +10,7 @@ CUF=ecoslim_thrustscan.cuf \
     ecoslim_compaction.cuf \
     ecoslim_particle_loop.cuf \
     ecoslim_particle_exch.cuf \
-    pfb_read.f90 \
+    ecoslim_pfb_read.f90 \
     EcoSLIM_CUDA_MPI.cuf
 
 all: test
