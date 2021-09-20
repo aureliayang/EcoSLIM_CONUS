@@ -45,7 +45,7 @@ module variable_list
 
     integer(MPI_OFFSET_KIND):: offset
 
-    character(200):: message
+    character(300):: message
 
     character(200):: runname, pname, DEMname, vtk_file, Indname
 
@@ -200,9 +200,11 @@ module variable_list
     ! it should use integer(8) for CONUS !!!
     ! p_sum on workers needs to be deallocated
     ! c_sum is only on manager
-    integer,allocatable,managed:: Zonet_old(:,:), Zonet_new(:,:)
+    integer,allocatable,managed:: Zonet_old(:,:)
+    integer,allocatable,device:: Zonet_new(:,:)
     ! only on rank ppx*qqy. Zonet_new is written into restart files.
-    integer,allocatable,managed:: grid(:,:), grid_old(:,:)
+    integer,allocatable,device:: grid(:,:)
+    integer,allocatable,managed:: grid_old(:,:)
     ! grid is on GPU, and should be initialized each time doing DDC as
     ! grid = 0
     ! grid(1,1) = 0;  grid(1,2) = 0
@@ -273,7 +275,7 @@ contains
     subroutine alloc_arrays_const()
         implicit none
 
-        reflect = .false.
+        reflect = .true.
         allocate(grid(t_rank,4),grid_old(ppx*qqy,4))
         allocate(neigh_listn(t_rank),neigh_listo(t_rank))
         allocate(neigh_list(t_rank),nump(t_rank))

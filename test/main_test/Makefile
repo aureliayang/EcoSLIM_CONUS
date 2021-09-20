@@ -26,7 +26,7 @@ clean:
 	Read_check.* \
 	slurm* \
 	EcoSLIM_Device_Utility.txt \
-	test*.txt \
+	SLIM*.txt \
 	grid.* \
 	topology.* \
 	Zone_de_before.* \

@@ -11,7 +11,7 @@ module create_subdomain
 
     use variable_list, only: p_num, c_sum
     use variable_list, only: d_indices
-    use variable_list, only: nx, ny, ppx, qqy, tPB, rank, t_rank,ierr
+    use variable_list, only: nx, ny, ppx, qqy, tPB, rank, t_rank !,ierr, buff
     use variable_list, only: grid_old, grid
     ! grid is on each rank while grid_old is only on ppx*qqy
     use variable_list, only: Zonet_old, Zonet_new
@@ -29,10 +29,10 @@ contains
 
         use mpi
         implicit none
-        integer:: i, j, dir, nlev, n,k
-        integer:: max_dim !, ierr
-        integer(8):: c_sum_cpu(9)
-        integer:: indices_cpu(9)
+        integer:: i, j, dir, nlev, n !,k,ii,jj
+        integer:: max_dim,ndim1,ndim2 !, ierr
+        !integer(8):: c_sum_cpu(9)
+        !integer:: indices_cpu(9)
 
         !if (rank == ppx*qqy) then ! at least, this if condition doesn't conflict
 
@@ -45,7 +45,6 @@ contains
             grid(1,4) = ny
             Zonet_new = -1
             Zonet_new(1:nx,1:ny) = 0
-            ! write(*,'(a,4(4(i3,1x),/))') 'on manager',((grid(i,j),i=1,4),j=1,ppx*qqy)
 
             dir = 1
             if(qqy > ppx) dir = -1
@@ -58,27 +57,40 @@ contains
             do i = 1, nlev
                 do j = 1, ppx*qqy, n ! which father node
                     if (dir == 1) then
-                        call column_sum<<<ceiling(dble(grid(j,3))/tPB),tPB>>>(j,dir)
-                        call thrustscan(c_sum,grid(j,3),d_indices) ! prefix-sum of c_sum
-                        max_dim = max(ppx*qqy,grid(j,3)*grid(j,4))
-                        call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j)
+                        ndim1 = grid(j,3)
+                        ndim2 = grid(j,4)
+                        call column_sum<<<ceiling(dble(ndim1)/tPB),tPB>>>(j,dir)
+                        call thrustscan(c_sum,ndim1,d_indices) ! prefix-sum of c_sum
+                        max_dim = max(ppx*qqy,ndim1*ndim2)
+                        !write(*,'(4(4(i3,1x),/))') grid_old,rank
+                        call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j,rank)
+                        !grid_old = grid
+                        !write(*,'(4(4(i3,1x),/))') grid_old,rank
+                        !Zonet_old = Zonet_new
+                        !write(*,'(7(22(i3,1x),/))') ((Zonet_old(ii,jj),ii=-buff+1,nx+buff),jj=-buff+1,ny+buff)
                     else
-                        call column_sum<<<ceiling(dble(grid(j,4))/tPB),tPB>>>(j,dir)
-                        call thrustscan(c_sum,grid(j,4),d_indices)
-                        max_dim = max(ppx*qqy,grid(j,3)*grid(j,4))
-                        call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j)
+                        ndim1 = grid(j,3)
+                        ndim2 = grid(j,4)
+                        call column_sum<<<ceiling(dble(ndim2)/tPB),tPB>>>(j,dir)
+                        call thrustscan(c_sum,ndim2,d_indices)
+                        max_dim = max(ppx*qqy,ndim1*ndim2)
+                        !write(*,'(4(4(i3,1x),/))') grid,rank
+                        call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j,rank)
+                        !write(*,'(4(4(i3,1x),/))') grid,rank
+                        !Zonet_old = Zonet_new
+                        !write(*,'(7(22(i3,1x),/))') ((Zonet_old(ii,jj),ii=-buff+1,nx+buff),jj=-buff+1,ny+buff)
                     endif
 
-                    do k = 0, t_rank-1
-                        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-                        if(k == rank) then
-                            c_sum_cpu = c_sum
-                            write(*,'(i3,a,9(i3,1x))') rank,'c_sum',c_sum_cpu
-                            indices_cpu = d_indices(1:9)
-                            write(*,'(a,9(i3,1x))') 'd_indices',indices_cpu
-                            write(*,'(4(4(i3,1x),/))') grid
-                        endif
-                    enddo
+                     !do k = 0, t_rank-1
+                     !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+                     !    if(k == rank) then
+                     !        c_sum_cpu = c_sum
+                     !        write(*,'(i3,a,9(i3,1x))') rank,'c_sum',c_sum_cpu
+                     !        indices_cpu = d_indices(1:9)
+                     !        write(*,'(a,9(i3,1x))') 'd_indices',indices_cpu
+                     !        write(*,'(4(4(i3,1x),/))') grid
+                     !    endif
+                     !enddo
 
                 end do
                 if(min(ppx,qqy) > 1) dir = -dir ! if means at least split once (i.e., 2)
@@ -87,9 +99,6 @@ contains
                 n = n/2
             end do
         !endif
-
-        ! bcast grid array and then copy to ix1n etc. on workers
-        ! call MPI_BCAST(grid,ppx*qqy*4,MPI_INTEGER,ppx*qqy,MPI_COMM_WORLD,ierr)
 
     end subroutine gridinfo
 
@@ -117,10 +126,10 @@ contains
 
     end subroutine column_sum
 
-    attributes(global) subroutine build_tree(n,dir,j)
+    attributes(grid_global) subroutine build_tree(n,dir,j,rank)
 
         implicit none
-        integer,value:: n, dir, j ! j is the current father node
+        integer,value:: n, dir, j, rank ! j is the current father node
         integer:: ii, nd, tempx0, tempy0, tempnx, tempny
         integer:: ik, jk, length
 
@@ -144,6 +153,7 @@ contains
                     grid(j+nd,3) = tempnx - ii
                     grid(j+nd,4) = grid(j,4)
                     grid(j,3) = ii
+                    !print *, ii,rank
                 endif
             endif
         else
@@ -155,11 +165,14 @@ contains
                     grid(j+nd,3) = grid(j,3)
                     grid(j+nd,4) = tempny - ii
                     grid(j,4) = ii
+                    !print *, ii,rank
                 endif
             endif
         end if
 
+        call syncthreads()
         length = grid(j+nd,3)*grid(j+nd,4)
+        !print *, length,rank,grid(j+nd,3),grid(j+nd,4)
         ! this is the total length of zone array when it was transformed to 1D
         ! so the threads are more than this number. Probably we can split this
         ! part to a new kernel.
@@ -173,6 +186,7 @@ contains
                 ik = grid(j+nd,1) + mod(ii,grid(j+nd,3))
             end if
             Zonet_new(ik,jk) = j + nd - 1
+            !print *, ik,jk,rank,j + nd - 1,Zonet_new(ik,jk)
         end if
         ! buffer zone has been set as -1
         ! in this operation, buffer is not considered while buffer is considered
