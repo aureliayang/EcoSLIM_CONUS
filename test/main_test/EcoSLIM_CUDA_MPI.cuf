@@ -34,8 +34,8 @@ use compact_array
 use exchange_particles
 
 implicit none
-integer(8),allocatable,pinned:: p_num_cpu(:,:)
-type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
+! integer(8),allocatable,pinned:: p_num_cpu(:,:)
+! type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
 real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
 real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
 real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
@@ -43,6 +43,7 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
+    write(ranknum,'(i5.5)') rank
 
     ! call open_hdf5_interface()
 !--------------------------------------------------------------------
@@ -53,7 +54,7 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
     rank, trim(hostname), deviceID, new_line(' ')
     offset = len(trim(message))*rank
 
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, 'EcoSLIM_Device_Utility.txt', &
+    call MPI_FILE_OPEN(MPI_COMM_WORLD, 'Device_Utility.txt', &
     MPI_MODE_WRONLY + MPI_MODE_CREATE, MPI_INFO_NULL, fh0, ierr)
     call MPI_FILE_SEEK(fh0,offset,MPI_SEEK_SET,ierr)
     call MPI_FILE_WRITE(fh0,message,len(trim(message)),MPI_CHARACTER, &
@@ -236,9 +237,6 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
     ! end of SLIM input
     close(10)
 !--------------------------------------------------------------------
-    ! print *, 'Read ok1'
-        write(ranknum,'(i5.5)') rank
-!--------------------------------------------------------------------
     call alloc_arrays_const()
     ! now we know the total dimension
 
@@ -264,13 +262,12 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         call gridinfo()
 
         call copy_grid() ! doing this on workers
-            open(10,file='topology.'//trim(adjustl(ranknum)))
-                write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
-                write(10,'(8(i3,1x))') ix2-ix1+1,ix2-ix1+nnx2,iy2-iy1+1,iy2-iy1+nny2
-            close(10)
+            ! open(10,file='topology.'//trim(adjustl(ranknum)))
+            !     write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
+            !     write(10,'(8(i3,1x))') ix2-ix1+1,ix2-ix1+nnx2,iy2-iy1+1,iy2-iy1+nny2
+            ! close(10)
 
         call alloc_arrays_temp() ! doing this on workers
-
             ! open(10,file='Zone_de_before.'//trim(adjustl(ranknum)))
             !     write(10,'(8(12(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
             ! close(10)
@@ -278,19 +275,26 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
         Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
 
-            open(10,file='Zone_de_after.'//trim(adjustl(ranknum)))
-                write(10,'(8(12(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+            open(10,file='Zone_de_after.'//trim(adjustl(ranknum))//'.txt')
+                if(rank == 0) &
+                    write(10,'(22(22(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 1) &
+                    write(10,'(23(22(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 2) &
+                    write(10,'(22(23(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 3) &
+                    write(10,'(23(23(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
             close(10)
 
     end if
 !--------------------------------------------------------------------
     call local_xyz()
-        !open(10,file='Local_range.'//trim(adjustl(ranknum)))
-        !    write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-        !    write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-        !    write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-        !    write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
-        !close(10)
+        ! open(10,file='Local_range.'//trim(adjustl(ranknum)))
+        !     write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+        !     write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
+        !     write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
+        !     write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+        ! close(10)
 
     if(rank == 0) then
         flush(11)
@@ -387,31 +391,30 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
     if(sum(neigh_list) > 0) then
         allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
-        !N_send = 0; N_recv = 0
     else
         allocate(N_recv(1),N_send(1))
-        !N_send = 0; N_recv = 0
     end if
 
-        open(10,file='Neighbor.'//trim(adjustl(ranknum)))
-            write(10,*) neigh_list
-            write(10,*) N_recv
-        close(10)
+        ! open(10,file='Neighbor.'//trim(adjustl(ranknum)))
+        !     write(10,*) neigh_list
+        !     write(10,*) N_recv
+        ! close(10)
 
     ! Intialize cuRand device API and this part need to check through again.
     call createRand_loop<<< ceiling(dble(np)/tPB),tPB >>>(np, rank, pfnt)
 
 !--------------------------------------------------------------------
     pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1    ! outkk is tout1+1
+
     do kk = outkk, pfnt
 
         ! reset ParFlow counter for cycles
         if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
+
         ! adjust the file counters
         pfkk = pfkk + 1
 
         ! Read the velocities computed by ParFlow
-
         write(filenum,'(i5.5)') pfkk
 
         !fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
@@ -501,7 +504,6 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         C_de = 0.d0
         ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
         ! the following adding of particles.
-
 !----------------------------------------
         if (clmtrans) then
             if (np_active < np) then
@@ -509,7 +511,7 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
                     PET_balance_de,d_isValid,nnx1,nny1,nz,dx,dy,dz_de,pfdt,denh2o)
                 ! d_isValid has the length as P or of np which is assigned in input script
-                ! so nnx1**nny1*nz should be smaller than np
+                ! so nnx1*nny1*nz should be smaller than np
                 ! we don't care about the buffer zone for add of particles
                 ! nnx1, nnx2 etc. subdomain info can be put in its own module. Then use module
                 ! in main program and pass arguments to other subroutines.
@@ -587,13 +589,13 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
             !    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
             !close(10)
 
-        call particle_exchange(nc5,rq4,status2)
+        call particle_exchange()
 
         mean_age    = mean_age_de
         mean_comp   = mean_comp_de
         total_mass  = total_mass_de
-        if(total_mass(1) > 0.) mean_age(1)  = mean_age(1)/total_mass(1)
-        if(total_mass(1) > 0.) mean_comp(1) = mean_comp(1)/total_mass(1)
+        if(total_mass(1) > 0.d0) mean_age(1)  = mean_age(1)/total_mass(1)
+        if(total_mass(1) > 0.d0) mean_comp(1) = mean_comp(1)/total_mass(1)
         mean_mass = total_mass/dble(np_active)
         PET_balance = PET_balance_de
         ET_np_cpu   = ET_np_de

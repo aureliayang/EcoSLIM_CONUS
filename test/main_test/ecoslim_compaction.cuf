@@ -3,7 +3,7 @@ module compact_array
     use variable_list, only: Zone_de
 
 contains
-!2--------------------------------------------------------------------
+!1--------------------------------------------------------------------
     attributes(global) subroutine prepare_holes(holes,d_indices,d_isValid,&
         numElements)
         !original:        1 0 1 1 0 0 1 0  d_isValid
@@ -30,7 +30,7 @@ contains
             holes(ii - d_indices(ii)) = ii
         end if
     end subroutine prepare_holes
-!3--------------------------------------------------------------------
+!2--------------------------------------------------------------------
     attributes(global) subroutine select2end(holes, &
         d_in,d_out,offset,hole_size,sumsend,nattri)
         !original:        1 0 1 1 0 0 1 0  d_isValid
@@ -81,7 +81,7 @@ contains
         end if
 
     end subroutine unpack_recv
-
+!4--------------------------------------------------------------------
     attributes(global) subroutine select2exit(holes, &
         d_in,d_out,hole_size)
 
@@ -99,7 +99,7 @@ contains
         end if
 
     end subroutine select2exit
-
+!5--------------------------------------------------------------------
     attributes(global) subroutine select2np_active(holes, &
         d_in,numElements,hole_size)
 
@@ -118,7 +118,7 @@ contains
         end if
 
     end subroutine select2np_active
-
+!6--------------------------------------------------------------------
     attributes(global) subroutine compaction_inplace(holes,d_indices,d_isValid,&
         d_in,offset,numElements)
         !original:        1 0 1 1 0 0 1 0  d_isValid
@@ -138,27 +138,26 @@ contains
         !np_active is numElements
         !holes is a temporary array that just needs dynamic allocation on cpu
         integer:: ii, ii2, temp1, temp2   !global index in the array
-        integer,value:: offset, numElements
+        integer,value:: offset, numElements, rank
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-        if(ii <= numElements) &
-        ii2 = d_indices(numElements) - d_indices(ii) + 1
-        ! if(ii <= numElements) print *,'rank',rank
-        ! if(ii <= numElements) print *, ii2
+        !if(ii <= numElements) &
+        !ii2 = d_indices(numElements) - d_indices(ii) + 1
+        !if(ii == 1) print *, 'rank',rank,'ii',ii,'ii2',ii2
+        !if(ii == numElements) print *, 'rank',rank,'ii',ii,'ii2',ii2
 
         if(ii <= numElements .and. d_isValid(ii) > 0) then
-            if (ii2 <= size(holes) .and. holes(ii2) <= d_indices(numElements)) then
+            ii2 = d_indices(numElements) - d_indices(ii) + 1
+            if (ii2 <= numElements-d_indices(numElements) .and. holes(ii2) <= d_indices(numElements)) then
                 temp1 = offset+holes(ii2)
                 temp2 = offset+ii
-                ! print *,'temp1',temp1
-                ! print *,'temp2',temp2
                 d_in(temp1,:) = d_in(temp2,:)
             end if
         end if
 
     end subroutine compaction_inplace
-!4--------------------------------------------------------------------
+!7--------------------------------------------------------------------
     attributes(global) subroutine prepare_neighbor(d_in,d_isValid,&
                                                    numElements,neighbor)
         !numElements is the current number of elements left in P, i.e., updated np_active
@@ -182,7 +181,7 @@ contains
             end if
         end if
     end subroutine prepare_neighbor
-!6--------------------------------------------------------------------
+!8--------------------------------------------------------------------
     attributes(global) subroutine connect_recv(d_in,numElements,N_recv)
         ! connect the received particles to the bottom of P and
         ! update P(:,8) of the received particles
@@ -198,7 +197,7 @@ contains
             d_in(numElements+ii,:) = d_in(numElements+N_recv+ii,:)
         end if
     end subroutine connect_recv
-!7--------------------------------------------------------------------
+!9--------------------------------------------------------------------
     attributes(global) subroutine scan_zone(nnx1,nny1,buff, &
                                             d_isValid,rank,t_rank)
 

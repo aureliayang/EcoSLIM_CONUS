@@ -1,0 +1,89 @@
+======== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   91.11%  550.94ms         1  550.94ms  550.94ms  550.94ms  mrand_createrand_loop_
+                    4.54%  27.435ms         1  27.435ms  27.435ms  27.435ms  mrand_createrand_init_
+                    1.92%  11.586ms        20  579.31us  210.92us  1.0338ms  particle_loop_particles_independent_
+                    1.07%  6.4715ms       198  32.684us     576ns  115.78us  [CUDA memcpy DtoH]
+                    0.76%  4.5993ms      1150  3.9990us     704ns  2.6561ms  [CUDA memcpy HtoD]
+                    0.15%  922.61us        10  92.260us  88.229us  96.229us  particle_loop_update_c_array_
+                    0.08%  479.80us        10  47.980us  45.570us  50.211us  add_particles_scan_new_particles_
+                    0.08%  472.79us        60  7.8790us  6.2400us  8.5440us  void thrust::cuda_cub::core::_kernel_agent<thrust::cuda_cub::__scan::ScanAgent<thrust::device_ptr<int>, thrust::device_ptr<int>, thrust::plus<int>, int, int, thrust::detail::integral_constant<bool, bool=1>>, thrust::device_ptr<int>, thrust::device_ptr<int>, thrust::plus<int>, int, cub::ScanTileState<int, bool=1>, thrust::cuda_cub::__scan::DoNothing<int>>(thrust::device_ptr<int>, thrust::device_ptr<int>, int, thrust::plus<int>, int, int)
+                    0.07%  398.93us        39  10.229us  9.1520us  14.112us  compact_array_compaction_inplace_
+                    0.03%  161.45us        23  7.0190us     800ns  137.45us  __pgi_dev_cumemset_4n
+                    0.02%  137.29us         1  137.29us  137.29us  137.29us  compact_array_scan_zone_
+                    0.02%  119.33us        10  11.933us  11.168us  12.960us  compact_array_select2np_active_
+                    0.02%  101.51us        10  10.151us  9.7600us  10.496us  compact_array_connect_recv_
+                    0.02%  100.26us        40  2.5060us  2.2090us  3.0410us  compact_array_prepare_neighbor_
+                    0.02%  98.630us        39  2.5280us  2.2400us  3.3280us  compact_array_prepare_holes_
+                    0.02%  95.554us        19  5.0290us  4.6400us  5.4400us  compact_array_select2end_
+                    0.01%  89.828us        60  1.4970us  1.3760us  2.4640us  void thrust::cuda_cub::core::_kernel_agent<thrust::cuda_cub::__scan::InitAgent<cub::ScanTileState<int, bool=1>, int>, cub::ScanTileState<int, bool=1>, int>(bool=1, cub::ScanTileState<int, bool=1>)
+                    0.01%  86.278us        91     948ns     800ns  1.5360us  __pgi_dev_cumemset_8n
+                    0.01%  66.500us        22  3.0220us  1.4080us  4.9610us  __pgi_dev_cumemset_16n
+                    0.01%  65.379us         1  65.379us  65.379us  65.379us  add_particles_add_init_particles_
+                    0.01%  60.227us        10  6.0220us  5.6320us  6.4010us  compact_array_select2exit_
+                    0.01%  47.521us        10  4.7520us  4.3840us  5.2160us  particle_loop_particles_separation_
+                    0.01%  45.380us        10  4.5380us  4.3530us  4.6720us  compact_array_unpack_recv_
+                    0.01%  38.115us        10  3.8110us  2.1770us  10.976us  [CUDA memcpy PtoP]
+                    0.00%  24.771us        10  2.4770us  2.3360us  2.5930us  add_particles_add_new_particles_
+                    0.00%  18.370us         3  6.1230us  6.0810us  6.1760us  void thrust::cuda_cub::core::_kernel_agent<thrust::cuda_cub::__scan::ScanAgent<thrust::device_ptr<__int64>, thrust::device_ptr<int>, thrust::plus<int>, int, __int64, thrust::detail::integral_constant<bool, bool=1>>, thrust::device_ptr<__int64>, thrust::device_ptr<int>, thrust::plus<int>, int, cub::ScanTileState<__int64, bool=1>, thrust::cuda_cub::__scan::DoNothing<__int64>>(thrust::device_ptr<__int64>, int, thrust::device_ptr<int>, int, thrust::plus<int>, int)
+                    0.00%  14.369us         3  4.7890us  4.2890us  5.6960us  create_subdomain_column_sum_
+                    0.00%  10.816us         3  3.6050us  3.5200us  3.7440us  create_subdomain_build_tree_
+                    0.00%  8.6420us         3  2.8800us  1.3130us  3.6800us  [CUDA memcpy DtoD]
+                    0.00%  6.4330us         3  2.1440us  2.0810us  2.1760us  create_subdomain_update_zone_new_
+                    0.00%  4.1920us         3  1.3970us  1.3760us  1.4080us  void thrust::cuda_cub::core::_kernel_agent<thrust::cuda_cub::__scan::InitAgent<cub::ScanTileState<__int64, bool=1>, int>, cub::ScanTileState<__int64, bool=1>, int>(bool=1, cub::ScanTileState<__int64, bool=1>)
+      API calls:   60.62%  5.18800s        28  185.29ms  4.0880us  5.17246s  cudaMallocHost
+                   24.39%  2.08731s      1071  1.9489ms  5.5580us  547.95ms  cudaMemcpy
+                    6.68%  572.08ms       935  611.85us  2.2390us  3.2665ms  cudaFree
+                    3.56%  304.57ms       236  1.2906ms  6.4170us  2.2592ms  cudaMemcpyToSymbol
+                    1.71%  146.65ms         2  73.324ms  293.39us  146.35ms  cuMemHostRegister
+                    1.62%  138.88ms        66  2.1043ms  1.9100us  2.2308ms  cudaDeviceSynchronize
+                    0.45%  38.597ms        40  964.91us  1.2870us  2.2352ms  cuStreamSynchronize
+                    0.26%  22.536ms       512  44.015us  4.0620us  17.818ms  cudaLaunchKernel
+                    0.24%  20.562ms         4  5.1406ms  11.483us  20.504ms  cudaMallocManaged
+                    0.23%  19.803ms       970  20.414us  2.9710us  9.4502ms  cudaMalloc
+                    0.08%  6.7811ms         4  1.6953ms  231.92us  2.2280ms  cudaStreamSynchronize
+                    0.03%  2.6617ms         4  665.43us  554.49us  909.36us  cuDeviceTotalMem
+                    0.03%  2.4953ms       404  6.1760us     308ns  517.29us  cuDeviceGetAttribute
+                    0.03%  2.3061ms         1  2.3061ms  2.3061ms  2.3061ms  cuMemHostUnregister
+                    0.02%  1.3287ms         1  1.3287ms  1.3287ms  1.3287ms  cuIpcOpenMemHandle
+                    0.01%  756.63us      1264     598ns     268ns  294.39us  cuEventCreate
+                    0.01%  583.17us         1  583.17us  583.17us  583.17us  cuIpcCloseMemHandle
+                    0.01%  533.86us      1264     422ns     239ns  9.8010us  cuEventDestroy
+                    0.01%  504.78us        50  10.095us  4.4240us  47.436us  cuMemcpyAsync
+                    0.00%  305.36us         4  76.339us  47.671us  141.89us  cuDeviceGetName
+                    0.00%  292.94us      1515     193ns     130ns  11.443us  cudaGetLastError
+                    0.00%  265.09us       382     693ns     269ns  13.084us  cuPointerGetAttributes
+                    0.00%  248.62us         1  248.62us  248.62us  248.62us  cudaMemcpy2D
+                    0.00%  195.06us       382     510ns     329ns  3.1370us  cudaGetDevice
+                    0.00%  127.59us       252     506ns     321ns  2.6310us  cudaDeviceGetAttribute
+                    0.00%  55.834us       252     221ns     138ns  2.7690us  cudaPeekAtLastError
+                    0.00%  54.758us         3  18.252us  9.1510us  33.095us  cudaMemcpyAsync
+                    0.00%  40.342us         4  10.085us  2.9100us  24.790us  cuStreamCreate
+                    0.00%  23.785us         4  5.9460us  2.4210us  15.556us  cuStreamDestroy
+                    0.00%  22.817us        19  1.2000us     462ns  11.788us  cuIpcGetMemHandle
+                    0.00%  20.624us         1  20.624us  20.624us  20.624us  cudaStreamCreate
+                    0.00%  19.806us         1  19.806us  19.806us  19.806us  cudaSetDevice
+                    0.00%  18.527us         4  4.6310us  2.1260us  10.034us  cuDeviceGetPCIBusId
+                    0.00%  15.996us        52     307ns     150ns  2.6390us  cuCtxGetCurrent
+                    0.00%  15.868us        11  1.4420us     940ns  1.7530us  cuEventQuery
+                    0.00%  14.965us        64     233ns     180ns     588ns  cuIpcGetEventHandle
+                    0.00%  13.930us        10  1.3930us  1.0560us  3.0560us  cuEventRecord
+                    0.00%  10.900us        19     573ns     486ns     728ns  cuMemGetAddressRange
+                    0.00%  9.4610us        19     497ns     361ns  1.0100us  cuPointerGetAttribute
+                    0.00%  8.2830us        19     435ns     358ns     704ns  cuPointerSetAttribute
+                    0.00%  6.6790us         1  6.6790us  6.6790us  6.6790us  cudaFuncGetAttributes
+                    0.00%  5.2620us         2  2.6310us  1.9440us  3.3180us  cuDeviceCanAccessPeer
+                    0.00%  3.7670us         8     470ns     308ns  1.3600us  cuDeviceGet
+                    0.00%  2.2950us         3     765ns     382ns  1.3300us  cuDeviceGetCount
+                    0.00%  2.0820us         4     520ns     447ns     696ns  cuDeviceGetUuid
+                    0.00%  1.8880us         5     377ns     282ns     544ns  cuCtxGetDevice
+                    0.00%     636ns         2     318ns     316ns     320ns  cudaGetDeviceCount
+                    0.00%     283ns         1     283ns     283ns     283ns  cudaRuntimeGetVersion
+
+======== Unified Memory profiling result:
+Device "NVIDIA GeForce GTX 1080 Ti (3)"
+   Count  Avg Size  Min Size  Max Size  Total Size  Total Time  Name
+      37  20.756KB  4.0000KB  52.000KB  768.0000KB  100.8320us  Host To Device
+      23  30.608KB  4.0000KB  60.000KB  704.0000KB  90.84800us  Device To Host
+      12         -         -         -           -  1.802688ms  Gpu page fault groups
+Total CPU Page faults: 12

@@ -30,75 +30,55 @@ contains
         use mpi
         implicit none
         integer:: i, j, dir, nlev, n !,k,ii,jj
-        integer:: max_dim,ndim1,ndim2 !, ierr
+        integer:: max_dim, ndim1, ndim2 !, ierr
         !integer(8):: c_sum_cpu(9)
         !integer:: indices_cpu(9)
 
-        !if (rank == ppx*qqy) then ! at least, this if condition doesn't conflict
+        grid_old  = grid
+        Zonet_old = Zonet_new
+        grid = 0   ! this is legal
+        grid(1,1) = 0
+        grid(1,2) = 0
+        grid(1,3) = nx
+        grid(1,4) = ny
+        Zonet_new = -1
+        Zonet_new(1:nx,1:ny) = 0
 
-            grid_old  = grid
-            Zonet_old = Zonet_new
-            grid = 0   ! this is legal
-            grid(1,1) = 0
-            grid(1,2) = 0
-            grid(1,3) = nx
-            grid(1,4) = ny
-            Zonet_new = -1
-            Zonet_new(1:nx,1:ny) = 0
+        dir = 1
+        if(qqy > ppx) dir = -1
+        ! dir = 1, split starts from x direction while -1 y direction
+        ! however, you have to think about much more times split in one direction
+        ! such as, you just split once across y axis while 5 times across x direction
+        nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
+        n = ppx*qqy
 
-            dir = 1
-            if(qqy > ppx) dir = -1
-            ! dir = 1, split starts from x direction while -1 y direction
-            ! however, you have to think about much more times split in one direction
-            ! such as, you just split once across y axis while 5 times across x direction
-            nlev = idnint(dlog(dble(ppx*qqy))/dlog(2.d0))
-            n = ppx*qqy
-
-            do i = 1, nlev
-                do j = 1, ppx*qqy, n ! which father node
-                    if (dir == 1) then
-                        ndim1 = grid(j,3)
-                        ndim2 = grid(j,4)
-                        call column_sum<<<ceiling(dble(ndim1)/tPB),tPB>>>(j,dir)
-                        call thrustscan(c_sum,ndim1,d_indices) ! prefix-sum of c_sum
-                        max_dim = max(ppx*qqy,ndim1*ndim2)
-                        !write(*,'(4(4(i3,1x),/))') grid_old,rank
-                        call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j,rank)
-                        !grid_old = grid
-                        !write(*,'(4(4(i3,1x),/))') grid_old,rank
-                        !Zonet_old = Zonet_new
-                        !write(*,'(7(22(i3,1x),/))') ((Zonet_old(ii,jj),ii=-buff+1,nx+buff),jj=-buff+1,ny+buff)
-                    else
-                        ndim1 = grid(j,3)
-                        ndim2 = grid(j,4)
-                        call column_sum<<<ceiling(dble(ndim2)/tPB),tPB>>>(j,dir)
-                        call thrustscan(c_sum,ndim2,d_indices)
-                        max_dim = max(ppx*qqy,ndim1*ndim2)
-                        !write(*,'(4(4(i3,1x),/))') grid,rank
-                        call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j,rank)
-                        !write(*,'(4(4(i3,1x),/))') grid,rank
-                        !Zonet_old = Zonet_new
-                        !write(*,'(7(22(i3,1x),/))') ((Zonet_old(ii,jj),ii=-buff+1,nx+buff),jj=-buff+1,ny+buff)
-                    endif
-
-                     !do k = 0, t_rank-1
-                     !    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-                     !    if(k == rank) then
-                     !        c_sum_cpu = c_sum
-                     !        write(*,'(i3,a,9(i3,1x))') rank,'c_sum',c_sum_cpu
-                     !        indices_cpu = d_indices(1:9)
-                     !        write(*,'(a,9(i3,1x))') 'd_indices',indices_cpu
-                     !        write(*,'(4(4(i3,1x),/))') grid
-                     !    endif
-                     !enddo
-
-                end do
-                if(min(ppx,qqy) > 1) dir = -dir ! if means at least split once (i.e., 2)
-                !!! for this subroutine, you should think about if split in one direction
-                !!! is much more than the other direction???
-                n = n/2
+        do i = 1, nlev
+            do j = 1, ppx*qqy, n ! which father node
+                ndim1 = grid(j,3)
+                ndim2 = grid(j,4)
+                if (dir == 1) then
+                    call column_sum<<<ceiling(dble(ndim1)/tPB),tPB>>>(j,dir)
+                    call thrustscan(c_sum,ndim1,d_indices) ! prefix-sum of c_sum
+                    !max_dim = max(ppx*qqy,ndim1*ndim2)
+                    !call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j)
+                    !call update_zone_new<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,j)
+                    !grid_old = grid
+                    !write(*,'(4(4(i3,1x),/))') grid_old,rank
+                    !Zonet_old = Zonet_new
+                    !write(*,'(43(43(i3,1x),/))') ((Zonet_old(ii,jj),ii=-buff+1,nx+buff),jj=-buff+1,ny+buff)
+                else
+                    call column_sum<<<ceiling(dble(ndim2)/tPB),tPB>>>(j,dir)
+                    call thrustscan(c_sum,ndim2,d_indices)
+                endif
+                max_dim = max(ppx*qqy,ndim1*ndim2)
+                call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j)
+                call update_zone_new<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,j)
             end do
-        !endif
+            if(min(ppx,qqy) > 1) dir = -dir ! if means at least split once (i.e., 2)
+            !!! for this subroutine, you should think about if split in one direction
+            !!! is much more than the other direction???
+            n = n/2
+        end do
 
     end subroutine gridinfo
 
@@ -126,10 +106,10 @@ contains
 
     end subroutine column_sum
 
-    attributes(grid_global) subroutine build_tree(n,dir,j,rank)
+    attributes(global) subroutine build_tree(n,dir,j)
 
         implicit none
-        integer,value:: n, dir, j, rank ! j is the current father node
+        integer,value:: n, dir, j ! j is the current father node
         integer:: ii, nd, tempx0, tempy0, tempnx, tempny
         integer:: ik, jk, length
 
@@ -153,7 +133,6 @@ contains
                     grid(j+nd,3) = tempnx - ii
                     grid(j+nd,4) = grid(j,4)
                     grid(j,3) = ii
-                    !print *, ii,rank
                 endif
             endif
         else
@@ -165,17 +144,21 @@ contains
                     grid(j+nd,3) = grid(j,3)
                     grid(j+nd,4) = tempny - ii
                     grid(j,4) = ii
-                    !print *, ii,rank
                 endif
             endif
         end if
+    end subroutine build_tree
 
-        call syncthreads()
+    attributes(global) subroutine update_zone_new(n,j)
+
+        implicit none
+        integer,value:: j,n
+        integer:: ii, nd, ik, jk, length
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        nd = n/2
         length = grid(j+nd,3)*grid(j+nd,4)
-        !print *, length,rank,grid(j+nd,3),grid(j+nd,4)
-        ! this is the total length of zone array when it was transformed to 1D
-        ! so the threads are more than this number. Probably we can split this
-        ! part to a new kernel.
 
         if(ii <= length) then
             if(mod(ii,grid(j+nd,3)) == 0) then
@@ -186,13 +169,9 @@ contains
                 ik = grid(j+nd,1) + mod(ii,grid(j+nd,3))
             end if
             Zonet_new(ik,jk) = j + nd - 1
-            !print *, ik,jk,rank,j + nd - 1,Zonet_new(ik,jk)
         end if
-        ! buffer zone has been set as -1
-        ! in this operation, buffer is not considered while buffer is considered
-        ! in some other subroutines.
 
-    end subroutine build_tree
+    end subroutine update_zone_new
 
 end module create_subdomain
 
