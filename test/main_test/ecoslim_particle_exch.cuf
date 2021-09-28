@@ -1,5 +1,5 @@
 module exchange_particles
-    ! subroutine particle_exchange
+
     use thrust
     use cudafor
     use compact_array
@@ -23,19 +23,20 @@ module exchange_particles
     use variable_list, only: et_age_de,et_mass_de,et_comp_de,et_np_de
     use variable_list, only: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
     use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
-    use variable_list, only: pfdt,moldiff,denh2o,dtfrac
+    use variable_list, only: pfdt,moldiff,denh2o,dtfrac,kk
 
 contains
-    subroutine particle_exchange(nc5,rq4,status)
+    subroutine particle_exchange()
         use mpi
         implicit none
         integer:: i, j, ierr, status(MPI_STATUS_SIZE,t_rank)
         integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank), &
                   rq2(t_rank), rq3(t_rank), rq4(t_rank)
         integer:: left, right, nattri, sum_recv, sum_send
+        integer:: k,one=0
         ! integer:: ik, jk, status2(MPI_STATUS_SIZE)
-        ! integer:: d_indices_cpu(200),d_isValid_cpu(200)
-        ! integer,allocatable::holes_cpu(:)
+        integer:: d_indices_cpu(200000),d_isValid_cpu(200000)
+        integer,allocatable::holes_cpu(:)
         ! real(8):: P_cpu(19*4)
         ! we have to send and receive numbers first
         ! otherwise, when receive, we have to wait the receive of particle-number
@@ -59,13 +60,12 @@ contains
                     call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                         P_de(N_inte+1:N_inte+N_peri,13+2*nind),d_isValid,N_peri,i)
                     ! get d_isValid, set it 0 where the particle will be sent to neighbor i
+
                     call thrustscan(d_isValid,N_peri,d_indices)
                     ! do prefix-sum and get d_indices
+
                     N_send(nc1) = N_peri - d_indices(N_peri)
                     call MPI_ISEND(N_send(nc1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,rq1(nc1),ierr)
-
-                    ! write(10,'(3(a,i3,1x))') 'rank',rank,'ierr',ierr,'i',i
-                    ! write(10,*) 'N_send',N_send
 
                     ! each neighbor use different sending buffer, no wait
                     if(N_send(nc1) > 0) then ! gpu number
@@ -80,9 +80,6 @@ contains
                         right = sum(N_send(1:nc1))*nattri
                         call MPI_ISEND(P_send(left:right),N_send(nc1)*nattri, &
                             MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq3(nc3),ierr)
-                        ! write(10,'(3(a,1x,i3))') 'rank',rank,'ierr',ierr,'i',i
-                        ! P_cpu = P_send
-                        ! write(10,'(2000(19(f20.5,1x),/))') P_cpu
                         call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                             holes,d_indices,d_isValid,P_de,N_inte,N_peri)
                         N_peri = d_indices(N_peri); deallocate(holes)
@@ -90,6 +87,7 @@ contains
                 end if
             end do
             np_active = N_inte + N_peri
+
             !-----------------------------------------
             ! receive part.
             !-----------------------------------------
@@ -102,9 +100,6 @@ contains
             end do
             if(nc2 > 0) call MPI_WAITALL(nc2,rq2(1:nc2),status(:,1:nc2),ierr)
 
-            !write(10,'(3(a,i3,1x))') 'rank',rank,'ierr',ierr,'i',i
-            !write(10,*) 'N_recv',N_recv
-
             nc4 = 0; nc5 = 0
             do i = 0, t_rank-1
                 if(neigh_list(i+1) > 0) then
@@ -115,13 +110,9 @@ contains
                         right = sum(N_recv(1:nc4))*nattri
                         call MPI_IRECV(P_recv(left:right),N_recv(nc4)*nattri, &
                             MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq4(nc5),ierr)
-                        ! write(10,*) 'rank',rank,'ierr',ierr,'i',i
-                        ! P_cpu = P_recv
-                        ! write(10,'(2000(19(f20.5,1x),/))') P_cpu
                     end if
                 end if
             end do
-
             !-----------------------------------------
             ! interior particles
             call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
@@ -141,9 +132,6 @@ contains
             if(nc2 > 0) N_peri = N_peri + sum(N_recv)
             np_active = N_inte + N_peri
 
-            !P = P_de
-            !write(10,'(2000(19(f20.5,1x),/))') ((P(ik,jk),jk=1,nattri),ik=1,np_active)
-
             call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
                 P_de,dx,dy,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
                 mean_age_de,mean_comp_de,total_mass_de,np_active)
@@ -157,7 +145,6 @@ contains
             N_exit = np_active - d_indices(np_active)
 
             if(N_exit > 0) then
-
                 allocate(holes(N_exit),P_exit(N_exit,nattri))
                 ! P_exit has to be deallocated after the use in main
                 call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
@@ -165,20 +152,15 @@ contains
                 call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(&
                     holes,P_de,P_exit,N_exit)
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,d_indices,d_isValid,P_de,0,np_active)
+                    holes,d_indices,d_isValid,P_de,one,np_active)
                 ! update the slots after np_active
                 np_active = d_indices(np_active)
-
-                !write(10,*) 'N_exit',N_exit
-                !write(10,'(2000(19(f20.5,1x),/))') ((P_exit(ik,jk),jk=1,nattri),ik=1,N_exit)
-
                 deallocate(holes,P_exit)
 
             end if
             !-----------------------------------------
             !P = P_de
             !write(10,'(2000(19(f20.5,1x),/))') ((P(ik,jk),jk=1,nattri),ik=1,np_active)
-
         !close(10)
     end subroutine particle_exchange
 

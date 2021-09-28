@@ -133,7 +133,7 @@ module variable_list
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
     integer,allocatable,pinned:: N_recv(:) ! for each subdomain, it has the number of neighbors
     integer:: N_exit, N_peri, N_inte ! a scalar variable.
-    real(8),allocatable,managed:: P_exit(:,:)
+    real(8),allocatable,device:: P_exit(:,:)
     real(8),allocatable,device:: P_send(:),P_recv(:)
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.
@@ -214,9 +214,6 @@ module variable_list
     integer,allocatable,managed:: neigh_list(:)
     ! t_rank-1, and should be initilized at the very beginning
     integer,allocatable,managed:: neigh_listo(:), neigh_listn(:)
-
-    integer,allocatable:: status2(:,:), rq4(:)
-    integer:: nc5
 !-------------------------------------
 contains
     subroutine alloc_arrays_temp()
@@ -273,14 +270,14 @@ contains
     end subroutine alloc_arrays_temp
 
     subroutine alloc_arrays_const()
+
         implicit none
 
         reflect = .true.
         allocate(grid(t_rank,4),grid_old(ppx*qqy,4))
-        allocate(neigh_listn(t_rank),neigh_listo(t_rank))
+        ! allocate(neigh_listn(t_rank),neigh_listo(t_rank))
         allocate(neigh_list(t_rank),nump(t_rank))
         allocate(d_isValid(np),d_indices(np),h(np))
-        allocate(status2(MPI_STATUS_SIZE,t_rank),rq4(t_rank))
 
         allocate(out_np_cpu(1),ET_np_cpu(1))
         allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
