@@ -1,0 +1,35 @@
+module test_shared
+
+contains
+    attributes(global) subroutine P_add(P)
+        implicit none
+        real(8),intent(inout):: P(:,:)
+        integer,parameter:: tPB=256
+        real(8),shared:: P_s(tPB,19)
+        integer:: ii
+
+        ii = threadIdx%x
+        P_s(ii,:) = P(ii,:)
+        P_s(ii,8) = P_s(ii,8) + 1
+        P(ii,:) = P_s(ii,:)
+
+    end subroutine P_add
+end module test_shared
+
+program test_shared_main
+    use cudafor
+    use test_shared
+    implicit none
+    integer,parameter:: tPB=256
+    real(8),device:: P_de(tPB,19)
+    real(8):: P(tPB,19)
+
+    P_de = 2.d0
+    P = P_de
+    print *, 'before',P(1:10,8)
+
+    call P_add<<<1,tPB>>>(P_de)
+    P = P_de
+    print *, 'after',P(1:10,8)
+
+end program test_shared_main
