@@ -1,0 +1,40 @@
+module test_shared
+
+    real(8),allocatable,device:: P_de(:,:)
+contains
+    attributes(global) subroutine P_add()
+        implicit none
+        !real(8),intent(inout):: P(:,:)
+        integer,parameter:: tPB=64
+        real(8),shared:: P_s(tPB,tPB)
+        integer:: ii
+
+        ii = threadIdx%x
+        P_s(ii,:) = P_de(ii,:)
+        P_s(8,ii) = P_s(8,ii) + 1
+        P_de(ii,:) = P_s(ii,:)
+
+    end subroutine P_add
+end module test_shared
+
+program test_shared_main
+    use cudafor
+    use test_shared
+    implicit none
+    integer,parameter:: tPB=64
+    !real(8),allocatable,device:: P_de(:,:)
+!    real(8),device:: P_de(tPB,tPB)
+    real(8):: P(tPB,tPB)
+integer:: i
+    allocate(P_de(tPB,tPB))
+
+    P_de = 2.d0
+    P = P_de
+    print *, 'before',P(1:10,8)
+do i=1,1000
+    call P_add<<<1,tPB>>>()
+enddo    
+P = P_de
+    print *, 'after',P(1:10,8)
+
+end program test_shared_main
