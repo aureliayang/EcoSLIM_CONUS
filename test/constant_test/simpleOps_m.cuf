@@ -1,0 +1,43 @@
+module simpleOps_m
+    integer , constant :: b
+contains
+    attributes(global) subroutine increment(a)
+    implicit none
+    integer , intent(inout) :: a(:)
+    integer :: i
+
+    i = threadIdx%x
+    a(i) = a(i)+b
+    end subroutine increment
+end module simpleOps_m
+
+program incrementTest
+    use cudafor
+    use simpleOps_m
+    implicit none
+    integer , parameter :: n = 256
+    integer :: a(n)
+    integer , device :: a_d(n)
+    integer , allocatable , device :: b_d(:,:)
+    integer , allocatable :: b_d2(:,:)
+
+    a = 1
+    b = 3
+
+    allocate(b_d(b,b),b_d2(b,b))
+    b_d= 3
+
+    a_d = a
+    call increment <<<1,n>>>(a_d)
+    a = a_d
+
+    b_d2 = b_d
+    print *, b_d2
+
+    if (any(a /= 4)) then
+        write (*,*) '**** Program Failed **** '
+    else
+        write (*,*) 'Program Passed '
+    endif
+
+end program incrementTest
