@@ -11,7 +11,7 @@ module create_subdomain
 
     use variable_list, only: p_num, c_sum
     use variable_list, only: d_indices
-    use variable_list, only: nx, ny, ppx, qqy, tPB, rank, t_rank !,ierr, buff
+    use variable_list, only: nx, ny, ppx, qqy, tPB ! , rank, t_rank !,ierr, buff
     use variable_list, only: grid_old, grid
     ! grid is on each rank while grid_old is only on ppx*qqy
     use variable_list, only: Zonet_old, Zonet_new
@@ -27,7 +27,7 @@ contains
         ! n is the interval between father nodes
         ! nd is the interval between the new child node and its father node
 
-        use mpi
+        ! use mpi
         implicit none
         integer:: i, j, dir, nlev, n !,k,ii,jj
         integer:: max_dim, ndim1, ndim2 !, ierr

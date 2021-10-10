@@ -63,7 +63,8 @@ module variable_list
     CHARACTER(20),allocatable:: conc_header(:)
     ! name for variables written in the C array above.  Dimensioned as l above.
 
-    real(8):: dx, dy, pfdt
+    real(8),constant:: dx, dy, pfdt
+    real(8):: dx_c, dy_c, pfdt_c
 
     integer:: pft1, pft2, tout1, pfnt, n_cycle
     ! parflow start and stop file numbers number of ParFlow timesteps

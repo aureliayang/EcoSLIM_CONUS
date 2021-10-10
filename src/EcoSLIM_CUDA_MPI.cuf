@@ -147,13 +147,16 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
     ! have to do this here since the following read of dz
 
     ! read dx, dy as scalars
-    read(10,*) dx
-    read(10,*) dy
+    read(10,*) dx_c
+    dx = dx_c
+    read(10,*) dy_c
+    dy = dy_c
     ! read dz as an array
     read(10,*) dz(1:nz)
     ! dz2 = dz
     ! read in (constant for now) ParFlow dt
-    read(10,*) pfdt
+    read(10,*) pfdt_c
+    pfdt = pfdt_c
     ! read in parflow start and stop times
     read(10,*) pft1
     read(10,*) pft2
@@ -200,12 +203,12 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         ! wite out log file
         write(11,*)
         write(11,*) 'Grid Dimensions'
-        write(11,'(" dx:",e12.5)') dx
-        write(11,'(" dy:",e12.5)') dy
+        write(11,'(" dx:",e12.5)') dx_c
+        write(11,'(" dy:",e12.5)') dy_c
         write(11,'(" dz:",*(e12.5,", "))') dz(1:nz)
         write(11,*)
         write(11,*) 'Timestepping Information'
-        write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt
+        write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt_c
         write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
         write(11,'(" ParFlow start step, pft1:",i12)') pft1
         write(11,'(" ParFlow end step, pft2:",i12)') pft2
@@ -334,19 +337,20 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         np_active = 0
         pid = 0
         if (np_active + np_ic*nnx1*nny1*nz >= np ) then
-            write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
-            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            !write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
+            !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-            write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
-            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-
+            !write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
+            !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+            !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+            write(17,*) ' **Warning IC input but no paricles left'
+            write(17,*) ' **Exiting code gracefully writing restart'
             goto 9090
         endif
 
         call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
-        tPB >>> (P_de,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dx,dy,dz_de)
+        tPB >>> (P_de,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dz_de)
 
         np_active = np_ic*nnx1*nny1*nz
         pid = np_ic*nnx1*nny1*nz
@@ -361,17 +365,24 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         !close(10)
 
     ! keep the following output as it is. we can figure out a better way to handle them later.
-    call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh4,ierr)
+    !call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh4,ierr)
 
-    write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
-    call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+    !write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
+    !call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
 
-    write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
-                            ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered', new_line(' ')
-    call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+    !write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
+    !                        ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered', new_line(' ')
+    !call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
 
-    ! open exited particle file and write header
-    call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh3,ierr)
+    !! open exited particle file and write header
+    !call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh3,ierr)
+
+    open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
+    write(20,*) ' **** Transient Simulation Particle Accounting ****'
+    write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
+                            ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered'
+
+    open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin')
 
     if(rank == 0) then
 
@@ -509,7 +520,7 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
             if (np_active < np) then
 
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
-                    PET_balance_de,d_isValid,nnx1,nny1,nz,dx,dy,dz_de,pfdt,denh2o)
+                    PET_balance_de,d_isValid,nnx1,nny1,nz,dz_de,denh2o)
                 ! d_isValid has the length as P or of np which is assigned in input script
                 ! so nnx1*nny1*nz should be smaller than np
                 ! we don't care about the buffer zone for add of particles
@@ -521,19 +532,21 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
                 i_added_particles = d_indices(nnx1*nny1) * iflux_p_res ! should be legal?
                 if(np_active + i_added_particles >= np) then
-                    write(message,'(A,A)') ' **Warning rainfall input but no paricles left', new_line(' ')
-                    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+                    !write(message,'(A,A)') ' **Warning rainfall input but no paricles left', new_line(' ')
+                    !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                    !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
-                    write(message,'(A,A)') ' **Exiting code gracefully writing restart', new_line(' ')
-                    call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+                    !write(message,'(A,A)') ' **Exiting code gracefully writing restart', new_line(' ')
+                    !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
+                    !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+                    write(17,*) ' **Warning rainfall input but no paricles left'
+                    write(17,*) ' **Exiting code gracefully writing restart'
                     goto 9090
                 endif
 
                 call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
                     tPB >>> (d_indices,P_de,iflux_p_res,np_active,pid,nind, &
-                    nnx1,nny1,nz,ix1,iy1,dx,dy,dz_de,pfdt,denh2o,kk,tout1)
+                    nnx1,nny1,nz,ix1,iy1,dz_de,denh2o,kk,tout1)
 
                 np_active = np_active + i_added_particles
                 pid = pid + i_added_particles
@@ -551,7 +564,7 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
 
         call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
-            P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1,dx,dy)
+            P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
         call thrustscan(d_isValid,np_active,d_indices)
         N_peri = np_active - d_indices(np_active)
         allocate(holes(N_peri))
@@ -579,7 +592,7 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
             et_age_de,et_mass_de,et_comp_de,et_np_de, &
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-            dx,dy,pfdt,moldiff,denh2o,dtfrac,N_inte,N_peri, &
+            moldiff,denh2o,dtfrac,N_inte,N_peri, &
             nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
 
             !open(10,file='P_peri.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
@@ -600,15 +613,23 @@ real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
         PET_balance = PET_balance_de
         ET_np_cpu   = ET_np_de
         out_np_cpu  = out_np_de
-        write(message,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12),a)') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
+        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
                                                       mean_mass,total_mass,PET_balance(1), &
                                                       PET_balance(2),i_added_particles,ET_np_cpu(1), &
                                                       Out_np_cpu(1),np_active,N_peri,N_inte,N_exit, &
-                                                      sum(N_send),sum(N_recv),new_line(' ')
-        call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+                                                      sum(N_send),sum(N_recv)
+        !call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
 
     end do
     9090 continue
+
+    flush(13);close(13)
+    flush(15);close(15)
+    flush(16);close(16)
+    flush(17);close(17)
+    flush(18);close(18)
+    flush(19);close(19)
+    flush(20);close(20)
 
     ! call close_hdf5_interface()
     call MPI_FINALIZE(ierr)
