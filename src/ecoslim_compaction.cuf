@@ -138,7 +138,7 @@ contains
         !np_active is numElements
         !holes is a temporary array that just needs dynamic allocation on cpu
         integer:: ii, ii2, temp1, temp2   !global index in the array
-        integer,value:: offset, numElements, rank
+        integer,value:: offset, numElements
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 

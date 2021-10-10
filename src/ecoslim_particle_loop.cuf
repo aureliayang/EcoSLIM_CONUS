@@ -7,16 +7,16 @@ module particle_loop
     use mrand, only: h
     use variable_list, only: EvapTrans_de,Saturation_de,Porosity_de
     use variable_list, only: Zone_de,Ind_de,C_de,Vx_de,Vy_de,Vz_de
+    use variable_list, only: dx, dy, pfdt
 
 contains
     attributes(global) subroutine particles_separation(P,d_isValid, &
-        xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1,dx,dy)
+        xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
         implicit none
         real(8),intent(inout):: P(:,:)
         integer,intent(out):: d_isValid(:)
         real(8),value:: xmin3,ymin3,xmax3,ymax3
         integer,value:: np_active,ix1,iy1
-        real(8),value:: dx,dy
         integer:: ii
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
@@ -42,7 +42,7 @@ contains
         et_age,et_mass,et_comp,et_np, &
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
-        dx,dy,pfdt,moldiff,denh2o,dtfrac,offset,np_active, &
+        moldiff,denh2o,dtfrac,offset,np_active, &
         nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
 
         implicit none
@@ -55,7 +55,7 @@ contains
 
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
-        real(8),value:: dx,dy,pfdt,moldiff,denh2o,dtfrac
+        real(8),value:: moldiff,denh2o,dtfrac
         integer,value:: np_active,nind,ix1,iy1,nnx1,nny1,nz
         integer,value:: offset,rank
         logical,value:: reflect
@@ -335,7 +335,7 @@ contains
 
     end subroutine particles_independent
 
-    attributes(global) subroutine Update_C_Array(P,dx,dy,dz,nz,ix1,iy1, &
+    attributes(global) subroutine Update_C_Array(P,dz,nz,ix1,iy1, &
         nnx1,nny1,buff,mean_age,mean_comp,total_mass,np_active)
 
         implicit none
@@ -343,7 +343,6 @@ contains
         real(8),intent(in):: dz(:)
         real(8),intent(inout):: mean_age(:),total_mass(:),mean_comp(:)
         integer,value:: nnx1,nny1,nz,ix1,iy1,buff,np_active
-        real(8),value:: dx,dy
         integer:: Ploc(3), ii, k
         real(8):: one, Z, temp
 
