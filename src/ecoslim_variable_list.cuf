@@ -121,6 +121,8 @@ module variable_list
 
     real(8):: Total_time1, Total_time2, t1, t2
     real(8):: sort_time, IO_time_read, IO_time_write, parallel_time
+    real(8):: h2d_time, d2h_time, add_time
+    real:: transfer_time, inte_time, exit_time, C_time
     ! integers for writing C or point based output
 
     integer,parameter:: tPB = 256 ! block size, is it the larger the better?
