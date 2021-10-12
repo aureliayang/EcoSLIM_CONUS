@@ -16,7 +16,7 @@ CUF=ecoslim_thrustscan.o \
 all: test
 
 test: ecoslim_cthrustscan.o ${CUF}
-	mpif90 -o $@ $^ -lstdc++
+	mpif90 -o $@ $^ -Mpreprocess -DTIMING -lstdc++
 
 ecoslim_cthrustscan.o: ecoslim_cthrustscan.cu
 	nvcc -c $^ -o $@ -std=c++14
@@ -42,7 +42,7 @@ ecoslim_particle_loop.o: ecoslim_particle_loop.cuf ecoslim_cuRAND_de.o ecoslim_v
 	mpif90 -c $< -o $@
 ecoslim_particle_exch.o: ecoslim_particle_exch.cuf ecoslim_particle_loop.o \
 	ecoslim_cuRAND_de.o ecoslim_variable_list.o
-	mpif90 -c $< -o $@
+	mpif90 -c $< -o $@ -Mpreprocess -DTIMING
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
 

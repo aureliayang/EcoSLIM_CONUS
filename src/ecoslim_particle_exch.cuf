@@ -24,6 +24,7 @@ module exchange_particles
     use variable_list, only: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
     use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
     use variable_list, only: pfdt,moldiff,denh2o,dtfrac,kk
+    use variable_list, only: transfer_time, inte_time, exit_time, C_time
 
 contains
     subroutine particle_exchange()
@@ -33,10 +34,15 @@ contains
         integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank), &
                   rq2(t_rank), rq3(t_rank), rq4(t_rank)
         integer:: left, right, nattri, sum_recv, sum_send
-        integer:: k,one=0
+
+        type(cudaEvent):: startEvent, stopEvent
+        integer:: istat, temp
+        real:: transfer_time_step, inte_time_step, exit_time_step, C_time_step
+
+        integer:: k, one = 0
         ! integer:: ik, jk, status2(MPI_STATUS_SIZE)
         integer:: d_indices_cpu(200000),d_isValid_cpu(200000)
-        integer,allocatable::holes_cpu(:)
+        integer,allocatable:: holes_cpu(:)
         ! real(8):: P_cpu(19*4)
         ! we have to send and receive numbers first
         ! otherwise, when receive, we have to wait the receive of particle-number
@@ -49,6 +55,12 @@ contains
         ! is repeatedly used, so we can't get the number of all neighbors at one time.
 
         !open(10,file='Send_Recv.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
+            #ifdef TIMING
+            istat = cudaEventCreate(startEvent)
+            istat = cudaEventCreate(stopEvent)
+
+            istat = cudaEventRecord(startEvent,0)
+            #endif
 
             nattri = 17 + 2*nind
             N_send = 0; N_recv = 0
@@ -63,8 +75,8 @@ contains
 
                     call thrustscan(d_isValid,N_peri,d_indices)
                     ! do prefix-sum and get d_indices
-
-                    N_send(nc1) = N_peri - d_indices(N_peri)
+                    temp = d_indices(N_peri)
+                    N_send(nc1) = N_peri - temp
                     call MPI_ISEND(N_send(nc1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,rq1(nc1),ierr)
 
                     ! each neighbor use different sending buffer, no wait
@@ -114,6 +126,14 @@ contains
                 end if
             end do
             !-----------------------------------------
+            #ifdef TIMING
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(transfer_time_step,startEvent,stopEvent)
+            transfer_time = transfer_time + transfer_time_step
+
+            istat = cudaEventRecord(startEvent,0)
+            #endif
             ! interior particles
             call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
                 P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
@@ -122,6 +142,13 @@ contains
                 xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
                 moldiff,denh2o,dtfrac,0,N_inte, &
                 nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+
+            #ifdef TIMING
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(inte_time_step,startEvent,stopEvent)
+            inte_time = inte_time + inte_time_step
+            #endif
 
             if(nc2 > 0) sum_recv = sum(N_recv)
             if(nc5 > 0) then
@@ -132,9 +159,23 @@ contains
             if(nc2 > 0) N_peri = N_peri + sum(N_recv)
             np_active = N_inte + N_peri
 
+            #ifdef TIMING
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+
             call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
                 P_de,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
                 mean_age_de,mean_comp_de,total_mass_de,np_active)
+
+            #ifdef TIMING
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(C_time_step,startEvent,stopEvent)
+            C_time = C_time + C_time_step
+
+            !-----------------------------------------
+            istat = cudaEventRecord(startEvent,0)
+            #endif
 
             ! then separate inactive particles
             call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
@@ -142,7 +183,8 @@ contains
             call thrustscan(d_isValid,np_active,d_indices)
             ! active and ET-inactive particles in overlap zone are sent
             ! out of domain, all outfolw-inactive, received ET-inactive are scanned here
-            N_exit = np_active - d_indices(np_active)
+            temp = d_indices(np_active)
+            N_exit = np_active - temp
 
             if(N_exit > 0) then
                 allocate(holes(N_exit),P_exit(N_exit,nattri))
@@ -152,13 +194,23 @@ contains
                 call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(&
                     holes,P_de,P_exit,N_exit)
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,d_indices,d_isValid,P_de,one,np_active)
+                    holes,d_indices,d_isValid,P_de,0,np_active)
                 ! update the slots after np_active
                 np_active = d_indices(np_active)
                 deallocate(holes,P_exit)
 
             end if
+
+            #ifdef TIMING
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(exit_time_step,startEvent,stopEvent)
+            exit_time = exit_time + exit_time_step
+
             !-----------------------------------------
+            istat = cudaEventDestroy(startEvent)
+            istat = cudaEventDestroy(stopEvent)
+            #endif
             !P = P_de
             !write(10,'(2000(19(f20.5,1x),/))') ((P(ik,jk),jk=1,nattri),ik=1,np_active)
         !close(10)
