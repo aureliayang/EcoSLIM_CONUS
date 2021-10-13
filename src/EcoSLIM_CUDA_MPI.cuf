@@ -301,13 +301,13 @@ real:: peri_time,peri_time_step
 
             open(10,file='Zone_de_after.'//trim(adjustl(ranknum))//'.txt')
                 if(rank == 0) &
-                    write(10,'(22(22(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                    write(10,'(462(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
                 if(rank == 1) &
-                    write(10,'(23(22(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                    write(10,'(463(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
                 if(rank == 2) &
-                    write(10,'(22(23(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
                 if(rank == 3) &
-                    write(10,'(23(23(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
             close(10)
 
     end if
@@ -435,6 +435,16 @@ real:: peri_time,peri_time_step
     ! Intialize cuRand device API and this part need to check through again.
     call createRand_loop<<< ceiling(dble(np)/tPB),tPB >>>(np, rank, pfnt)
 
+    #if _TEXTURE == 1
+    EvapTrans_T => EvapTrans_de
+    Saturation_T => Saturation_de
+    Porosity_T => Porosity_de
+    Vx_T => Vx_de
+    Vy_T => Vy_de
+    Vz_T => Vz_de
+    Ind_T => Ind_de
+    dz_T => dz_de
+    #endif
 !--------------------------------------------------------------------
     pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1    ! outkk is tout1+1
 
@@ -445,7 +455,7 @@ real:: peri_time,peri_time_step
 
         ! adjust the file counters
         pfkk = pfkk + 1
-        #ifdef TIMING
+        #if _TIMING == 1
         t1 = mpi_wtime()
         #endif
 
@@ -508,7 +518,7 @@ real:: peri_time,peri_time_step
             end if
         end if
 
-        #ifdef TIMING
+        #if _TIMING == 1
         t2 = mpi_wtime()
         IO_time_read = IO_time_read + t2 - t1
         #endif
@@ -518,7 +528,7 @@ real:: peri_time,peri_time_step
         Vy = Vy * V_mult
         Vz = Vz * V_mult
 
-        #ifdef TIMING
+        #if _TIMING == 1
         t1 = mpi_wtime()
         #endif
 
@@ -550,26 +560,26 @@ real:: peri_time,peri_time_step
         ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
         ! the following adding of particles.
 
-        #ifdef TIMING
+        #if _TIMING == 1
         t2 = mpi_wtime()
         h2d_time = h2d_time + t2 - t1
         #endif
 !----------------------------------------
-        #ifdef TIMING
+        #if _TIMING == 1
         t1 = mpi_wtime()
         #endif
 
         if (clmtrans) then
             if (np_active < np) then
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(startEvent,0)
                 !#endif
 
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
                     PET_balance_de,d_isValid,nnx1,nny1,nz,dz_de,denh2o)
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(stopEvent,0)
                 !istat = cudaEventSynchronize(stopEvent)
                 !istat = cudaEventElapsedTime(scan_time_step,startEvent,stopEvent)
@@ -582,27 +592,27 @@ real:: peri_time,peri_time_step
                 ! nnx1, nnx2 etc. subdomain info can be put in its own module. Then use module
                 ! in main program and pass arguments to other subroutines.
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(startEvent,0)
                 !#endif
 
                 ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
                 call thrustscan(d_isValid,nnx1*nny1,d_indices)
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(stopEvent,0)
                 !istat = cudaEventSynchronize(stopEvent)
                 !istat = cudaEventElapsedTime(thrust_time_step,startEvent,stopEvent)
                 !thrust_time = thrust_time + thrust_time_step
                 !#endif
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(startEvent,0)
                 !#endif
                 temp = d_indices(nnx1*nny1)
                 i_added_particles = temp * iflux_p_res ! should be legal?
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(stopEvent,0)
                 !istat = cudaEventSynchronize(stopEvent)
                 !istat = cudaEventElapsedTime(copy_time_step,startEvent,stopEvent)
@@ -622,7 +632,7 @@ real:: peri_time,peri_time_step
                     goto 9090
                 endif
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(startEvent,0)
                 !#endif
 
@@ -630,7 +640,7 @@ real:: peri_time,peri_time_step
                     tPB >>> (d_indices,P_de,iflux_p_res,np_active,pid,nind, &
                     nnx1,nny1,nz,ix1,iy1,dz_de,denh2o,kk,tout1)
 
-                !#ifdef TIMING
+                !#ifdef _TIMING
                 !istat = cudaEventRecord(stopEvent,0)
                 !istat = cudaEventSynchronize(stopEvent)
                 !istat = cudaEventElapsedTime(add2_time_step,startEvent,stopEvent)
@@ -652,12 +662,12 @@ real:: peri_time,peri_time_step
 
         call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
 
-        #ifdef TIMING
+        #if _TIMING == 1
         t2 = mpi_wtime()
         add_time = add_time + t2 - t1
         #endif
 
-        #ifdef TIMING
+        #if _TIMING == 1
         t1 = mpi_wtime()
         #endif
         call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
@@ -690,15 +700,24 @@ real:: peri_time,peri_time_step
             !    P = P_de
             !    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
             !close(10)
-        #ifdef TIMING
+        #if _TIMING == 1
         t2 = mpi_wtime()
         sort_time = sort_time + t2 - t1
         #endif
 
-        #ifdef TIMING
+        #if _TIMING == 1
         istat = cudaEventRecord(startEvent,0)
         #endif
         ! peripheric particles
+        #if _TEXTURE == 1
+        call particles_independent_T<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
+            P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+            et_age_de,et_mass_de,et_comp_de,et_np_de, &
+            xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+            xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
+            moldiff,denh2o,dtfrac,N_inte,N_peri, &
+            nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+        #else
         call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
             P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
             et_age_de,et_mass_de,et_comp_de,et_np_de, &
@@ -706,7 +725,9 @@ real:: peri_time,peri_time_step
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
             moldiff,denh2o,dtfrac,N_inte,N_peri, &
             nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
-        #ifdef TIMING
+        #endif
+
+        #if _TIMING == 1
         istat = cudaEventRecord(stopEvent,0)
         istat = cudaEventSynchronize(stopEvent)
         istat = cudaEventElapsedTime(peri_time_step,startEvent,stopEvent)
@@ -739,6 +760,11 @@ real:: peri_time,peri_time_step
 
     end do
     9090 continue
+
+    #if _TEXTURE == 1
+    nullify(EvapTrans_T,Saturation_T,Porosity_T)
+    nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
+    #endif
 
     istat = cudaEventDestroy(startEvent)
     istat = cudaEventDestroy(stopEvent)
