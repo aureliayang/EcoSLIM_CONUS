@@ -71,7 +71,16 @@ contains
             ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
 
             open(17,file='Load_info.'//trim(adjustl(ranknum))//'.txt')
-            write(17,*)
+            #if _TIMING == 1
+            write(17,*) 'TIMING defined'
+            #else
+            write(17,*) 'TIMING not defined'
+            #endif
+            #if _TEXTURE == 1
+            write(17,*) 'TEXTURE defined'
+            #else
+            write(17,*) 'TEXTURE not defined'
+            #endif
             write(17,*) '## Domain Info'
             write(17,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
             write(17,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax

@@ -55,7 +55,7 @@ contains
         ! is repeatedly used, so we can't get the number of all neighbors at one time.
 
         !open(10,file='Send_Recv.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-            #ifdef TIMING
+            #if _TIMING == 1
             istat = cudaEventCreate(startEvent)
             istat = cudaEventCreate(stopEvent)
 
@@ -126,7 +126,7 @@ contains
                 end if
             end do
             !-----------------------------------------
-            #ifdef TIMING
+            #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(transfer_time_step,startEvent,stopEvent)
@@ -135,6 +135,15 @@ contains
             istat = cudaEventRecord(startEvent,0)
             #endif
             ! interior particles
+            #if _TEXTURE == 1
+                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                moldiff,denh2o,dtfrac,0,N_inte, &
+                nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            #else
             call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
                 P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
                 et_age_de,et_mass_de,et_comp_de,et_np_de, &
@@ -142,8 +151,9 @@ contains
                 xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
                 moldiff,denh2o,dtfrac,0,N_inte, &
                 nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            #endif
 
-            #ifdef TIMING
+            #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(inte_time_step,startEvent,stopEvent)
@@ -159,7 +169,7 @@ contains
             if(nc2 > 0) N_peri = N_peri + sum(N_recv)
             np_active = N_inte + N_peri
 
-            #ifdef TIMING
+            #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif
 
@@ -167,7 +177,7 @@ contains
                 P_de,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
                 mean_age_de,mean_comp_de,total_mass_de,np_active)
 
-            #ifdef TIMING
+            #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(C_time_step,startEvent,stopEvent)
@@ -201,7 +211,7 @@ contains
 
             end if
 
-            #ifdef TIMING
+            #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(exit_time_step,startEvent,stopEvent)
