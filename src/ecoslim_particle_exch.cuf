@@ -136,13 +136,23 @@ contains
             #endif
             ! interior particles
             #if _TEXTURE == 1
-                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+            #if _SHARED == 1
+            call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB,tPB*(13+nind*2)*8>>> ( &
                 P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
                 et_age_de,et_mass_de,et_comp_de,et_np_de, &
                 xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
                 xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
                 moldiff,denh2o,dtfrac,0,N_inte, &
                 nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            #else
+            call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                moldiff,denh2o,dtfrac,0,N_inte, &
+                nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            #endif
             #else
             call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
                 P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
