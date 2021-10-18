@@ -91,6 +91,7 @@ contains
             write(17,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
             write(17,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
             write(17,'("Zmin:",e12.5," Zmax:",e12.5)') Zgmin, Zgmax
+            write(17,*)
 
     end subroutine global_xyz
 
