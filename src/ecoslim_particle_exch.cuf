@@ -25,6 +25,7 @@ module exchange_particles
     use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
     use variable_list, only: pfdt,moldiff,denh2o,dtfrac,kk
     use variable_list, only: transfer_time, inte_time, exit_time, C_time
+    use variable_list, only: startEvent, stopEvent
 
 contains
     subroutine particle_exchange()
@@ -35,9 +36,7 @@ contains
                   rq2(t_rank), rq3(t_rank), rq4(t_rank)
         integer:: left, right, nattri, sum_recv, sum_send
 
-        type(cudaEvent):: startEvent, stopEvent
         integer:: istat, temp
-        real:: transfer_time_step, inte_time_step, exit_time_step, C_time_step
 
         integer:: k, one = 0
         ! integer:: ik, jk, status2(MPI_STATUS_SIZE)
@@ -55,10 +54,6 @@ contains
         ! is repeatedly used, so we can't get the number of all neighbors at one time.
 
         !open(10,file='Send_Recv.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-            #if _TIMING == 1
-            istat = cudaEventCreate(startEvent)
-            istat = cudaEventCreate(stopEvent)
-            #endif
 
             nattri = 17 + 2*nind
             if(transfer > 0) then
@@ -131,8 +126,7 @@ contains
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(transfer_time_step,startEvent,stopEvent)
-            transfer_time = transfer_time + transfer_time_step
+            istat = cudaEventElapsedTime(transfer_time,startEvent,stopEvent)
             #endif
             !-----------------------------------------
             #if _TIMING == 1
@@ -170,8 +164,7 @@ contains
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(inte_time_step,startEvent,stopEvent)
-            inte_time = inte_time + inte_time_step
+            istat = cudaEventElapsedTime(inte_time,startEvent,stopEvent)
             #endif
 
             !-----------------------------------------
@@ -198,8 +191,7 @@ contains
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(C_time_step,startEvent,stopEvent)
-            C_time = C_time + C_time_step
+            istat = cudaEventElapsedTime(C_time,startEvent,stopEvent)
             #endif
 
             !-----------------------------------------
@@ -233,16 +225,10 @@ contains
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(exit_time_step,startEvent,stopEvent)
-            exit_time = exit_time + exit_time_step
+            istat = cudaEventElapsedTime(exit_time,startEvent,stopEvent)
             #endif
 
             !-----------------------------------------
-            #if _TIMING == 1
-            istat = cudaEventDestroy(startEvent)
-            istat = cudaEventDestroy(stopEvent)
-            #endif
-
             !P = P_de
             !write(10,'(2000(19(f20.5,1x),/))') ((P(ik,jk),jk=1,nattri),ik=1,np_active)
         !close(10)

@@ -39,9 +39,7 @@ implicit none
 real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
 real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
 real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
-type(cudaEvent):: startEvent,stopEvent
 integer:: istat, temp
-real:: peri_time,peri_time_step
 !real:: scan_time,scan_time_step
 !real:: thrust_time,thrust_time_step
 !real:: copy_time,copy_time_step
@@ -75,13 +73,16 @@ real:: peri_time,peri_time_step
     Total_time2 = 0.d0
     t1 = 0.d0
     t2 = 0.d0
-    IO_time_read = 0.d0
+
     IO_time_write = 0.d0
     parallel_time = 0.d0
-    sort_time = 0.d0
-    h2d_time = 0.d0
-    d2h_time = 0.d0
-    add_time = 0.d0
+
+    IO_time_read = 0.
+    h2d_time = 0.
+    d2h_time = 0.
+    add_time = 0.
+
+    sort_time = 0.
     peri_time= 0.
     transfer_time= 0.
     inte_time= 0.
@@ -457,7 +458,7 @@ real:: peri_time,peri_time_step
         ! adjust the file counters
         pfkk = pfkk + 1
         #if _TIMING == 1
-        t1 = mpi_wtime()
+        istat = cudaEventRecord(startEvent,0)
         #endif
 
         ! Read the velocities computed by ParFlow
@@ -520,8 +521,9 @@ real:: peri_time,peri_time_step
         end if
 
         #if _TIMING == 1
-        t2 = mpi_wtime()
-        IO_time_read = IO_time_read + t2 - t1
+        istat = cudaEventRecord(stopEvent,0)
+        istat = cudaEventSynchronize(stopEvent)
+        istat = cudaEventElapsedTime(IO_time_read,startEvent,stopEvent)
         #endif
 
         ! Determine whether to perform forward or backward patricle tracking
@@ -530,7 +532,7 @@ real:: peri_time,peri_time_step
         Vz = Vz * V_mult
 
         #if _TIMING == 1
-        t1 = mpi_wtime()
+        istat = cudaEventRecord(startEvent,0)
         #endif
 
         Vx_de = Vx
@@ -562,12 +564,13 @@ real:: peri_time,peri_time_step
         ! the following adding of particles.
 
         #if _TIMING == 1
-        t2 = mpi_wtime()
-        h2d_time = h2d_time + t2 - t1
+        istat = cudaEventRecord(stopEvent,0)
+        istat = cudaEventSynchronize(stopEvent)
+        istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
         #endif
 !----------------------------------------
         #if _TIMING == 1
-        t1 = mpi_wtime()
+        istat = cudaEventRecord(startEvent,0)
         #endif
 
         if (clmtrans) then
@@ -664,51 +667,46 @@ real:: peri_time,peri_time_step
         call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
 
         #if _TIMING == 1
-        t2 = mpi_wtime()
-        add_time = add_time + t2 - t1
+        istat = cudaEventRecord(stopEvent,0)
+        istat = cudaEventSynchronize(stopEvent)
+        istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
         #endif
 
         if(transfer > 0) then
-        #if _TIMING == 1
-        t1 = mpi_wtime()
-        #endif
-        call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
-            P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
-        call thrustscan(d_isValid,np_active,d_indices)
-        temp = d_indices(np_active)
-        N_peri = np_active - temp
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+            call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
+                P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
+            call thrustscan(d_isValid,np_active,d_indices)
+            temp = d_indices(np_active)
+            N_peri = np_active - temp
 
-        if(np_active + N_peri >= np) then
-            write(17,*) ' **Warning particles separation out of bound'
-            write(17,*) ' **Exiting code gracefully writing restart'
-            goto 9090
-        endif
+            if(np_active + N_peri >= np) then
+                write(17,*) ' **Warning particles separation out of bound'
+                write(17,*) ' **Exiting code gracefully writing restart'
+                goto 9090
+            endif
 
-        allocate(holes(N_peri))
-        call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-            holes,d_indices,d_isValid,np_active)
-        call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-            holes,P_de,np_active,N_peri)
-        call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-            holes,d_indices,d_isValid,P_de,0,np_active)
-        N_inte = d_indices(np_active); deallocate(holes)
-        call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-            P_de,N_inte,N_peri)
+            allocate(holes(N_peri))
+            call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                holes,d_indices,d_isValid,np_active)
+            call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                holes,P_de,np_active,N_peri)
+            call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                holes,d_indices,d_isValid,P_de,0,np_active)
+            N_inte = d_indices(np_active); deallocate(holes)
+            call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                P_de,N_inte,N_peri)
 
-            !open(10,file='P_separa.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-            !    write(10,*) 'rank',rank,N_peri,N_inte
-            !    write(10,*) np_active
-            !    write(10,*) pid
-            !    P = P_de
-            !    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
-            !close(10)
-        #if _TIMING == 1
-        t2 = mpi_wtime()
-        sort_time = sort_time + t2 - t1
-        #endif
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time,startEvent,stopEvent)
+            #endif
         else
-        N_peri = np_active
-        N_inte = 0
+            N_peri = np_active
+            N_inte = 0
         endif
 
         #if _TIMING == 1
@@ -746,15 +744,8 @@ real:: peri_time,peri_time_step
         #if _TIMING == 1
         istat = cudaEventRecord(stopEvent,0)
         istat = cudaEventSynchronize(stopEvent)
-        istat = cudaEventElapsedTime(peri_time_step,startEvent,stopEvent)
-        peri_time = peri_time + peri_time_step
+        istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
         #endif
-            !open(10,file='P_peri.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-            !    write(10,*) np_active
-            !    write(10,*) pid
-            !    P = P_de
-            !    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
-            !close(10)
 
         call particle_exchange()
 
@@ -772,7 +763,8 @@ real:: peri_time,peri_time_step
                                                       PET_balance(2),i_added_particles,ET_np_cpu(1), &
                                                       Out_np_cpu(1),np_active,N_peri,N_inte,N_exit, &
                                                       sum(N_send),sum(N_recv)
-        !call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
+        write(17,'(3(i8),9(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,add_time,sort_time, &
+                                            peri_time,transfer_time,inte_time,C_time,exit_time
 
     end do
     9090 continue
@@ -790,15 +782,15 @@ real:: peri_time,peri_time_step
     write(17,*)
     write(17,*) 'Simulation Timing and Profiling:'
     !Write(17,'("Total Execution Time (s):",e12.5)') float(Total_time2-Total_time1)/1000.
-    write(17,'("File IO Time Read (s):",e12.5)') IO_time_read
-    write(17,'("Host to device data transfer (s):",e12.5)') h2d_time
-    write(17,'("Add new particles (s):",e12.5)') add_time
-    write(17,'("Peripheric particles (s):",e12.5)') peri_time/1000.
-    write(17,'("Interior particles (s):",e12.5)') inte_time/1000.
-    write(17,'("Update C array (s):",e12.5)') C_time/1000.
-    write(17,'("Exit particles (s):",e12.5)') exit_time/1000.
-    write(17,'("Particles separation (s):",e12.5)') sort_time
-    write(17,'("Transfer particles (s):",e12.5)') transfer_time/1000.
+    !write(17,'("File IO Time Read (s):",e12.5)') IO_time_read
+    !write(17,'("Host to device data transfer (s):",e12.5)') h2d_time
+    !write(17,'("Add new particles (s):",e12.5)') add_time
+    !write(17,'("Peripheric particles (s):",e12.5)') peri_time/1000.
+    !write(17,'("Interior particles (s):",e12.5)') inte_time/1000.
+    !write(17,'("Update C array (s):",e12.5)') C_time/1000.
+    !write(17,'("Exit particles (s):",e12.5)') exit_time/1000.
+    !write(17,'("Particles separation (s):",e12.5)') sort_time
+    !write(17,'("Transfer particles (s):",e12.5)') transfer_time/1000.
     !write(17,'("scan (s):",e12.5)') scan_time/1000.
     !write(17,'("thrust (s):",e12.5)') thrust_time/1000.
     !write(17,'("copy (s):",e12.5)') copy_time/1000.
@@ -820,3 +812,17 @@ real:: peri_time,peri_time_step
 
 end program EcoSLIM
 
+!open(10,file='P_separa.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
+!    write(10,*) 'rank',rank,N_peri,N_inte
+!    write(10,*) np_active
+!    write(10,*) pid
+!    P = P_de
+!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+!close(10)
+
+!open(10,file='P_peri.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
+!    write(10,*) np_active
+!    write(10,*) pid
+!    P = P_de
+!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+!close(10)

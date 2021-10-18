@@ -81,6 +81,12 @@ contains
             #else
             write(17,*) 'TEXTURE not defined'
             #endif
+            #if _SHARED == 1
+            write(17,*) 'SHARED defined'
+            #else
+            write(17,*) 'SHARED not defined'
+            #endif
+            write(17,*)
             write(17,*) '## Domain Info'
             write(17,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
             write(17,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
