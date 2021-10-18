@@ -95,6 +95,9 @@ integer:: istat, temp
 
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
+    #if _TIMING == 1
+    t1 = mpi_wtime()
+    #endif
 !--------------------------------------------------------------------
     ! Read inputs, set up domain, write the log file
     ! open SLIM input .txt file
@@ -657,13 +660,6 @@ integer:: istat, temp
             end if
         end if
 
-            !open(10,file='P_new.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-            !    write(10,*) np_active
-            !    write(10,*) pid
-            !    P = P_de
-            !    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
-            !close(10)
-
         call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
 
         #if _TIMING == 1
@@ -774,6 +770,9 @@ integer:: istat, temp
     nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
     #endif
 
+    #if _TIMING == 1
+    t2 = mpi_wtime()
+    #endif
     istat = cudaEventDestroy(startEvent)
     istat = cudaEventDestroy(stopEvent)
 
@@ -781,7 +780,7 @@ integer:: istat, temp
     write(17,*) '###  Execution Finished'
     write(17,*)
     write(17,*) 'Simulation Timing and Profiling:'
-    !Write(17,'("Total Execution Time (s):",e12.5)') float(Total_time2-Total_time1)/1000.
+    write(17,'("Total Execution Time (s):",e12.5)') t2 - t1
     !write(17,'("File IO Time Read (s):",e12.5)') IO_time_read
     !write(17,'("Host to device data transfer (s):",e12.5)') h2d_time
     !write(17,'("Add new particles (s):",e12.5)') add_time
@@ -811,6 +810,13 @@ integer:: istat, temp
     call MPI_FINALIZE(ierr)
 
 end program EcoSLIM
+
+!open(10,file='P_new.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
+!    write(10,*) np_active
+!    write(10,*) pid
+!    P = P_de
+!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+!close(10)
 
 !open(10,file='P_separa.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
 !    write(10,*) 'rank',rank,N_peri,N_inte
