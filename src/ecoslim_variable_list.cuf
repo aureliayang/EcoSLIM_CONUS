@@ -168,6 +168,7 @@ module variable_list
     integer:: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
     integer,allocatable:: nump(:) ! gather active particles to jusdge if DDC
     integer:: decom = 0
+    integer:: transfer
 
 !-------------------------------------
     ! GPU variables

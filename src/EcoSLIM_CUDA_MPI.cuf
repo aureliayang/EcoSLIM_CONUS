@@ -132,6 +132,7 @@ real:: peri_time,peri_time_step
     read(10,*) nCLMsoil
     read(10,*) ppx
     read(10,*) qqy
+    read(10,*) transfer
     ! read in number of particles for IC (if np_ic = -1 then restart from a file)
     read(10,*) np_ic
 
@@ -667,6 +668,7 @@ real:: peri_time,peri_time_step
         add_time = add_time + t2 - t1
         #endif
 
+        if(transfer > 0) then
         #if _TIMING == 1
         t1 = mpi_wtime()
         #endif
@@ -704,6 +706,10 @@ real:: peri_time,peri_time_step
         t2 = mpi_wtime()
         sort_time = sort_time + t2 - t1
         #endif
+        else
+        N_peri = np_active
+        N_inte = 0
+        endif
 
         #if _TIMING == 1
         istat = cudaEventRecord(startEvent,0)
@@ -717,7 +723,7 @@ real:: peri_time,peri_time_step
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
             moldiff,denh2o,dtfrac,N_inte,N_peri, &
-            nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            nind,ix1,iy1,nz,reflect,rank)
         #else
         call particles_independent_T<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
             P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
@@ -725,7 +731,7 @@ real:: peri_time,peri_time_step
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
             moldiff,denh2o,dtfrac,N_inte,N_peri, &
-            nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            nind,ix1,iy1,nz,reflect,rank)
         #endif
         #else
         call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
@@ -734,7 +740,7 @@ real:: peri_time,peri_time_step
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
             moldiff,denh2o,dtfrac,N_inte,N_peri, &
-            nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+            nind,ix1,iy1,nz,reflect,rank)
         #endif
 
         #if _TIMING == 1
