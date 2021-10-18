@@ -48,7 +48,7 @@ contains
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
         moldiff,denh2o,dtfrac,offset,np_active, &
-        nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+        nind,ix1,iy1,nz,reflect,rank)
 
         implicit none
 
@@ -61,7 +61,7 @@ contains
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         real(8),value:: moldiff,denh2o,dtfrac
-        integer,value:: np_active,nind,ix1,iy1,nnx1,nny1,nz
+        integer,value:: np_active,nind,ix1,iy1,nz
         integer,value:: offset,rank
         logical,value:: reflect
 
@@ -146,8 +146,8 @@ contains
                 end if
 
                 ! Find each particle's factional cell location
-                Clocx = (P(ii,1) - float(Ploc(1))*dx)  / dx
-                Clocy = (P(ii,2) - float(Ploc(2))*dy)  / dy
+                Clocx = (P(ii,1) - dble(Ploc(1))*dx)  / dx
+                Clocy = (P(ii,2) - dble(Ploc(2))*dy)  / dy
 
                 Z = 0.d0
                 do k = 1, Ploc(3)
@@ -176,9 +176,9 @@ contains
                 ! calculate particle dt
                 ! check each direction independently
                 advdt = pfdt
-                if (Vpx /= 0.) advdt(1) = abs(dtfrac*(dx/Vpx))
-                if (Vpy /= 0.) advdt(2) = abs(dtfrac*(dy/Vpy))
-                if (Vpz /= 0.) advdt(3) = dtfrac*(dz(Ploc(3)+1)/abs(Vpz))
+                if (Vpx /= 0.) advdt(1) = dabs(dtfrac*(dx/Vpx))
+                if (Vpy /= 0.) advdt(2) = dabs(dtfrac*(dy/Vpy))
+                if (Vpz /= 0.) advdt(3) = dtfrac*(dz(Ploc(3)+1)/dabs(Vpz))
 
                 particledt = min(advdt(1), advdt(2), advdt(3), &
                                 pfdt*dtfrac, delta_time-P(ii,4))
@@ -186,7 +186,7 @@ contains
                 ! calculate Flux in cell and compare it with the ET flux out of the cell
                 if (EvapTrans_de(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
                 ! calculate ET flux volumetrically and compare to
-                et_flux = abs(EvapTrans_de(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz(Ploc(3)+1)
+                et_flux = dabs(EvapTrans_de(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz(Ploc(3)+1)
 
                 ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
                 ! probability of being captured by roots
@@ -244,23 +244,23 @@ contains
                 P(ii,3) = P(ii,3) + particledt * Vpz
                 P(ii,4) = P(ii,4) + particledt
 
-                Ltemp = SQRT((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
+                Ltemp = dsqrt((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
                              (particledt*Vpz)**2)
 
                 ! Molecular Diffusion
                 if (moldiff > 0.d0) then
-                    z1 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii))-0.5d0)
-                    z2 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii))-0.5d0)
-                    z3 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z1 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z2 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z3 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
 
-                    P(ii,1) = P(ii,1) + z1 * SQRT(moldiff*2.d0*particledt)
-                    P(ii,2) = P(ii,2) + z2 * SQRT(moldiff*2.d0*particledt)
-                    P(ii,3) = P(ii,3) + z3 * SQRT(moldiff*2.d0*particledt)
+                    P(ii,1) = P(ii,1) + z1 * dsqrt(moldiff*2.d0*particledt)
+                    P(ii,2) = P(ii,2) + z2 * dsqrt(moldiff*2.d0*particledt)
+                    P(ii,3) = P(ii,3) + z3 * dsqrt(moldiff*2.d0*particledt)
 
                     Ltemp = Ltemp + &
-                                SQRT((z1*SQRT(moldiff*2.d0*particledt))**2 + &
-                                     (z2*SQRT(moldiff*2.d0*particledt))**2 + &
-                                     (z3*SQRT(moldiff*2.d0*particledt))**2)
+                                dsqrt((z1*dsqrt(moldiff*2.d0*particledt))**2 + &
+                                     (z2*dsqrt(moldiff*2.d0*particledt))**2 + &
+                                     (z3*dsqrt(moldiff*2.d0*particledt))**2)
                 end if
                 P(ii,11) = P(ii,11) + Ltemp
                 ! placeholder for other interactions; potentially added later
@@ -348,7 +348,7 @@ contains
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
         moldiff,denh2o,dtfrac,offset,np_active, &
-        nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+        nind,ix1,iy1,nz,reflect,rank)
 
         implicit none
 
@@ -361,7 +361,7 @@ contains
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         real(8),value:: moldiff,denh2o,dtfrac
-        integer,value:: np_active,nind,ix1,iy1,nnx1,nny1,nz
+        integer,value:: np_active,nind,ix1,iy1,nz
         integer,value:: offset,rank
         logical,value:: reflect
 
@@ -450,8 +450,8 @@ contains
                 end if
 
                 ! Find each particle's factional cell location
-                Clocx = (P_s(ii,1) - float(Ploc(1))*dx)  / dx
-                Clocy = (P_s(ii,2) - float(Ploc(2))*dy)  / dy
+                Clocx = (P_s(ii,1) - dble(Ploc(1))*dx)  / dx
+                Clocy = (P_s(ii,2) - dble(Ploc(2))*dy)  / dy
 
                 Z = 0.d0
                 do k = 1, Ploc(3)
@@ -480,9 +480,9 @@ contains
                 ! calculate particle dt
                 ! check each direction independently
                 advdt = pfdt
-                if (Vpx /= 0.) advdt(1) = abs(dtfrac*(dx/Vpx))
-                if (Vpy /= 0.) advdt(2) = abs(dtfrac*(dy/Vpy))
-                if (Vpz /= 0.) advdt(3) = dtfrac*(dz_T(Ploc(3)+1)/abs(Vpz))
+                if (Vpx /= 0.) advdt(1) = dabs(dtfrac*(dx/Vpx))
+                if (Vpy /= 0.) advdt(2) = dabs(dtfrac*(dy/Vpy))
+                if (Vpz /= 0.) advdt(3) = dtfrac*(dz_T(Ploc(3)+1)/dabs(Vpz))
 
                 particledt = min(advdt(1), advdt(2), advdt(3), &
                                 pfdt*dtfrac, delta_time-P_s(ii,4))
@@ -490,7 +490,7 @@ contains
                 ! calculate Flux in cell and compare it with the ET flux out of the cell
                 if (EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
                 ! calculate ET flux volumetrically and compare to
-                et_flux = abs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
+                et_flux = dabs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
 
                 ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
                 ! probability of being captured by roots
@@ -548,23 +548,23 @@ contains
                 P_s(ii,3) = P_s(ii,3) + particledt * Vpz
                 P_s(ii,4) = P_s(ii,4) + particledt
 
-                Ltemp = SQRT((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
+                Ltemp = dsqrt((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
                              (particledt*Vpz)**2)
 
                 ! Molecular Diffusion
                 if (moldiff > 0.d0) then
-                    z1 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii_g))-0.5d0)
-                    z2 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii_g))-0.5d0)
-                    z3 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii_g))-0.5d0)
+                    z1 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii_g))-0.5d0)
+                    z2 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii_g))-0.5d0)
+                    z3 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii_g))-0.5d0)
 
-                    P_s(ii,1) = P_s(ii,1) + z1 * SQRT(moldiff*2.d0*particledt)
-                    P_s(ii,2) = P_s(ii,2) + z2 * SQRT(moldiff*2.d0*particledt)
-                    P_s(ii,3) = P_s(ii,3) + z3 * SQRT(moldiff*2.d0*particledt)
+                    P_s(ii,1) = P_s(ii,1) + z1 * dsqrt(moldiff*2.d0*particledt)
+                    P_s(ii,2) = P_s(ii,2) + z2 * dsqrt(moldiff*2.d0*particledt)
+                    P_s(ii,3) = P_s(ii,3) + z3 * dsqrt(moldiff*2.d0*particledt)
 
                     Ltemp = Ltemp + &
-                                SQRT((z1*SQRT(moldiff*2.d0*particledt))**2 + &
-                                     (z2*SQRT(moldiff*2.d0*particledt))**2 + &
-                                     (z3*SQRT(moldiff*2.d0*particledt))**2)
+                                dsqrt((z1*dsqrt(moldiff*2.d0*particledt))**2 + &
+                                     (z2*dsqrt(moldiff*2.d0*particledt))**2 + &
+                                     (z3*dsqrt(moldiff*2.d0*particledt))**2)
                 end if
                 P_s(ii,11) = P_s(ii,11) + Ltemp
                 ! placeholder for other interactions; potentially added later
@@ -651,7 +651,7 @@ contains
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
         moldiff,denh2o,dtfrac,offset,np_active, &
-        nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+        nind,ix1,iy1,nz,reflect,rank)
 
         implicit none
 
@@ -663,7 +663,7 @@ contains
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         real(8),value:: moldiff,denh2o,dtfrac
-        integer,value:: np_active,nind,ix1,iy1,nnx1,nny1,nz
+        integer,value:: np_active,nind,ix1,iy1,nz
         integer,value:: offset,rank
         logical,value:: reflect
 
@@ -748,8 +748,8 @@ contains
                 end if
 
                 ! Find each particle's factional cell location
-                Clocx = (P(ii,1) - float(Ploc(1))*dx)  / dx
-                Clocy = (P(ii,2) - float(Ploc(2))*dy)  / dy
+                Clocx = (P(ii,1) - dble(Ploc(1))*dx)  / dx
+                Clocy = (P(ii,2) - dble(Ploc(2))*dy)  / dy
 
                 Z = 0.d0
                 do k = 1, Ploc(3)
@@ -778,9 +778,9 @@ contains
                 ! calculate particle dt
                 ! check each direction independently
                 advdt = pfdt
-                if (Vpx /= 0.) advdt(1) = abs(dtfrac*(dx/Vpx))
-                if (Vpy /= 0.) advdt(2) = abs(dtfrac*(dy/Vpy))
-                if (Vpz /= 0.) advdt(3) = dtfrac*(dz_T(Ploc(3)+1)/abs(Vpz))
+                if (Vpx /= 0.) advdt(1) = dabs(dtfrac*(dx/Vpx))
+                if (Vpy /= 0.) advdt(2) = dabs(dtfrac*(dy/Vpy))
+                if (Vpz /= 0.) advdt(3) = dtfrac*(dz_T(Ploc(3)+1)/dabs(Vpz))
 
                 particledt = min(advdt(1), advdt(2), advdt(3), &
                                 pfdt*dtfrac, delta_time-P(ii,4))
@@ -788,7 +788,7 @@ contains
                 ! calculate Flux in cell and compare it with the ET flux out of the cell
                 if (EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
                 ! calculate ET flux volumetrically and compare to
-                et_flux = abs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
+                et_flux = dabs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
 
                 ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
                 ! probability of being captured by roots
@@ -846,23 +846,23 @@ contains
                 P(ii,3) = P(ii,3) + particledt * Vpz
                 P(ii,4) = P(ii,4) + particledt
 
-                Ltemp = SQRT((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
+                Ltemp = dsqrt((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
                             (particledt*Vpz)**2)
 
                 ! Molecular Diffusion
                 if (moldiff > 0.d0) then
-                    z1 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii))-0.5d0)
-                    z2 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii))-0.5d0)
-                    z3 = 2.d0*SQRT(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z1 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z2 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z3 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
 
-                    P(ii,1) = P(ii,1) + z1 * SQRT(moldiff*2.d0*particledt)
-                    P(ii,2) = P(ii,2) + z2 * SQRT(moldiff*2.d0*particledt)
-                    P(ii,3) = P(ii,3) + z3 * SQRT(moldiff*2.d0*particledt)
+                    P(ii,1) = P(ii,1) + z1 * dsqrt(moldiff*2.d0*particledt)
+                    P(ii,2) = P(ii,2) + z2 * dsqrt(moldiff*2.d0*particledt)
+                    P(ii,3) = P(ii,3) + z3 * dsqrt(moldiff*2.d0*particledt)
 
                     Ltemp = Ltemp + &
-                                SQRT((z1*SQRT(moldiff*2.d0*particledt))**2 + &
-                                    (z2*SQRT(moldiff*2.d0*particledt))**2 + &
-                                    (z3*SQRT(moldiff*2.d0*particledt))**2)
+                                dsqrt((z1*dsqrt(moldiff*2.d0*particledt))**2 + &
+                                    (z2*dsqrt(moldiff*2.d0*particledt))**2 + &
+                                    (z3*dsqrt(moldiff*2.d0*particledt))**2)
                 end if
                 P(ii,11) = P(ii,11) + Ltemp
                 ! placeholder for other interactions; potentially added later
@@ -945,13 +945,13 @@ contains
     #endif
 
     attributes(global) subroutine Update_C_Array(P,dz,nz,ix1,iy1, &
-        nnx1,nny1,buff,mean_age,mean_comp,total_mass,np_active)
+        mean_age,mean_comp,total_mass,np_active)
 
         implicit none
         real(8),intent(inout):: P(:,:)
         real(8),intent(in):: dz(:)
         real(8),intent(inout):: mean_age(:),total_mass(:),mean_comp(:)
-        integer,value:: nnx1,nny1,nz,ix1,iy1,buff,np_active
+        integer,value:: nz,ix1,iy1,np_active
         integer:: Ploc(3), ii, k
         real(8):: one, Z, temp
 

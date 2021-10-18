@@ -5,7 +5,7 @@ module exchange_particles
     use compact_array
     use particle_loop
     use variable_list, only: N_recv, N_send, N_peri, N_inte, N_exit
-    use variable_list, only: neigh_list
+    use variable_list, only: neigh_list, transfer
     ! neigh_list is allocated after getting number of total GPUs.
     ! it is 1 if neighbor exists while 0 if neighbor doesn't exist.
     ! N_send has the same length of neigh_list and was built one by one.
@@ -58,11 +58,13 @@ contains
             #if _TIMING == 1
             istat = cudaEventCreate(startEvent)
             istat = cudaEventCreate(stopEvent)
-
-            istat = cudaEventRecord(startEvent,0)
             #endif
 
             nattri = 17 + 2*nind
+            if(transfer > 0) then
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
             N_send = 0; N_recv = 0
             nc1 = 0; nc3 = 0
             do i = 0, t_rank-1 ! go through to send particles
@@ -131,36 +133,38 @@ contains
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(transfer_time_step,startEvent,stopEvent)
             transfer_time = transfer_time + transfer_time_step
-
+            #endif
+            !-----------------------------------------
+            #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif
             ! interior particles
             #if _TEXTURE == 1
-            #if _SHARED == 1
-            call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB,tPB*(13+nind*2)*8>>> ( &
-                P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                moldiff,denh2o,dtfrac,0,N_inte, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+                #if _SHARED == 1
+                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB,tPB*(13+nind*2)*8>>> ( &
+                    P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                    moldiff,denh2o,dtfrac,0,N_inte, &
+                    nind,ix1,iy1,nz,reflect,rank)
+                #else
+                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                    P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                    moldiff,denh2o,dtfrac,0,N_inte, &
+                    nind,ix1,iy1,nz,reflect,rank)
+                #endif
             #else
-            call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
-                P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                moldiff,denh2o,dtfrac,0,N_inte, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
-            #endif
-            #else
-            call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
-                P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                moldiff,denh2o,dtfrac,0,N_inte, &
-                nind,ix1,iy1,nnx1,nny1,nz,reflect,rank)
+                call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                    P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                    moldiff,denh2o,dtfrac,0,N_inte, &
+                    nind,ix1,iy1,nz,reflect,rank)
             #endif
 
             #if _TIMING == 1
@@ -170,6 +174,7 @@ contains
             inte_time = inte_time + inte_time_step
             #endif
 
+            !-----------------------------------------
             if(nc2 > 0) sum_recv = sum(N_recv)
             if(nc5 > 0) then
                 call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
@@ -179,12 +184,15 @@ contains
             if(nc2 > 0) N_peri = N_peri + sum(N_recv)
             np_active = N_inte + N_peri
 
+            endif
+
+            !-----------------------------------------
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif
 
             call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
-                P_de,dz_de,nz,ix1,iy1,nnx1,nny1,buff, &
+                P_de,dz_de,nz,ix1,iy1, &
                 mean_age_de,mean_comp_de,total_mass_de,np_active)
 
             #if _TIMING == 1
@@ -192,11 +200,12 @@ contains
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(C_time_step,startEvent,stopEvent)
             C_time = C_time + C_time_step
-
-            !-----------------------------------------
-            istat = cudaEventRecord(startEvent,0)
             #endif
 
+            !-----------------------------------------
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
             ! then separate inactive particles
             call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                 P_de(:,8),d_isValid,np_active,0)
@@ -226,11 +235,14 @@ contains
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(exit_time_step,startEvent,stopEvent)
             exit_time = exit_time + exit_time_step
+            #endif
 
             !-----------------------------------------
+            #if _TIMING == 1
             istat = cudaEventDestroy(startEvent)
             istat = cudaEventDestroy(stopEvent)
             #endif
+
             !P = P_de
             !write(10,'(2000(19(f20.5,1x),/))') ((P(ik,jk),jk=1,nattri),ik=1,np_active)
         !close(10)
