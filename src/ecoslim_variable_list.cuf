@@ -121,7 +121,8 @@ module variable_list
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time, add_time
-    real:: sort_time, peri_time, transfer_time, inte_time, exit_time, C_time
+    real:: sort_time, peri_time, inte_time, exit_time, C_time
+    real:: transfer_time1, transfer_time2, transfer_time3
     type(cudaEvent):: startEvent, stopEvent
     ! integers for writing C or point based output
 

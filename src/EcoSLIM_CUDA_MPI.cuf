@@ -84,7 +84,9 @@ integer:: istat, temp
 
     sort_time = 0.
     peri_time= 0.
-    transfer_time= 0.
+    transfer_time1= 0.
+    transfer_time2= 0.
+    transfer_time3= 0.
     inte_time= 0.
     exit_time= 0.
     C_time   = 0.
@@ -363,13 +365,6 @@ integer:: istat, temp
         np_active = 0
         pid = 0
         if (np_active + np_ic*nnx1*nny1*nz >= np ) then
-            !write(message,'(a,a)') ' **Warning IC input but no paricles left', new_line(' ')
-            !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-
-            !write(message,'(a,a)') ' **Exiting code gracefully writing restart', new_line(' ')
-            !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
             write(17,*) ' **Warning IC input but no paricles left'
             write(17,*) ' **Exiting code gracefully writing restart'
             goto 9090
@@ -382,26 +377,6 @@ integer:: istat, temp
         pid = np_ic*nnx1*nny1*nz
 
     end if
-
-        !open(10,file='P_init.'//trim(adjustl(ranknum))//'.txt')
-        !    write(10,*) np_active
-        !    write(10,*) pid
-        !    P = P_de
-        !    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
-        !close(10)
-
-    ! keep the following output as it is. we can figure out a better way to handle them later.
-    !call MPI_FILE_OPEN(MPI_COMM_SELF,logf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh4,ierr)
-
-    !write(message,'(a,a)') ' **** Transient Simulation Particle Accounting ****', new_line(' ')
-    !call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
-
-    !write(message,'(a,a)') ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
-    !                        ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered', new_line(' ')
-    !call MPI_FILE_WRITE(fh4,trim(message),len(trim(message)),MPI_CHARACTER,MPI_STATUS_IGNORE,ierr)
-
-    !! open exited particle file and write header
-    !call MPI_FILE_OPEN(MPI_COMM_SELF,exitedf,MPI_MODE_WRONLY+MPI_MODE_CREATE,MPI_INFO_NULL,fh3,ierr)
 
     open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
     write(20,*) ' **** Transient Simulation Particle Accounting ****'
@@ -667,8 +642,8 @@ integer:: istat, temp
         istat = cudaEventSynchronize(stopEvent)
         istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
         #endif
-
-        if(transfer > 0) then
+!----------------------------------------
+        if(transfer == 1) then
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif
@@ -704,7 +679,7 @@ integer:: istat, temp
             N_peri = np_active
             N_inte = 0
         endif
-
+!----------------------------------------
         #if _TIMING == 1
         istat = cudaEventRecord(startEvent,0)
         #endif
@@ -742,9 +717,9 @@ integer:: istat, temp
         istat = cudaEventSynchronize(stopEvent)
         istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
         #endif
-
+!----------------------------------------
         call particle_exchange()
-
+!----------------------------------------
         mean_age    = mean_age_de
         mean_comp   = mean_comp_de
         total_mass  = total_mass_de
@@ -759,8 +734,9 @@ integer:: istat, temp
                                                       PET_balance(2),i_added_particles,ET_np_cpu(1), &
                                                       Out_np_cpu(1),np_active,N_peri,N_inte,N_exit, &
                                                       sum(N_send),sum(N_recv)
-        write(17,'(3(i8),9(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,add_time,sort_time, &
-                                            peri_time,transfer_time,inte_time,C_time,exit_time
+        write(17,'(3(i8),11(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,add_time,sort_time, &
+                                            peri_time,transfer_time1,transfer_time2,transfer_time3,inte_time, &
+                                            C_time,exit_time
 
     end do
     9090 continue
