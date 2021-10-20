@@ -122,7 +122,11 @@ module variable_list
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time, add_time
     real:: sort_time, peri_time, inte_time, exit_time, C_time
-    real:: transfer_time1, transfer_time2, transfer_time3
+    real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
+    real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
+    real:: scan_time, thrust_time, copy_time, add2_time, reduce_time = 0.
+    real:: sort_time1 = 0., sort_time2 = 0.,sort_time3 = 0.,sort_time4 = 0.,sort_time5 = 0.
+    real:: sort_time6 = 0., sort_time7 = 0.,sort_time8 = 0.,sort_time9 = 0.,sort_time10 = 0.
     type(cudaEvent):: startEvent, stopEvent
     ! integers for writing C or point based output
 
@@ -150,7 +154,7 @@ module variable_list
     real(8),allocatable,pinned:: Saturation(:,:,:)    ! Saturation (read from ParFlow)
     real(8),allocatable,pinned:: Porosity(:,:,:)      ! Porosity (read from ParFlow)
     real(8),allocatable,pinned:: EvapTrans(:,:,:)     ! CLM EvapTrans (read from ParFlow, [1/T] units)
-    real(8),allocatable:: EvapTrans_da(:,:,:)
+    real(8),allocatable,pinned:: EvapTrans_da(:,:,:)
     real(8),allocatable,pinned:: CLMvars(:,:,:)     ! CLM Output (read from ParFlow, following single file
                                                   ! CLM output as specified in the manual)
     real(8),allocatable,pinned:: Ind(:,:,:)
@@ -187,6 +191,7 @@ module variable_list
     real(8),allocatable,device,target:: Saturation_de(:,:,:)
     real(8),allocatable,device,target:: Porosity_de(:,:,:)
     real(8),allocatable,device,target:: EvapTrans_de(:,:,:)
+    real(8),allocatable,device,target:: EvapTrans_da_de(:,:,:)
     real(8),allocatable,device,target:: CLMvars_de(:,:)
 
     #else
@@ -199,6 +204,7 @@ module variable_list
     real(8),allocatable,device:: Saturation_de(:,:,:)
     real(8),allocatable,device:: Porosity_de(:,:,:)
     real(8),allocatable,device:: EvapTrans_de(:,:,:)
+    real(8),allocatable,device:: EvapTrans_da_de(:,:,:)
     real(8),allocatable,device:: CLMvars_de(:,:)
 
     #endif
@@ -282,6 +288,7 @@ contains
             allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
                      Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
                      EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+                     EvapTrans_da_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
                      CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
                      Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
             allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))

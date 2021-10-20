@@ -8,6 +8,7 @@ module add_particles
     use mrand, only: h   ! curand states saved in global memory
     use variable_list, only: Saturation_de, Porosity_de, C_de
     use variable_list, only: EvapTrans_de, CLMvars_de, Ind_de
+    use variable_list, only: EvapTrans_da_de
     use variable_list, only: dx, dy, pfdt
 
 contains
@@ -89,8 +90,7 @@ attributes(global) subroutine add_init_particles( &
 end subroutine add_init_particles
 
 attributes(global) subroutine scan_new_particles( &
-    PET_balance,d_isValid,nnx1,nny1,nz,dz, &
-    denh2o)
+    PET_balance,d_isValid,nnx1,nny1,nz,dz,denh2o)
 
     implicit none
     real(8),intent(out):: PET_balance(:)
@@ -161,7 +161,7 @@ attributes(global) subroutine add_new_particles( &
         end if
         k = nz
 
-        if(EvapTrans_de(i,j,k) > 0.d0) then
+        if(EvapTrans_da_de(i,j,k) > 0.d0) then
             do ij = 1, iflux_p_res
 
                 index = np_active + d_indices(ii)*iflux_p_res - (ij - 1)
@@ -195,7 +195,7 @@ attributes(global) subroutine add_new_particles( &
                 P(index,5) = 0.0d0
                 P(index,17+2*nind) = dble(kk-1)*pfdt + P(index,4)
                 P(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
-                            EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o
+                            EvapTrans_da_de(i,j,k)*dx*dy*dz(k)*denh2o
 
                 if(CLMvars_de(i,j) > 0.d0) then !this is snowmelt
                     P(index,7) = 3.d0 ! Snow composition
