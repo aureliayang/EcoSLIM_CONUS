@@ -1,0 +1,237 @@
+module compact_array
+    use cudafor
+    !use variable_list, only: Zone_de
+
+contains
+!1--------------------------------------------------------------------
+    attributes(global) subroutine prepare_holes(holes,d_indices,d_isValid,&
+        numElements)
+        !original:        1 0 1 1 0 0 1 0  d_isValid
+        !index(or ii):    1 2 3 4 5 6 7 8  ii
+        !prefix sum:      1 1 2 3 3 3 4 4  d_indices
+        !ii-d_indices:    0 1 1 1 2 3 3 4
+        !N-sum(index):    3 3 2 1 1 1 0 0  d_indices(numElements)-d_indices
+        !N-sum(index)+1:  4 4 3 2 2 2 1 1  ii2
+        !numElements:     8
+        !holes:           2 5 6 8
+        !holes index:     1 2 3 4
+
+        implicit none
+        integer,intent(in):: d_indices(:), d_isValid(:)
+        integer,intent(out):: holes(:)
+        !dimension is determined by np_active - d_indices(np_active)
+        !np_active is numElements
+        !holes is a temporary array that just needs dynamic allocation on cpu
+        integer:: ii   !global index in the array
+        integer,value:: numElements
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        if(ii <= numElements .and. d_isValid(ii) == 0) then
+            holes(ii - d_indices(ii)) = ii
+        end if
+    end subroutine prepare_holes
+!2--------------------------------------------------------------------
+    attributes(global) subroutine select2end(holes, &
+        d_in,d_out,offset,hole_size,sumsend,nattri)
+        !original:        1 0 1 1 0 0 1 0  d_isValid
+        !index(or ii):    1 2 3 4 5 6 7 8  ii
+        !prefix sum:      1 1 2 3 3 3 4 4  d_indices
+        !ii-d_indices:    0 1 1 1 2 3 3 4
+
+        implicit none
+        real(8),intent(out):: d_out(:)
+        real(8),intent(in):: d_in(:,:)
+        integer,intent(in):: holes(:)
+        integer:: ii, temp1, temp2, temp3
+        integer,value:: offset, hole_size, sumsend, nattri
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= hole_size) then
+            temp1 = (sumsend + ii - 1)*nattri + 1
+            temp2 = (sumsend + ii)*nattri
+            temp3 = offset + holes(ii)
+            d_out(temp1:temp2) = d_in(temp3,:)
+        end if
+
+    end subroutine select2end
+
+!3--------------------------------------------------------------------
+    attributes(global) subroutine unpack_recv(d_in, &
+        d_out,offset,sumrecv,nattri)
+        !original:        1 0 1 1 0 0 1 0  d_isValid
+        !index(or ii):    1 2 3 4 5 6 7 8  ii
+        !prefix sum:      1 1 2 3 3 3 4 4  d_indices
+        !ii-d_indices:    0 1 1 1 2 3 3 4
+
+        implicit none
+        real(8),intent(in):: d_in(:)
+        real(8),intent(out):: d_out(:,:)
+        ! integer,intent(in):: holes(:)
+        integer:: ii, temp1, temp2, temp3
+        integer,value:: offset, sumrecv, nattri
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= sumrecv) then
+            temp1 = (ii - 1)*nattri + 1
+            temp2 = ii*nattri
+            temp3 = offset + ii
+            d_out(temp3,1:nattri) = d_in(temp1:temp2)
+        end if
+
+    end subroutine unpack_recv
+!4--------------------------------------------------------------------
+    attributes(global) subroutine select2exit(holes, &
+        d_in,d_out,hole_size)
+
+        implicit none
+        real(8),intent(in):: d_in(:,:)
+        real(8),intent(out):: d_out(:,:)
+        integer,intent(in):: holes(:)
+        integer:: ii   !global index in the array
+        integer,value:: hole_size
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= hole_size) then
+            d_out(ii,:) = d_in(holes(ii),:)
+        end if
+
+    end subroutine select2exit
+!5--------------------------------------------------------------------
+    attributes(global) subroutine select2np_active(holes, &
+        d_in,numElements,hole_size)
+
+        implicit none
+        real(8),intent(inout):: d_in(:,:)
+        integer,intent(in):: holes(:)
+        integer,value:: numElements,hole_size
+        integer:: ii, temp1, temp2
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= hole_size) then
+            temp1 = numElements+ii
+            temp2 = holes(ii)
+            d_in(temp1,:) = d_in(temp2,:)
+        end if
+
+    end subroutine select2np_active
+!6--------------------------------------------------------------------
+    attributes(global) subroutine compaction_inplace(holes,d_indices,d_isValid,&
+        d_in,offset,numElements)
+        !original:        1 0 1 1 0 0 1 0  d_isValid
+        !index(or ii):    1 2 3 4 5 6 7 8  ii
+        !prefix sum:      1 1 2 3 3 3 4 4  d_indices
+        !ii-d_indices:    0 1 1 1 2 3 3 4
+        !N-sum(index):    3 3 2 1 1 1 0 0  d_indices(numElements)-d_indices
+        !N-sum(index)+1:  4 4 3 2 2 2 1 1  ii2
+        !numElements:     8
+        !holes:           2 5 6 8
+        !holes index:     1 2 3 4
+
+        implicit none
+        real(8),intent(inout):: d_in(:,:)
+        integer,intent(in):: holes(:),d_indices(:),d_isValid(:)
+        !dimension is determined by np_active - d_indices(np_active)
+        !np_active is numElements
+        !holes is a temporary array that just needs dynamic allocation on cpu
+        integer:: ii, ii2, temp1, temp2   !global index in the array
+        integer,value:: offset, numElements
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        !if(ii <= numElements) &
+        !ii2 = d_indices(numElements) - d_indices(ii) + 1
+        !if(ii == 1) print *, 'rank',rank,'ii',ii,'ii2',ii2
+        !if(ii == numElements) print *, 'rank',rank,'ii',ii,'ii2',ii2
+
+        if(ii <= numElements .and. d_isValid(ii) > 0) then
+            ii2 = d_indices(numElements) - d_indices(ii) + 1
+            if (ii2 <= numElements-d_indices(numElements) .and. holes(ii2) <= d_indices(numElements)) then
+                temp1 = offset+holes(ii2)
+                temp2 = offset+ii
+                d_in(temp1,:) = d_in(temp2,:)
+            end if
+        end if
+
+    end subroutine compaction_inplace
+!7--------------------------------------------------------------------
+    attributes(global) subroutine prepare_neighbor(d_in,d_isValid,&
+                                                   numElements,neighbor)
+        !numElements is the current number of elements left in P, i.e., updated np_active
+
+        implicit none
+        real(8),intent(in):: d_in(:)
+        ! the 8th attribution of P array
+        integer,intent(out):: d_isValid(:)
+        integer,value:: numElements, neighbor
+        ! numElements is the length to scan
+        ! neighbor is the rank of neighbor
+        integer:: ii   !global index in the array
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= numElements) then
+            if(idnint(d_in(ii)) == neighbor) then
+                d_isValid(ii) = 0
+            else
+                d_isValid(ii) = 1
+            end if
+        end if
+    end subroutine prepare_neighbor
+!8--------------------------------------------------------------------
+    attributes(global) subroutine connect_recv(d_in,numElements,N_recv)
+        ! connect the received particles to the bottom of P and
+        ! update P(:,8) of the received particles
+
+        implicit none
+        real(8),intent(inout):: d_in(:,:)
+        integer,value:: numElements, N_recv
+        integer:: ii   !global index in the array
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= N_recv) then
+            d_in(numElements+ii,:) = d_in(numElements+N_recv+ii,:)
+        end if
+    end subroutine connect_recv
+!9--------------------------------------------------------------------
+    !attributes(global) subroutine scan_zone(nnx1,nny1,buff, &
+    !                                        d_isValid,rank,t_rank)
+
+    !    implicit none
+    !    ! integer,intent(in):: zone(:,:)
+    !    integer,intent(out):: d_isValid(:)
+    !    integer,value:: nnx1,nny1,buff,rank,t_rank
+    !    integer:: ii,i,j,temp,lock,length
+
+    !        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    !        lock = 1
+    !        length = (nnx1+2*buff)*(nny1+2*buff)
+    !        ! this is the total length of zone array when it was transformed to 1D
+
+    !        if(ii <= length) then
+    !            if(mod(ii, nnx1 + 2*buff) == 0) then
+    !                j = ii/(nnx1 + 2*buff) - buff
+    !                i = nnx1 + buff
+    !            else
+    !                j = ii/(nnx1 + 2*buff) - buff + 1
+    !                i = mod(ii,nnx1 + 2*buff) - buff
+    !            end if
+    !        end if
+
+    !        if(ii <= t_rank) d_isValid(ii) = 0
+    !        ! for this scan, we only have t_rank elements
+
+    !        if(ii <= length) then
+    !            if(Zone_de(i,j) >= 0 .and. Zone_de(i,j) /= rank) then
+    !                temp = atomicAdd(d_isValid(Zone_de(i,j)+1),lock)
+    !            end if
+    !        end if
+
+    !        if(ii <= t_rank .and. d_isValid(ii) > 0) d_isValid(ii) = 1
+    !end subroutine scan_zone
+
+end module compact_array
