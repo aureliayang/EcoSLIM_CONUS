@@ -1,0 +1,70 @@
+program testcompaction
+    use cudafor
+    use thrust
+    use compact_array
+
+    implicit none
+
+    real(8), allocatable, pinned :: cpuData(:,:)
+    real(8), allocatable, device :: gpuData(:,:)
+    integer, allocatable, device :: d_isValid(:),d_indices(:),holes(:)
+    integer, allocatable, pinned :: d_isValid_cpu(:)
+
+    type (cudaEvent) :: startEvent, stopEvent
+    real:: time1_total=0., time2_total=0., time3_total=0.
+    real:: time1, time2, time3
+    integer:: temp
+
+    integer:: istat, i, j, tPB = 256  !test will keep blocksize as 256.
+    integer:: N = 80000000, nind = 1
+
+    istat = cudaEventCreate(startEvent)
+    istat = cudaEventCreate(stopEvent)
+
+    do while (N > 0)
+        !==============allocate arrays
+        allocate(cpuData(N,17+2*nind))
+        allocate(gpuData(N,17+2*nind))
+        allocate(d_isValid_cpu(N),d_isValid(N),d_indices(N))
+
+        !==============prepare the original CPU array
+        cpuData = 0.d0
+        d_isValid_cpu = 0
+        do i = 1, N/8
+            cpuData((i-1)*8+1:i*8,8) = [1.d0, 0.d0, 1.d0, 1.d0, 0.d0, 0.d0, 1.d0, 0.d0]
+            d_isValid_cpu((i-1)*8+1:i*8) = [1, 0, 1, 1, 0, 0, 1, 0]
+        enddo
+
+        gpuData = cpuData
+        d_isValid = d_isValid_cpu
+
+        !==============loop start
+        do i = 1, 30
+        !----------------
+
+            istat = cudaEventRecord(startEvent, 0)
+
+            call thrustscan(d_isValid,N,d_indices)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time1, startEvent, stopEvent)
+
+            temp = d_indices(N); allocate(holes(N-temp)) !This time is not considered？
+            deallocate(holes)
+
+        !----------------
+            time1_total = time1_total + time1
+        enddo
+        !==============loop end
+
+        time1_total = time1_total/30.d0
+
+        write(*,'(a,1(f8.3,1x),2i10)') 'Time used (ms):', time1_total, N, temp
+        N = N/2
+    end do
+
+    istat = cudaEventDestroy(startEvent)
+    istat = cudaEventDestroy(stopEvent)
+
+end program
