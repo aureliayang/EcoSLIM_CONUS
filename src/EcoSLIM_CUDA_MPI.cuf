@@ -40,10 +40,6 @@ real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
 real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
 real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 integer:: istat, temp
-!real:: scan_time,scan_time_step
-!real:: thrust_time,thrust_time_step
-!real:: copy_time,copy_time_step
-!real:: add2_time,add2_time_step
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -84,16 +80,14 @@ integer:: istat, temp
 
     sort_time = 0.
     peri_time= 0.
-    transfer_time1= 0.
-    transfer_time2= 0.
-    transfer_time3= 0.
     inte_time= 0.
     exit_time= 0.
     C_time   = 0.
-    !scan_time   = 0.
-    !copy_time   = 0.
-    !add2_time   = 0.
-    !thrust_time   = 0.
+
+    scan_time   = 0.
+    copy_time   = 0.
+    add2_time   = 0.
+    thrust_time   = 0.
 
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
@@ -307,14 +301,22 @@ integer:: istat, temp
         Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
 
             open(10,file='Zone_de_after.'//trim(adjustl(ranknum))//'.txt')
-                if(rank == 0) &
-                    write(10,'(462(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 1) &
-                    write(10,'(463(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 2) &
-                    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 3) &
-                    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                !if(rank == 0) &
+                !    write(10,'(462(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                !if(rank == 1) &
+                !    write(10,'(463(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                !if(rank == 2) &
+                !    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                !if(rank == 3) &
+                !    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+            if(rank == 0) &
+            write(10,'(22(22(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+            if(rank == 1) &
+            write(10,'(23(22(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+            if(rank == 2) &
+            write(10,'(22(23(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+            if(rank == 3) &
+            write(10,'(23(23(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
             close(10)
 
     end if
@@ -485,6 +487,9 @@ integer:: istat, temp
             EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
             EvapTrans_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
+            if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
+            where (EvapTrans > 0.d0) EvapTrans_da = EvapTrans_da + EvapTrans
+
             if (clmfile) then
                 ! Read in CLM output file @RMM to do make this input
                 ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
@@ -518,6 +523,7 @@ integer:: istat, temp
         Vz_de = Vz
         Saturation_de = Saturation
         EvapTrans_de  = EvapTrans
+        if (mod(kk,add_f) == 0) EvapTrans_da_de  = EvapTrans_da
         CLMvars_de    = CLMvars(:,:,11)
         ! probably this can be deallocated after adding of particles
         ! Now just think about the hourly add of particles.
@@ -547,26 +553,25 @@ integer:: istat, temp
         istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
         #endif
 !----------------------------------------
-        #if _TIMING == 1
-        istat = cudaEventRecord(startEvent,0)
-        #endif
+        !#if _TIMING == 1
+        !istat = cudaEventRecord(startEvent,0)
+        !#endif
 
         if (clmtrans) then
             if (np_active < np) then
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(startEvent,0)
-                !#endif
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
 
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
                     PET_balance_de,d_isValid,nnx1,nny1,nz,dz_de,denh2o)
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(stopEvent,0)
-                !istat = cudaEventSynchronize(stopEvent)
-                !istat = cudaEventElapsedTime(scan_time_step,startEvent,stopEvent)
-                !scan_time = scan_time + scan_time_step
-                !#endif
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(scan_time,startEvent,stopEvent)
+                #endif
 
                 ! d_isValid has the length as P or of np which is assigned in input script
                 ! so nnx1*nny1*nz should be smaller than np
@@ -574,107 +579,193 @@ integer:: istat, temp
                 ! nnx1, nnx2 etc. subdomain info can be put in its own module. Then use module
                 ! in main program and pass arguments to other subroutines.
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(startEvent,0)
-                !#endif
+                if (mod(kk,add_f) == 0) then
+                    ! so the frequency to write restart file should be 24*n
+                    ! i am not sure why i used 1752 previously but I feel it is not necessary
 
-                ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
-                call thrustscan(d_isValid,nnx1*nny1,d_indices)
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(startEvent,0)
+                    #endif
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(stopEvent,0)
-                !istat = cudaEventSynchronize(stopEvent)
-                !istat = cudaEventElapsedTime(thrust_time_step,startEvent,stopEvent)
-                !thrust_time = thrust_time + thrust_time_step
-                !#endif
+                    ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
+                    call thrustscan(d_isValid,nnx1*nny1,d_indices)
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(startEvent,0)
-                !#endif
-                temp = d_indices(nnx1*nny1)
-                i_added_particles = temp * iflux_p_res ! should be legal?
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(stopEvent,0)
+                    istat = cudaEventSynchronize(stopEvent)
+                    istat = cudaEventElapsedTime(thrust_time,startEvent,stopEvent)
+                    #endif
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(stopEvent,0)
-                !istat = cudaEventSynchronize(stopEvent)
-                !istat = cudaEventElapsedTime(copy_time_step,startEvent,stopEvent)
-                !copy_time = copy_time + copy_time_step
-                !#endif
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(startEvent,0)
+                    #endif
 
-                if(np_active + i_added_particles >= np) then
-                    !write(message,'(A,A)') ' **Warning rainfall input but no paricles left', new_line(' ')
-                    !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                    !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+                    temp = d_indices(nnx1*nny1)
+                    i_added_particles = temp * iflux_p_res ! should be legal?
 
-                    !write(message,'(A,A)') ' **Exiting code gracefully writing restart', new_line(' ')
-                    !call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                    !MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-                    write(17,*) ' **Warning rainfall input but no paricles left'
-                    write(17,*) ' **Exiting code gracefully writing restart'
-                    goto 9090
-                endif
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(stopEvent,0)
+                    istat = cudaEventSynchronize(stopEvent)
+                    istat = cudaEventElapsedTime(copy_time,startEvent,stopEvent)
+                    #endif
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(startEvent,0)
-                !#endif
+                    if(np_active + i_added_particles >= np) then
+                        write(17,*) ' **Warning rainfall input but no paricles left'
+                        write(17,*) ' **Exiting code gracefully writing restart'
+                        goto 9090
+                    endif
 
-                call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
-                    tPB >>> (d_indices,P_de,iflux_p_res,np_active,pid,nind, &
-                    nnx1,nny1,nz,ix1,iy1,dz_de,denh2o,kk,tout1)
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(startEvent,0)
+                    #endif
 
-                !#ifdef _TIMING
-                !istat = cudaEventRecord(stopEvent,0)
-                !istat = cudaEventSynchronize(stopEvent)
-                !istat = cudaEventElapsedTime(add2_time_step,startEvent,stopEvent)
-                !add2_time = add2_time + add2_time_step
-                !#endif
+                    call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
+                        tPB >>> (d_indices,P_de,iflux_p_res,np_active,pid,nind, &
+                        nnx1,nny1,nz,ix1,iy1,dz_de,denh2o,kk,tout1)
 
-                np_active = np_active + i_added_particles
-                pid = pid + i_added_particles
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(stopEvent,0)
+                    istat = cudaEventSynchronize(stopEvent)
+                    istat = cudaEventElapsedTime(add2_time,startEvent,stopEvent)
+                    #endif
+
+                    np_active = np_active + i_added_particles
+                    pid = pid + i_added_particles
+                end if
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+
+                call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
+                #endif
 
             end if
         end if
 
-        call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-        #if _TIMING == 1
-        istat = cudaEventRecord(stopEvent,0)
-        istat = cudaEventSynchronize(stopEvent)
-        istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
-        #endif
+        !#if _TIMING == 1
+        !istat = cudaEventRecord(stopEvent,0)
+        !istat = cudaEventSynchronize(stopEvent)
+        !istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
+        !#endif
 !----------------------------------------
         if(transfer == 1) then
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif
-            call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
-                P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
-            call thrustscan(d_isValid,np_active,d_indices)
-            temp = d_indices(np_active)
-            N_peri = np_active - temp
-
-            if(np_active + N_peri >= np) then
-                write(17,*) ' **Warning particles separation out of bound'
-                write(17,*) ' **Exiting code gracefully writing restart'
-                goto 9090
-            endif
-
-            allocate(holes(N_peri))
-            call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,np_active)
-            call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                holes,P_de,np_active,N_peri)
-            call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,P_de,0,np_active)
-            N_inte = d_indices(np_active); deallocate(holes)
-            call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                P_de,N_inte,N_peri)
-
+                call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
+                    P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(sort_time,startEvent,stopEvent)
+            istat = cudaEventElapsedTime(sort_time1,startEvent,stopEvent)
             #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+                call thrustscan(d_isValid,np_active,d_indices)
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time2,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+                temp = d_indices(np_active)
+                N_peri = np_active - temp
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time3,startEvent,stopEvent)
+            #endif
+
+                if(np_active + N_peri >= np) then
+                    write(17,*) ' **Warning particles separation out of bound'
+                    write(17,*) ' **Exiting code gracefully writing restart'
+                    goto 9090
+                endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                    allocate(holes(N_peri))
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time4,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                    holes,d_indices,d_isValid,np_active)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time5,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                    holes,P_de,np_active,N_peri)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time6,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                    holes,d_indices,d_isValid,P_de,0,np_active)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time7,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                N_inte = d_indices(np_active);
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time8,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                deallocate(holes)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time9,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+                call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                    P_de,N_inte,N_peri)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time10,startEvent,stopEvent)
+                #endif
         else
             N_peri = np_active
             N_inte = 0
@@ -686,7 +777,8 @@ integer:: istat, temp
         ! peripheric particles
         #if _TEXTURE == 1
         #if _SHARED == 1
-        call particles_independent_T<<<ceiling(dble(N_peri)/tPB),tPB,tPB*(13+nind*2)*8>>> ( &
+        call particles_independent_T<<<ceiling(dble(N_peri)/tPB),tPB, &
+            tPB*(13+nind*2)*kind(0.d0)>>> ( &
             P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
             et_age_de,et_mass_de,et_comp_de,et_np_de, &
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
@@ -734,9 +826,12 @@ integer:: istat, temp
                                                       PET_balance(2),i_added_particles,ET_np_cpu(1), &
                                                       Out_np_cpu(1),np_active,N_peri,N_inte,N_exit, &
                                                       sum(N_send),sum(N_recv)
-        write(17,'(3(i8),11(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,add_time,sort_time, &
-                                            peri_time,transfer_time1,transfer_time2,transfer_time3,inte_time, &
-                                            C_time,exit_time
+        write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,scan_time,thrust_time,copy_time, &
+                                            add2_time,reduce_time,sort_time1,sort_time2,sort_time3,sort_time4, &
+                                            sort_time5,sort_time6,sort_time7,sort_time8,sort_time9,sort_time10, &
+                                            peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
+                                            tran_time6,tran_time7,tran_time8,tran_time9,inte_time, &
+                                            tran_time10,C_time,exit_time
 
     end do
     9090 continue
