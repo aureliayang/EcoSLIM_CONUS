@@ -8,12 +8,16 @@ program testcompaction
     real(8), allocatable, pinned :: cpuData(:,:)
     real(8), allocatable, device :: gpuData(:,:)
     integer, allocatable, device :: d_isValid(:),d_indices(:),holes(:)
-    integer, allocatable, pinned :: d_isValid_cpu(:)
+    real(8), allocatable, device :: P_send(:),P_exit(:,:)
 
     type (cudaEvent) :: startEvent, stopEvent
     real:: time1_total=0., time2_total=0., time3_total=0.
-    real:: time1, time2, time3
-    integer:: temp
+    real:: time4_total=0., time5_total=0., time6_total=0.
+    real:: time7_total=0., time8_total=0., time9_total=0.
+    real:: time10_total=0.
+    real:: time1, time2, time3, time4, time5
+    real:: time6, time7, time8, time9, time10
+    integer:: temp, holesize
 
     integer:: istat, i, j, tPB = 256  !test will keep blocksize as 256.
     integer:: N = 80000000, nind = 1
@@ -22,45 +26,153 @@ program testcompaction
     istat = cudaEventCreate(stopEvent)
 
     do while (N > 0)
-        !==============allocate arrays
-        allocate(cpuData(N,17+2*nind))
-        allocate(gpuData(N,17+2*nind))
-        allocate(d_isValid_cpu(N),d_isValid(N),d_indices(N))
 
-        !==============prepare the original CPU array
-        cpuData = 0.d0
-        d_isValid_cpu = 0
-        do i = 1, N/8
-            cpuData((i-1)*8+1:i*8,8) = [1.d0, 0.d0, 1.d0, 1.d0, 0.d0, 0.d0, 1.d0, 0.d0]
-            d_isValid_cpu((i-1)*8+1:i*8) = [1, 0, 1, 1, 0, 0, 1, 0]
-        enddo
+        do j = 1, 30
+            print *, 'N', N,'j', j
+            !==============allocate arrays
+            allocate(cpuData(N,17+2*nind))
+            allocate(gpuData(N,17+2*nind),P_send(40000000*19),P_exit(40000000,19))
+            allocate(d_isValid(N),d_indices(N))
 
-        gpuData = cpuData
-        d_isValid = d_isValid_cpu
+            !==============prepare the original CPU array
+            cpuData = 0.d0
+            do i = 1, N/8
+                cpuData((i-1)*8+1:i*8,8) = [1.d0, 0.d0, 1.d0, 1.d0, 0.d0, 0.d0, 1.d0, 0.d0]
+            enddo
+            gpuData = cpuData
 
-        !==============loop start
-        do i = 1, 30
-        !----------------
+            !==============loop start
 
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            call prepare_neighbor<<<ceiling(dble(N)/tPB),tPB>>>( &
+            gpuData(:,8),d_isValid,N,0)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time1, startEvent, stopEvent)
+
+            !----------------
             istat = cudaEventRecord(startEvent, 0)
 
             call thrustscan(d_isValid,N,d_indices)
 
             istat = cudaEventRecord(stopEvent, 0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(time1, startEvent, stopEvent)
+            istat = cudaEventElapsedTime(time2, startEvent, stopEvent)
 
-            temp = d_indices(N); allocate(holes(N-temp)) !This time is not considered？
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            temp = d_indices(N); holesize = N-temp
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time3, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            allocate(holes(holesize)) !This time is not considered？
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time4, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            call prepare_holes<<<ceiling(dble(N)/tPB),tPB>>>( &
+            holes,d_indices,d_isValid,N)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time5, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            call select2exit<<<ceiling(dble(holesize)/tPB),tPB>>>(&
+            holes,gpudata,P_exit,holesize)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time6, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            call select2end<<<ceiling(dble(holesize)/tPB),tPB>>>(holes, &
+            gpuData,P_send,0,holesize,0,19)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time7, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            call compaction_inplace<<<ceiling(dble(N)/tPB),tPB>>>( &
+            holes,d_indices,d_isValid,gpuData,0,N)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time8, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
             deallocate(holes)
 
-        !----------------
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time9, startEvent, stopEvent)
+
+            !----------------
+            istat = cudaEventRecord(startEvent, 0)
+
+            call unpack_recv<<<ceiling(dble(holesize)/tPB),tPB>>>( &
+            P_send,gpudata,temp,holesize,19)
+
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time10, startEvent, stopEvent)
+
+            !----------------
             time1_total = time1_total + time1
+            time2_total = time2_total + time2
+            time3_total = time3_total + time3
+            time4_total = time4_total + time4
+            time5_total = time5_total + time5
+            time6_total = time6_total + time6
+            time7_total = time7_total + time7
+            time8_total = time8_total + time8
+            time9_total = time9_total + time9
+            time10_total = time10_total + time10
+
+            deallocate(cpuData)
+            deallocate(gpuData,P_send,P_exit)
+            deallocate(d_isValid,d_indices)
+
         enddo
         !==============loop end
 
         time1_total = time1_total/30.d0
+        time2_total = time2_total/30.d0
+        time3_total = time3_total/30.d0
+        time4_total = time4_total/30.d0
+        time5_total = time5_total/30.d0
+        time6_total = time6_total/30.d0
+        time7_total = time7_total/30.d0
+        time8_total = time8_total/30.d0
+        time9_total = time9_total/30.d0
+        time10_total = time10_total/30.d0
 
-        write(*,'(a,1(f8.3,1x),2i10)') 'Time used (ms):', time1_total, N, temp
+        write(10,'(a,10(f10.5,1x),2i10)') 'Time used (ms):', time1_total, time2_total, &
+                                        time3_total, time4_total, time5_total, time6_total, &
+                                        time7_total, time8_total, time9_total, time10_total, &
+                                        N, temp
         N = N/2
     end do
 
