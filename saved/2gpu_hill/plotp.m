@@ -13,3 +13,4 @@ set(ll,'linewidth',2);
 set(gca,'FontSize',18,'FontName','Times New Roman','FontWeight','Bold','Linewidth',1);
 ylabel('Active Particle Number','FontSize',20,'FontName','Times New Roman','FontWeight','Bold');
 xlabel('Timestep','FontSize',20,'FontName','Times New Roman','FontWeight','Bold');
+legend('2gpus total','cpu','gpu0','gpu1','1gpu')

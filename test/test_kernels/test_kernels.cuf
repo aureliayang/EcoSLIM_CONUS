@@ -27,6 +27,17 @@ program testcompaction
 
     do while (N > 0)
 
+        time1_total = 0.d0
+        time2_total = 0.d0
+        time3_total = 0.d0
+        time4_total = 0.d0
+        time5_total = 0.d0
+        time6_total = 0.d0
+        time7_total = 0.d0
+        time8_total = 0.d0
+        time9_total = 0.d0
+        time10_total = 0.d0
+
         do j = 1, 30
             print *, 'N', N,'j', j
             !==============allocate arrays

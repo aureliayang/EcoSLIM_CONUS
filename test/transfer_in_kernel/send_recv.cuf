@@ -1,0 +1,29 @@
+module kernel_sr
+    use cudafor
+    use mpi
+
+contains
+    attributes(global) subroutine sendp(P)
+        implicit none
+        real(8),intent(in):: P(:)
+        integer:: ii, ierr
+        !integer,value:: numElements
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        !if(ii <= numElements) then
+            call MPI_SEND(P(ii),1,MPI_DOUBLE_PRECISION,0,ii,MPI_COMM_WORLD,ierr)
+        !end if
+    end subroutine sendp
+
+    !attributes(global) subroutine recvp(P)
+    !    implicit none
+    !    real(8),intent(in):: P(:)
+    !    integer:: ii, ierr, status(MPI_STATUS_SIZE)
+    !    !integer,value:: numElements
+!
+    !    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    !    !if(ii <= numElements) then
+    !        call MPI_RECV(P(ii),1,MPI_DOUBLE_PRECISION,1,ii,MPI_COMM_WORLD,status,ierr)
+    !    !end if
+    !end subroutine recvp
+end module kernel_sr

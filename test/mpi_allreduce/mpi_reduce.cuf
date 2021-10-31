@@ -1,0 +1,65 @@
+program simple_write
+  use mpi
+  use cudafor
+  implicit none
+
+  integer :: rank, nproc, ierr, status(MPI_STATUS_SIZE)
+  integer :: i, j, k
+
+  real(8),allocatable,device :: P(:)
+  real(8),allocatable :: P_cpu(:)
+
+  type (cudaEvent) :: startEvent, stopEvent
+  real:: time1, time2, time3
+
+  integer:: istat
+  integer:: np
+
+  character*200 ranknum
+
+    call mpi_init(ierr)
+    call mpi_comm_size(mpi_comm_world, nproc, ierr)
+    call mpi_comm_rank(mpi_comm_world, rank, ierr)
+
+    ierr = cudaSetDevice(rank)
+
+    np = 2; allocate(P(np),P_cpu(np))
+    !if (rank == 0) P = 1.d0
+    !if (rank == 1) P = 0.d0
+    P = 1.d0
+    P_cpu = P
+
+    istat = cudaEventCreate(startEvent)
+    istat = cudaEventCreate(stopEvent)
+
+    write(ranknum,'(i5.5)') rank
+
+    open(10,file='Reduce_time.'//trim(adjustl(ranknum))//'.txt')
+
+        do j = 1, 30
+            istat = cudaEventRecord(startEvent, 0)
+            call MPI_ALLReduce(MPI_IN_PLACE,P_cpu,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
+            P_cpu = P
+            istat = cudaEventRecord(stopEvent, 0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(time2, startEvent, stopEvent)
+
+            write(10,*) j, P_cpu, time2, 'ms'
+        end do
+
+    flush(10)
+    close(10)
+    istat = cudaEventDestroy(startEvent)
+    istat = cudaEventDestroy(stopEvent)
+
+    call mpi_finalize(ierr)
+
+  end program simple_write
+
+ ! do i=0,nproc-1
+ !     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+ !     if(i==rank)then
+ !         print *, 'before',rank,cpu_rank
+ !     endif
+ ! enddo
+ !call MPI_RECV(P(1:i),i,MPI_DOUBLE_PRECISION,0,j,MPI_COMM_WORLD,status,ierr)
