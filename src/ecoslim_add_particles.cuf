@@ -121,23 +121,25 @@ attributes(global) subroutine scan_new_particles( &
             end if
         end if
 
-        if(EvapTrans_de(i,j,k) > 0.d0) then
-            temp = atomicAdd(PET_balance(1),pfdt*EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o)
-        else
-            temp = atomicAdd(PET_balance(2),pfdt*EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o)
-        endif
+        !if(Saturation_de(i,j,k) > 0.d0) then !active area
 
-        if(EvapTrans_da_de(i,j,k) > 0.d0) then
-            if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 1
-            ! only the top layer (k = nz) will introduce new particles
-            ! in fact, the if(k == nz) is not necessary since if EvapTrans_de(i,j,k) > 0.d0
-            ! it must be in the top layer.
-        else
-            if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 0
-        endif
-        ! pass add_f and kk in, use if condition.
-        ! but I feel too much extra work. Probably just let it calculate and we never use it,
+            if(EvapTrans_de(i,j,k) > 0.d0) then
+                temp = atomicAdd(PET_balance(1),pfdt*EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o)
+            else
+                temp = atomicAdd(PET_balance(2),pfdt*EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o)
+            endif
 
+            if(EvapTrans_da_de(i,j,k) > 0.d0) then
+                if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 1
+                ! only the top layer (k = nz) will introduce new particles
+                ! in fact, the if(k == nz) is not necessary since if EvapTrans_de(i,j,k) > 0.d0
+                ! it must be in the top layer.
+            else
+                if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 0
+            endif
+            ! pass add_f and kk in, use if condition.
+            ! but I feel too much extra work. Probably just let it calculate and we never use it,
+        !end if
     end if
 
 end subroutine scan_new_particles
@@ -191,6 +193,7 @@ attributes(global) subroutine add_new_particles( &
                 P(index,4) = 0.0d0 + curand_uniform(h(index))*pfdt
 
                 if (nind > 0) then
+                    ! bug, should be transferred to local
                     Ploc(1) = floor(P(index,1) / dx)
                     Ploc(2) = floor(P(index,2) / dy)
                     Ploc(3) = nz-1
