@@ -14,5 +14,5 @@
 ###### compaction after transfers for all neighbors
 * This will keep the length of peripherical particles and compact at the end of the send
 ## Separation
-## Other notes
+## Others
 loop.txt is just for residual of previous code.
