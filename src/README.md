@@ -6,4 +6,5 @@
 ###### compaction after each transfer for a neighbor
 ###### compaction after transfers for all neighbors
 ## Separation
+## Other notes
 loop.txt is just for residual of previous code.
