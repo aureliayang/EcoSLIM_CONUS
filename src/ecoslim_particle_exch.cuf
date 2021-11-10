@@ -1,13 +1,12 @@
 module exchange_particles
-
     use thrust
     use cudafor
     use compact_array
     use particle_loop
     use variable_list, only: N_recv, N_send, N_peri, N_inte, N_exit
     use variable_list, only: neigh_list, transfer
-    ! neigh_list is allocated after getting number of total GPUs.
-    ! it is 1 if neighbor exists while 0 if neighbor doesn't exist.
+    ! neigh_list is allocated after getting the number of total GPUs.
+    ! It is 1 if neighbor exists while 0 if neighbor doesn't exist.
     ! N_send has the same length of neigh_list and was built one by one.
     ! N_recv is allocated or deallocated after initialization/update of grid.
     ! N_recv has the length of its neighbors and has been initialized as 0.
@@ -122,7 +121,7 @@ contains
                             #if _TIMING == 1
                             istat = cudaEventRecord(startEvent,0)
                             #endif
-                            call select2end<<<ceiling(dble(N_send(nc1))/tPB),tPB>>>(holes, &
+                            call select2send<<<ceiling(dble(N_send(nc1))/tPB),tPB>>>(holes, &
                                 P_de,P_send,N_inte,N_send(nc1),sum_send,nattri)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)

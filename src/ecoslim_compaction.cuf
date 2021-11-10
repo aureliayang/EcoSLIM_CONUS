@@ -31,7 +31,7 @@ contains
         end if
     end subroutine prepare_holes
 !2--------------------------------------------------------------------
-    attributes(global) subroutine select2end(holes, &
+    attributes(global) subroutine select2send(holes, &
         d_in,d_out,offset,hole_size,sumsend,nattri)
         !original:        1 0 1 1 0 0 1 0  d_isValid
         !index(or ii):    1 2 3 4 5 6 7 8  ii
@@ -54,7 +54,7 @@ contains
             d_out(temp1:temp2) = d_in(temp3,:)
         end if
 
-    end subroutine select2end
+    end subroutine select2send
 
 !3--------------------------------------------------------------------
     attributes(global) subroutine unpack_recv(d_in, &

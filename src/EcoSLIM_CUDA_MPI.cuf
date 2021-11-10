@@ -133,6 +133,7 @@ integer:: istat, temp
     read(10,*) ppx
     read(10,*) qqy
     read(10,*) transfer
+    read(10,*) separate
     ! read in number of particles for IC (if np_ic = -1 then restart from a file)
     read(10,*) np_ic
 
@@ -633,22 +634,23 @@ integer:: istat, temp
                     pid = pid + i_added_particles
                 end if
 
-                !istat = cudaDeviceSynchronize ()
                 PET_balance = PET_balance_de
                 call MPI_Barrier(MPI_COMM_WORLD,ierr)
-                #if _TIMING == 1
-                ! istat = cudaEventRecord(startEvent,0)
-                t1 = mpi_wtime()
-                #endif
+
+                    #if _TIMING == 1
+                    ! istat = cudaEventRecord(startEvent,0)
+                    t1 = mpi_wtime()
+                    #endif
+
                 call MPI_ALLReduce(MPI_IN_PLACE,PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-                !istat = cudaDeviceSynchronize ()
-                #if _TIMING == 1
-                !istat = cudaEventRecord(stopEvent,0)
-                !istat = cudaEventSynchronize(stopEvent)
-                !istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
-                t2 = mpi_wtime()
-                reduce_time = (t2 - t1)*1000
-                #endif
+
+                    #if _TIMING == 1
+                    !istat = cudaEventRecord(stopEvent,0)
+                    !istat = cudaEventSynchronize(stopEvent)
+                    !istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
+                    t2 = mpi_wtime()
+                    reduce_time = (t2 - t1)*1000
+                    #endif
 
             end if
         end if
@@ -663,49 +665,49 @@ integer:: istat, temp
         ! are mixed in the array, the thrustscan and movement of interior particles may happen at
         ! the same time, but they are all read-only operations, so it doesn't matter.
 
-        if(transfer == 1) then
-            #if _TIMING == 1
-            istat = cudaEventRecord(startEvent,0)
-            #endif
-                call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>> ( &
-                    P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
-            #if _TIMING == 1
-            istat = cudaEventRecord(stopEvent,0)
-            istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(sort_time1,startEvent,stopEvent)
-            #endif
-
-            #if _TIMING == 1
-            istat = cudaEventRecord(startEvent,0)
-            #endif
-                call thrustscan(d_isValid,np_active,d_indices)
-            #if _TIMING == 1
-            istat = cudaEventRecord(stopEvent,0)
-            istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(sort_time2,startEvent,stopEvent)
-            #endif
-
-            #if _TIMING == 1
-            istat = cudaEventRecord(startEvent,0)
-            #endif
-                temp = d_indices(np_active)
-                N_peri = np_active - temp
-            #if _TIMING == 1
-            istat = cudaEventRecord(stopEvent,0)
-            istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(sort_time3,startEvent,stopEvent)
-            #endif
-
-                if(np_active + N_peri >= np) then
-                    write(17,*) ' **Warning particles separation out of bound'
-                    write(17,*) ' **Exiting code gracefully writing restart'
-                    goto 9090
-                endif
+        if(separate) then
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+            call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time1,startEvent,stopEvent)
+                #endif
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                    allocate(holes(N_peri))
+            call thrustscan(d_isValid,np_active,d_indices)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time2,startEvent,stopEvent)
+                #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+            N_inte = d_indices(np_active)
+            N_peri = np_active - N_inte
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(sort_time3,startEvent,stopEvent)
+                #endif
+
+            if(np_active + N_peri >= np) then
+                write(17,*) ' **Warning particles separation out of bound'
+                write(17,*) ' **Exiting code gracefully writing restart'
+                goto 9090
+            endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+            allocate(holes(N_peri))
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -715,8 +717,8 @@ integer:: istat, temp
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,d_indices,d_isValid,np_active)
+            call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                holes,d_indices,d_isValid,np_active)
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -726,8 +728,8 @@ integer:: istat, temp
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                    holes,P_de,np_active,N_peri)
+            call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                holes,P_de,np_active,N_peri)
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -737,8 +739,8 @@ integer:: istat, temp
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,d_indices,d_isValid,P_de,0,np_active)
+            call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                holes,d_indices,d_isValid,P_de,0,np_active)
                 ! if no compaction, you will need d_isValid and if condition to judge
                 ! during the interior particles' movement
                 #if _TIMING == 1
@@ -750,7 +752,7 @@ integer:: istat, temp
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                N_inte = d_indices(np_active);
+            !N_inte = d_indices(np_active);
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -760,7 +762,7 @@ integer:: istat, temp
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                deallocate(holes)
+            deallocate(holes)
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -770,8 +772,8 @@ integer:: istat, temp
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-                call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                    P_de,N_inte,N_peri)
+            call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                P_de,N_inte,N_peri)
                 ! if not connect, ther will be the risk that it is out of particles when do receiving
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)

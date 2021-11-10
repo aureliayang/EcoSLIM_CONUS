@@ -109,7 +109,7 @@ module variable_list
     ! If V_mult = -1, backward tracking
     ! density of water (M/L3), molecular diffusion (L2/T), fractionation
 
-    logical clmtrans, clmfile, reflect  ! reflect has not been read
+    logical clmtrans, clmfile, reflect, separate  ! reflect has not been read
     ! logical for mode of operation with CLM, will add particles with P-ET > 0
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
