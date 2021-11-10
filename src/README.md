@@ -1,38 +1,38 @@
 # Input file
-* **runname** EcoSLIM run name
-* **pname** Path of ParFlow files
-* **DEMname** pfb file name of DEM
-* **nx** Dimension in x direction
-* **ny** Dimension in y direction
-* **nz** Dimension in z direction
-* **nCLMsoil** Layers coupled between CLM an ParFlow
-* **ppx** Split in x direction
-* **qqy** Split in y direction
-* **transfer** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is transfer with separation, 2 is transfer without separation
-* **np_ic** Number o particle per cell at the start of simulation
-* **np** Maximum number permitted during run time 
-* **dx** grid-cell size in x direction
-* **dy** grid-cell size in y direction
-* **dz** grid-cell size in z direction from bottom to top, separated by comma
-* **pfdt** ParFlow dt, need double-check in the code for mass balance
-* **pft1** ParFlow start time
-* **pft2** ParFlow end time
-* **tout1** EcoSLIM start number; it is 0 forcold start; it is the last completed timestep fo hot start
-* **n_cycle** The cycles to use the ParFlow files
-* **add_f** The time interval to add particles
-* **ipwrite**
-* **ibinpntswrite**
-* **etwrite**
-* **icwrite**
-* **V_mult**
-* **ckmtrans**
-* **clmfile**
-* **iflux_p_res**
-* **denh2o**
-* **moldiff**
-* **dtfrac**
-* **nind**
-* **Indname**
+* **runname,** EcoSLIM run name
+* **pname,** Path of ParFlow files
+* **DEMname,** pfb file name of DEM
+* **nx,** Dimension in x direction
+* **ny,** Dimension in y direction
+* **nz,** Dimension in z direction
+* **nCLMsoil,** Layers coupled between CLM an ParFlow
+* **ppx,** Split in x direction
+* **qqy,** Split in y direction
+* **transfer,** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is transfer with separation, 2 is transfer without separation
+* **np_ic,** Number o particle per cell at the start of simulation
+* **np,** Maximum number permitted during run time 
+* **dx,** grid-cell size in x direction
+* **dy,** grid-cell size in y direction
+* **dz,** grid-cell size in z direction from bottom to top, separated by comma
+* **pfdt,** ParFlow dt, need double-check in the code for mass balance
+* **pft1,** ParFlow start time
+* **pft2,** ParFlow end time
+* **tout1,** EcoSLIM start number; it is 0 forcold start; it is the last completed timestep fo hot start
+* **n_cycle,** The cycles to use the ParFlow files
+* **add_f,** The time interval to add particles
+* **ipwrite,**
+* **ibinpntswrite,**
+* **etwrite,**
+* **icwrite,**
+* **V_mult,**
+* **ckmtrans,**
+* **clmfile,**
+* **iflux_p_res,**
+* **denh2o,**
+* **moldiff,**
+* **dtfrac,**
+* **nind,**
+* **Indname,**
 # Transfer schemes
 * **neigh_list** uses *managed memory* and has the length of total GPU number. This is because the do loop use it can pass the non-neighbor quickly. However, if we compact is with pure neighbors, there should be extra work. But we can think carefully about this to choose the best way.  
 * Label the destination of particles which will be transferred by P(ii,13+2\*nind), where ii is the number of particle. It saves the rank of the destination. It is the original pid, but after using mpi and transfer, there is no sense for this attribute anymore. We ca try to rebuild *pid* attribute later.  
