@@ -227,6 +227,7 @@ contains
 
             if(ii <= length) then
                 if(Zone_de(i,j) >= 0 .and. Zone_de(i,j) /= rank) then
+                ! since there is -1 for halo
                     temp = atomicAdd(d_isValid(Zone_de(i,j)+1),lock)
                 end if
             end if

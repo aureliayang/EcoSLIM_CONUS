@@ -659,6 +659,10 @@ integer:: istat, temp
         !istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
         !#endif
 !----------------------------------------
+        ! If you don't physically separate the particles, the interior and peripherical particles
+        ! are mixed in the array, the thrustscan and movement of interior particles may happen at
+        ! the same time, but they are all read-only operations, so it doesn't matter.
+
         if(transfer == 1) then
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
@@ -735,6 +739,8 @@ integer:: istat, temp
                 #endif
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,d_indices,d_isValid,P_de,0,np_active)
+                ! if no compaction, you will need d_isValid and if condition to judge
+                ! during the interior particles' movement
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -766,6 +772,7 @@ integer:: istat, temp
                 #endif
                 call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                     P_de,N_inte,N_peri)
+                ! if not connect, ther will be the risk that it is out of particles when do receiving
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
