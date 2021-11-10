@@ -7,5 +7,5 @@ Welcome download and use. Enjoy!
 ## CONUS domain
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/images/conus.png)
 ## Subdomain demonstration
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/images/Picture1.png)  
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/images/subdomain.png)  
 
