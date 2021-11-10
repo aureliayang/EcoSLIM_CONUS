@@ -41,7 +41,7 @@
 * put **N_send** array in **managed memory**
 * send each **N_send** element to the corresponding neighbor 
 * copy P(ii,13+2\*nind) back to CPU 
-* use (13+2\*nind) to do the do loop
+* use P(ii,13+2\*nind) to do the do loop
 * We need P_send anyway since cuda-aware mpi doesn't support row memory
 ## Packed transfer
 ###### compaction after each transfer for a neighbor
