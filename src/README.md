@@ -8,8 +8,8 @@
 * **nCLMsoil,** Layers coupled between CLM an ParFlow
 * **ppx,** Split in x direction
 * **qqy,** Split in y direction
-* **separate,** Separate or not
 * **transfer,** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is transfer with separation, 2 is transfer without separation
+* **separate,** Separate or not
 * **np_ic,** Number o particle per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
 * **dx,** grid-cell size in x direction
