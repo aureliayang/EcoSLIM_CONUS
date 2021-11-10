@@ -1,3 +1,24 @@
+# Input file
+* EcoSLIM run name
+* the path of parflow files
+* pfb filename of DEM
+* nx
+* ny
+* nz
+* nCLMsoil
+* ppx
+* qqy
+* transfer scheme
+* particle per cell at start of simulation
+* np
+* dx
+* dy
+* dz
+* parflow dt
+* parflow t1
+* parflow t2
+* EcoSLIM start number
+* 
 # Transfer schemes
 * **neigh_list** uses *managed memory* and has the length of total GPU number. This is because the do loop use it can pass the non-neighbor quickly. However, if we compact is with pure neighbors, there should be extra work. But we can think carefully about this to choose the best way.  
 * Label the destination of particles which will be transferred by P(ii,13+2\*nind), where ii is the number of particle. It saves the rank of the destination. It is the original pid, but after using mpi and transfer, there is no sense for this attribute anymore. We ca try to rebuild *pid* attribute later.  
