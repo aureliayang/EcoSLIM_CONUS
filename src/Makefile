@@ -70,6 +70,7 @@ clean:
 	P_separa.* \
 	P_peri.* \
 	Send_Recv.* \
-	null
+	null \
+	Device_Utility.txt
 
 
