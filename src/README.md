@@ -1,4 +1,4 @@
-# Input file
+# Input file (for users)
 * **runname,** EcoSLIM run name
 * **pname,** Path of ParFlow files
 * **DEMname,** pfb file name of DEM
@@ -33,7 +33,7 @@
 * **dtfrac,**
 * **nind,**
 * **Indname,**
-# Transfer schemes
+# Transfer schemes (for developers)
 * **neigh_list** uses *managed memory* and has the length of total number of GPUs. This is because the do loop using it can skip the non-neighbor quickly. However, if we compact it with pure neighbors, there should be extra work. We can think carefully about this to choose the best way.  
 * Label the destination of particles which will be transferred by P(ii,13+2\*nind), where ii is the number of particle. It saves the rank of the destination. It is the original pid attribute, but after using mpi and transfer, there is no sense for this attribute anymore. We ca try to rebuild *pid* attribute later.  
 ## One by one transfer
