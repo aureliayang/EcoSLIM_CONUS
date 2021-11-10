@@ -54,5 +54,4 @@
 ## Others
 loop.txt is just for residual of previous code.
 
-![GitHub Logo](/images/logo.png)
-Format: ![Alt Text](url)
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/images/Picture1.png)
