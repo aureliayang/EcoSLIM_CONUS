@@ -25,7 +25,7 @@
 * **etwrite,**
 * **icwrite,**
 * **V_mult,**
-* **ckmtrans,**
+* **clmtrans,**
 * **clmfile,**
 * **iflux_p_res,**
 * **denh2o,**
