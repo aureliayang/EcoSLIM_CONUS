@@ -10,7 +10,7 @@
 * We need P_send anyway since cuda-aware mpi doesn't support row memory
 ## Packed transfer
 ###### compaction after each transfer for a neighbor
-* This will shorten the thrustscan list but need compaction
+* This will shorten the thrustscan length but increase the frequency of compaction
 ###### compaction after transfers for all neighbors
 * This will keep the length of peripherical particles and compact at the end of the send
 ## Separation
