@@ -92,11 +92,7 @@ integer:: istat, temp
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
     #if _TIMING == 1
-<<<<<<< HEAD
     Total_time1 = mpi_wtime()
-=======
-    t1 = mpi_wtime()
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
     #endif
 !--------------------------------------------------------------------
     ! Read inputs, set up domain, write the log file
@@ -637,7 +633,6 @@ integer:: istat, temp
                     pid = pid + i_added_particles
                 end if
 
-<<<<<<< HEAD
                 !istat = cudaDeviceSynchronize ()
                 PET_balance = PET_balance_de
                 call MPI_Barrier(MPI_COMM_WORLD,ierr)
@@ -653,18 +648,6 @@ integer:: istat, temp
                 !istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
                 t2 = mpi_wtime()
                 reduce_time = (t2 - t1)*1000
-=======
-                #if _TIMING == 1
-                istat = cudaEventRecord(startEvent,0)
-                #endif
-
-                call MPI_ALLReduce(MPI_IN_PLACE,PET_balance_de,2,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierr)
-
-                #if _TIMING == 1
-                istat = cudaEventRecord(stopEvent,0)
-                istat = cudaEventSynchronize(stopEvent)
-                istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                 #endif
 
             end if
@@ -676,13 +659,10 @@ integer:: istat, temp
         !istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
         !#endif
 !----------------------------------------
-<<<<<<< HEAD
         ! If you don't physically separate the particles, the interior and peripherical particles
         ! are mixed in the array, the thrustscan and movement of interior particles may happen at
         ! the same time, but they are all read-only operations, so it doesn't matter.
 
-=======
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
         if(transfer == 1) then
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
@@ -759,11 +739,8 @@ integer:: istat, temp
                 #endif
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,d_indices,d_isValid,P_de,0,np_active)
-<<<<<<< HEAD
                 ! if no compaction, you will need d_isValid and if condition to judge
                 ! during the interior particles' movement
-=======
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -795,10 +772,7 @@ integer:: istat, temp
                 #endif
                 call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
                     P_de,N_inte,N_peri)
-<<<<<<< HEAD
                 ! if not connect, ther will be the risk that it is out of particles when do receiving
-=======
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -856,11 +830,6 @@ integer:: istat, temp
         if(total_mass(1) > 0.d0) mean_age(1)  = mean_age(1)/total_mass(1)
         if(total_mass(1) > 0.d0) mean_comp(1) = mean_comp(1)/total_mass(1)
         mean_mass = total_mass/dble(np_active)
-<<<<<<< HEAD
-
-=======
-        PET_balance = PET_balance_de
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
         ET_np_cpu   = ET_np_de
         out_np_cpu  = out_np_de
         write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
@@ -884,11 +853,7 @@ integer:: istat, temp
     #endif
 
     #if _TIMING == 1
-<<<<<<< HEAD
     Total_time2 = mpi_wtime()
-=======
-    t2 = mpi_wtime()
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
     #endif
     istat = cudaEventDestroy(startEvent)
     istat = cudaEventDestroy(stopEvent)
@@ -897,11 +862,7 @@ integer:: istat, temp
     write(17,*) '###  Execution Finished'
     write(17,*)
     write(17,*) 'Simulation Timing and Profiling:'
-<<<<<<< HEAD
     write(17,'("Total Execution Time (s):",e12.5)') Total_time2 - Total_time1
-=======
-    write(17,'("Total Execution Time (s):",e12.5)') t2 - t1
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
     !write(17,'("File IO Time Read (s):",e12.5)') IO_time_read
     !write(17,'("Host to device data transfer (s):",e12.5)') h2d_time
     !write(17,'("Add new particles (s):",e12.5)') add_time
