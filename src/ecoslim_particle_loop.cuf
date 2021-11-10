@@ -411,6 +411,7 @@ contains
                     end if
                 end do
 
+<<<<<<< HEAD
                 if(Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
                     ! the problem is you cannot check if the particle has been in the inactive
                     ! area after the last do while iteration.
@@ -425,6 +426,8 @@ contains
 
                 end if
 
+=======
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                 ! check to make sure particles are in central part of the domain and if not
                 ! apply some boundary condition to them
                 ! check if particles are in domain, need to expand this to include better treatment of BC's
@@ -615,7 +618,11 @@ contains
                     (P_s(ii,1) >= Xgmax).or.(P_s(ii,2) >= Ygmax).or.(P_s(ii,3) > Zgmax)) then
                     ! unavoidable particle loss, this should be written into the log file later.
                     ! flag particle as inactive
+<<<<<<< HEAD
                     P_s(ii,8) = 0.d0
+=======
+                    P_s(ii, 8) = 0.d0
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                     ! flag as exiting via loss
                     P_s(ii,10) = 3.d0
                     goto 999
@@ -643,13 +650,20 @@ contains
             P_s(ii,13+2*nind) = -1.
             if(P_s(ii,10) /= 3.) then ! otherwise, particle is out of domain
                 if(Zone_de(Ploc(1)+1,Ploc(2)+1) /= rank) then
+<<<<<<< HEAD
                     ! we assume the above boundary constrain has clean the -1 area of Zone_de
                     ! i.e., there will be no particles in the -1 halo
+=======
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                     if(P_s(ii,8) == 1. .or. (P_s(ii,8) == 0. .and. P_s(ii,10) == 2.)) &
                     P_s(ii,13+2*nind) = Zone_de(Ploc(1)+1,Ploc(2)+1)
                 end if
             endif
+<<<<<<< HEAD
             ! Hence, particles which will be sent to neighbors has been labelled
+=======
+            ! Hence, particles which will be sent to neighbors has been labeled
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
 
             ! Transfer local coordinates to global
             P_s(ii,1) = P_s(ii,1) + dble(ix1)*dx

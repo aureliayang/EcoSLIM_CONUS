@@ -225,8 +225,12 @@ contains
                     ! interior particles
                     #if _TEXTURE == 1
                         #if _SHARED == 1
+<<<<<<< HEAD
                         call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB, &
                             tPB*(13+nind*2)*kind(0.d0)>>> ( &
+=======
+                        call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB,tPB*(13+nind*2)*8>>> ( &
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                             P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
                             et_age_de,et_mass_de,et_comp_de,et_np_de, &
                             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &

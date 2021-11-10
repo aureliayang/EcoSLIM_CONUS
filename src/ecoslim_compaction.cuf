@@ -227,7 +227,10 @@ contains
 
             if(ii <= length) then
                 if(Zone_de(i,j) >= 0 .and. Zone_de(i,j) /= rank) then
+<<<<<<< HEAD
                 ! since there is -1 for halo
+=======
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
                     temp = atomicAdd(d_isValid(Zone_de(i,j)+1),lock)
                 end if
             end if

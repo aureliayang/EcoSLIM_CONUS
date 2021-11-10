@@ -8,6 +8,7 @@ program testcompaction
     real(8), allocatable, pinned :: cpuData(:,:)
     real(8), allocatable, device :: gpuData(:,:)
     integer, allocatable, device :: d_isValid(:),d_indices(:),holes(:)
+<<<<<<< HEAD
     real(8), allocatable, device :: P_send(:),P_exit(:,:)
 
     type (cudaEvent) :: startEvent, stopEvent
@@ -18,6 +19,14 @@ program testcompaction
     real:: time1, time2, time3, time4, time5
     real:: time6, time7, time8, time9, time10
     integer:: temp, holesize
+=======
+    integer, allocatable, pinned :: d_isValid_cpu(:)
+
+    type (cudaEvent) :: startEvent, stopEvent
+    real:: time1_total=0., time2_total=0., time3_total=0.
+    real:: time1, time2, time3
+    integer:: temp
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
 
     integer:: istat, i, j, tPB = 256  !test will keep blocksize as 256.
     integer:: N = 80000000, nind = 1
@@ -26,6 +35,7 @@ program testcompaction
     istat = cudaEventCreate(stopEvent)
 
     do while (N > 0)
+<<<<<<< HEAD
 
         time1_total = 0.d0
         time2_total = 0.d0
@@ -65,12 +75,35 @@ program testcompaction
             istat = cudaEventElapsedTime(time1, startEvent, stopEvent)
 
             !----------------
+=======
+        !==============allocate arrays
+        allocate(cpuData(N,17+2*nind))
+        allocate(gpuData(N,17+2*nind))
+        allocate(d_isValid_cpu(N),d_isValid(N),d_indices(N))
+
+        !==============prepare the original CPU array
+        cpuData = 0.d0
+        d_isValid_cpu = 0
+        do i = 1, N/8
+            cpuData((i-1)*8+1:i*8,8) = [1.d0, 0.d0, 1.d0, 1.d0, 0.d0, 0.d0, 1.d0, 0.d0]
+            d_isValid_cpu((i-1)*8+1:i*8) = [1, 0, 1, 1, 0, 0, 1, 0]
+        enddo
+
+        gpuData = cpuData
+        d_isValid = d_isValid_cpu
+
+        !==============loop start
+        do i = 1, 30
+        !----------------
+
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
             istat = cudaEventRecord(startEvent, 0)
 
             call thrustscan(d_isValid,N,d_indices)
 
             istat = cudaEventRecord(stopEvent, 0)
             istat = cudaEventSynchronize(stopEvent)
+<<<<<<< HEAD
             istat = cudaEventElapsedTime(time2, startEvent, stopEvent)
 
             !----------------
@@ -166,10 +199,20 @@ program testcompaction
             deallocate(gpuData,P_send,P_exit)
             deallocate(d_isValid,d_indices)
 
+=======
+            istat = cudaEventElapsedTime(time1, startEvent, stopEvent)
+
+            temp = d_indices(N); allocate(holes(N-temp)) !This time is not considered？
+            deallocate(holes)
+
+        !----------------
+            time1_total = time1_total + time1
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
         enddo
         !==============loop end
 
         time1_total = time1_total/30.d0
+<<<<<<< HEAD
         time2_total = time2_total/30.d0
         time3_total = time3_total/30.d0
         time4_total = time4_total/30.d0
@@ -184,6 +227,10 @@ program testcompaction
                                         time3_total, time4_total, time5_total, time6_total, &
                                         time7_total, time8_total, time9_total, time10_total, &
                                         N, temp
+=======
+
+        write(*,'(a,1(f8.3,1x),2i10)') 'Time used (ms):', time1_total, N, temp
+>>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
         N = N/2
     end do
 
