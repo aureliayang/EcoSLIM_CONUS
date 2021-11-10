@@ -17,7 +17,7 @@
 * **pfdt,** ParFlow dt, need double-check in the code for mass balance
 * **pft1,** ParFlow start time
 * **pft2,** ParFlow end time
-* **tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep fo hot start
+* **tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep for hot start
 * **n_cycle,** The cycles to use the ParFlow files
 * **add_f,** The time interval to add particles
 * **ipwrite,**
