@@ -411,7 +411,7 @@ contains
                     end if
                 end do
 
-                if(Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
+                if(Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) <= 0.d0) then
                     ! the problem is you cannot check if the particle has been in the inactive
                     ! area after the last do while iteration.
                     ! but it can be checked in the next do loop in the next timestep.
