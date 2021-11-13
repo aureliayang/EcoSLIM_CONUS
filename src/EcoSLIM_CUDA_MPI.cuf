@@ -1,9 +1,8 @@
-! Last Change:  2020-11-12 17:43:44
 !--------------------------------------------------------------------
 ! **EcoSLIM** is a Lagrangian, particle-tracking that simulates advective
-! and diffusive movement of water parcels.  This code can be used to
+! and diffusive movement of water parcels. This code can be used to
 ! simulate age, diagnosing travel times, source water composition and
-! flowpaths.  It integrates seamlessly with **ParFlow-CLM**.
+! flowpaths. It integrates seamlessly with **ParFlow-CLM**.
 !
 ! Developed by: Reed Maxwell-August 2016 (rmaxwell@mines.edu)
 !
@@ -13,33 +12,33 @@
 !
 ! released under GNU LPGL, see LICENSE file for details
 !--------------------------------------------------------------------
-! 06/26/2021 GPU version, Chen Yang
+! 06/26/2021 GPU version, Chen Yang (cy15@princeton.edu)
 !--------------------------------------------------------------------
 program EcoSLIM
-! use mpi
-! use cudafor
-use mrand
-! use thrust
-use utilities
-use particle_loop
-use mpiDeviceUtil
-use variable_list
-! use hdf5_file_read
-! use hdf5_file_write
-use subdomain_bound
-use create_subdomain
-use add_particles
-use compact_array
-! use exchange_zone
-use exchange_particles
+    ! use mpi
+    ! use cudafor
+    use mrand
+    ! use thrust
+    use utilities
+    use particle_loop
+    use mpiDeviceUtil
+    use variable_list
+    ! use hdf5_file_read
+    ! use hdf5_file_write
+    use subdomain_bound
+    use create_subdomain
+    use add_particles
+    use compact_array
+    ! use exchange_zone
+    use exchange_particles
 
-implicit none
-! integer(8),allocatable,pinned:: p_num_cpu(:,:)
-! type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
-real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
-real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
-real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
-integer:: istat, temp
+    implicit none
+    ! integer(8),allocatable,pinned:: p_num_cpu(:,:)
+    ! type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
+    real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
+    real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
+    real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
+    integer:: istat, temp
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -63,7 +62,7 @@ integer:: istat, temp
     call MPI_FILE_CLOSE(fh0, ierr)
 
 !--------------------------------------------------------------------
-    ! how to do timing is also a new question when asyn later.
+    ! How to do timing is also a new question when we do asyn later.
     ! Set up timing
     Total_time1 = 0.d0
     Total_time2 = 0.d0
@@ -79,24 +78,24 @@ integer:: istat, temp
     add_time = 0.
 
     sort_time = 0.
-    peri_time= 0.
-    inte_time= 0.
-    exit_time= 0.
-    C_time   = 0.
+    peri_time = 0.
+    inte_time = 0.
+    exit_time = 0.
+    C_time    = 0.
 
     scan_time   = 0.
     copy_time   = 0.
     add2_time   = 0.
-    thrust_time   = 0.
+    thrust_time = 0.
 
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
-    #if _TIMING == 1
+
+        #if _TIMING == 1
     Total_time1 = mpi_wtime()
-    #endif
+        #endif
 
     open(30,file='Debug.'//trim(adjustl(ranknum))//'.txt')
-
 !--------------------------------------------------------------------
     ! Read inputs, set up domain, write the log file
     ! open SLIM input .txt file
@@ -313,14 +312,14 @@ integer:: istat, temp
                 !    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
                 !if(rank == 3) &
                 !    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            if(rank == 0) &
-            write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            if(rank == 1) &
-            write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            if(rank == 2) &
-            write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            if(rank == 3) &
-            write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 0) &
+                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 1) &
+                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 2) &
+                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+                if(rank == 3) &
+                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
             close(10)
 
     end if
@@ -354,13 +353,13 @@ integer:: istat, temp
             ! allocate(h_cpu(np))
             ! h_cpu = h
             ! write(*,*) rank,'h_before',h_cpu(1)
-        call createRand_init<<<ceiling(dble(nnx1*nny1*nz)/tPB),tPB>>>(nx,ny,nz, &
+        call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> (nx,ny,nz, &
             rank,np_ic,nnx1,nny1)
             ! h_cpu = h
             ! write(*,*) rank,'h_after',h_cpu(1)
     endif
 
-    dz_de  = dz ! I can't understand why dz doesn't work.
+    dz_de  = dz
     Ind_de = Ind
     Porosity_de   = Porosity
     Saturation_de = Saturation
@@ -371,23 +370,23 @@ integer:: istat, temp
         np_active = 0
         pid = 0
 
-        if (np_active + np_ic*nnx1*nny1*nz >= np ) then
-            write(17,*) ' **Warning IC input but no paricles left'
-            write(17,*) ' **Exiting code gracefully writing restart'
-            goto 9090
-        endif
-
         call scan_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
         tPB >>> (d_isValid,nnx1,nny1,nz)
 
         call thrustscan(d_isValid,nnx1*nny1*nz,d_indices)
 
-        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
-        tPB >>> (d_indices,P_de,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dz_de)
-
         np_active = d_indices(nnx1*nny1*nz)
         np_active = np_ic*np_active
         pid = np_active
+
+        if (np_active >= np) then
+            write(17,*) ' **Warning IC input but no paricles left'
+            write(17,*) ' **Exiting code gracefully writing restart'
+            goto 9090
+        endif
+
+        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> &
+        (d_indices,P_de,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dz_de)
 
     end if
 
@@ -411,8 +410,8 @@ integer:: istat, temp
 
     endif
 
-    call scan_zone<<<ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-        tPB>>>(nnx1,nny1,buff,neigh_list,rank,t_rank)
+    call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+        tPB >>> (nnx1,nny1,buff,neigh_list,rank,t_rank)
 
     if(sum(neigh_list) > 0) then
         allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
@@ -426,17 +425,17 @@ integer:: istat, temp
         ! close(10)
 
     ! Intialize cuRand device API and this part need to check through again.
-    call createRand_loop<<< ceiling(dble(np)/tPB),tPB >>>(np, rank, pfnt)
+    call createRand_loop<<< ceiling(dble(np)/tPB),tPB >>> (np, rank, pfnt)
 
     #if _TEXTURE == 1
-    EvapTrans_T => EvapTrans_de
-    Saturation_T => Saturation_de
-    Porosity_T => Porosity_de
-    Vx_T => Vx_de
-    Vy_T => Vy_de
-    Vz_T => Vz_de
-    Ind_T => Ind_de
-    dz_T => dz_de
+        EvapTrans_T  => EvapTrans_de
+        Saturation_T => Saturation_de
+        Porosity_T   => Porosity_de
+        Vx_T  => Vx_de
+        Vy_T  => Vy_de
+        Vz_T  => Vz_de
+        Ind_T => Ind_de
+        dz_T  => dz_de
     #endif
 
 !--------------------------------------------------------------------
@@ -445,13 +444,14 @@ integer:: istat, temp
     do kk = outkk, pfnt
 
         ! reset ParFlow counter for cycles
-        if (mod((kk-1),(pft2-pft1+1)) == 0 )  pfkk = pft1 - 1
+        if (mod((kk-1),(pft2-pft1+1)) == 0)  pfkk = pft1 - 1
 
         ! adjust the file counters
         pfkk = pfkk + 1
-        #if _TIMING == 1
-        istat = cudaEventRecord(startEvent,0)
-        #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
 
         ! Read the velocities computed by ParFlow
         write(filenum,'(i5.5)') pfkk
@@ -515,20 +515,20 @@ integer:: istat, temp
             end if
         end if
 
-        #if _TIMING == 1
-        istat = cudaEventRecord(stopEvent,0)
-        istat = cudaEventSynchronize(stopEvent)
-        istat = cudaEventElapsedTime(IO_time_read,startEvent,stopEvent)
-        #endif
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(IO_time_read,startEvent,stopEvent)
+            #endif
 
         ! Determine whether to perform forward or backward patricle tracking
         Vx = Vx * V_mult
         Vy = Vy * V_mult
         Vz = Vz * V_mult
 
-        #if _TIMING == 1
-        istat = cudaEventRecord(startEvent,0)
-        #endif
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
 
         Vx_de = Vx
         Vy_de = Vy
@@ -566,25 +566,21 @@ integer:: istat, temp
         #endif
 
 !----------------------------------------
-        !#if _TIMING == 1
-        !istat = cudaEventRecord(startEvent,0)
-        !#endif
-
         if (clmtrans) then
             if (np_active < np) then
 
-                #if _TIMING == 1
-                istat = cudaEventRecord(startEvent,0)
-                #endif
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(startEvent,0)
+                    #endif
 
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
                     PET_balance_de,d_isValid,nnx1,nny1,nz,dz_de,denh2o)
 
-                #if _TIMING == 1
-                istat = cudaEventRecord(stopEvent,0)
-                istat = cudaEventSynchronize(stopEvent)
-                istat = cudaEventElapsedTime(scan_time,startEvent,stopEvent)
-                #endif
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(stopEvent,0)
+                    istat = cudaEventSynchronize(stopEvent)
+                    istat = cudaEventElapsedTime(scan_time,startEvent,stopEvent)
+                    #endif
 
                 ! d_isValid has the length as P or of np which is assigned in input script
                 ! so nnx1*nny1*nz should be smaller than np
@@ -596,31 +592,31 @@ integer:: istat, temp
                     ! so the frequency to write restart file should be 24*n
                     ! i am not sure why i used 1752 previously but I feel it is not necessary
 
-                    #if _TIMING == 1
-                    istat = cudaEventRecord(startEvent,0)
-                    #endif
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(startEvent,0)
+                        #endif
 
                     ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
                     call thrustscan(d_isValid,nnx1*nny1,d_indices)
 
-                    #if _TIMING == 1
-                    istat = cudaEventRecord(stopEvent,0)
-                    istat = cudaEventSynchronize(stopEvent)
-                    istat = cudaEventElapsedTime(thrust_time,startEvent,stopEvent)
-                    #endif
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(stopEvent,0)
+                        istat = cudaEventSynchronize(stopEvent)
+                        istat = cudaEventElapsedTime(thrust_time,startEvent,stopEvent)
+                        #endif
 
-                    #if _TIMING == 1
-                    istat = cudaEventRecord(startEvent,0)
-                    #endif
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(startEvent,0)
+                        #endif
 
                     temp = d_indices(nnx1*nny1)
                     i_added_particles = temp * iflux_p_res ! should be legal?
 
-                    #if _TIMING == 1
-                    istat = cudaEventRecord(stopEvent,0)
-                    istat = cudaEventSynchronize(stopEvent)
-                    istat = cudaEventElapsedTime(copy_time,startEvent,stopEvent)
-                    #endif
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(stopEvent,0)
+                        istat = cudaEventSynchronize(stopEvent)
+                        istat = cudaEventElapsedTime(copy_time,startEvent,stopEvent)
+                        #endif
 
                     if(np_active + i_added_particles >= np) then
                         write(17,*) ' **Warning rainfall input but no paricles left'
@@ -628,26 +624,25 @@ integer:: istat, temp
                         goto 9090
                     endif
 
-                    #if _TIMING == 1
-                    istat = cudaEventRecord(startEvent,0)
-                    #endif
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(startEvent,0)
+                        #endif
 
                     call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
                         tPB >>> (d_indices,P_de,iflux_p_res,np_active,pid,nind, &
                         nnx1,nny1,nz,ix1,iy1,dz_de,denh2o,kk,tout1)
 
-                    #if _TIMING == 1
-                    istat = cudaEventRecord(stopEvent,0)
-                    istat = cudaEventSynchronize(stopEvent)
-                    istat = cudaEventElapsedTime(add2_time,startEvent,stopEvent)
-                    #endif
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(stopEvent,0)
+                        istat = cudaEventSynchronize(stopEvent)
+                        istat = cudaEventElapsedTime(add2_time,startEvent,stopEvent)
+                        #endif
 
                     np_active = np_active + i_added_particles
                     pid = pid + i_added_particles
                 end if
 
                 PET_balance = PET_balance_de
-
                 call MPI_Barrier(MPI_COMM_WORLD,ierr)
 
                     #if _TIMING == 1
@@ -667,12 +662,6 @@ integer:: istat, temp
 
             end if
         end if
-
-        !#if _TIMING == 1
-        !istat = cudaEventRecord(stopEvent,0)
-        !istat = cudaEventSynchronize(stopEvent)
-        !istat = cudaEventElapsedTime(add_time,startEvent,stopEvent)
-        !#endif
 
 !----------------------------------------
         ! If you don't physically separate the particles, the interior and peripherical particles
@@ -763,15 +752,15 @@ integer:: istat, temp
                 istat = cudaEventElapsedTime(sort_time7,startEvent,stopEvent)
                 #endif
 
-                #if _TIMING == 1
-                istat = cudaEventRecord(startEvent,0)
-                #endif
-            !N_inte = d_indices(np_active);
-                #if _TIMING == 1
-                istat = cudaEventRecord(stopEvent,0)
-                istat = cudaEventSynchronize(stopEvent)
-                istat = cudaEventElapsedTime(sort_time8,startEvent,stopEvent)
-                #endif
+            !        #if _TIMING == 1
+            !        istat = cudaEventRecord(startEvent,0)
+            !        #endif
+            !    !N_inte = d_indices(np_active);
+            !        #if _TIMING == 1
+            !        istat = cudaEventRecord(stopEvent,0)
+            !        istat = cudaEventSynchronize(stopEvent)
+            !        istat = cudaEventElapsedTime(sort_time8,startEvent,stopEvent)
+            !        #endif
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
@@ -799,9 +788,9 @@ integer:: istat, temp
             N_inte = 0
         endif
 !----------------------------------------
-        #if _TIMING == 1
-        istat = cudaEventRecord(startEvent,0)
-        #endif
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
         ! peripheric particles
         #if _TEXTURE == 1
         #if _SHARED == 1
@@ -832,11 +821,11 @@ integer:: istat, temp
             nind,ix1,iy1,nz,reflect,rank)
         #endif
 
-        #if _TIMING == 1
-        istat = cudaEventRecord(stopEvent,0)
-        istat = cudaEventSynchronize(stopEvent)
-        istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
-        #endif
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
+            #endif
 !----------------------------------------
         call particle_exchange()
 !----------------------------------------
@@ -848,24 +837,28 @@ integer:: istat, temp
         mean_mass = total_mass/dble(np_active)
         ET_np_cpu   = ET_np_de
         out_np_cpu  = out_np_de
+
         write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk),mean_age,mean_comp, &
                                                       mean_mass,total_mass,PET_balance(1), &
                                                       PET_balance(2),i_added_particles,ET_np_cpu(1), &
                                                       Out_np_cpu(1),np_active,N_peri,N_inte,N_exit, &
                                                       sum(N_send),sum(N_recv)
+
         write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,scan_time,thrust_time,copy_time, &
                                             add2_time,reduce_time,sort_time1,sort_time2,sort_time3,sort_time4, &
                                             sort_time5,sort_time6,sort_time7,sort_time8,sort_time9,sort_time10, &
                                             peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
                                             tran_time6,tran_time7,tran_time8,tran_time9,inte_time, &
                                             tran_time10,C_time,exit_time
+
         flush(17);flush(20)
+
     end do
     9090 continue
 
     #if _TEXTURE == 1
-    nullify(EvapTrans_T,Saturation_T,Porosity_T)
-    nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
+        nullify(EvapTrans_T,Saturation_T,Porosity_T)
+        nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
     #endif
 
     #if _TIMING == 1

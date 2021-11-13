@@ -160,7 +160,7 @@ attributes(global) subroutine scan_new_particles( &
             end if
         end if
 
-        !if(Saturation_de(i,j,k) > 0.d0) then !active area
+        ! if(Saturation_de(i,j,k) > 0.d0) then !active area
 
             if(EvapTrans_de(i,j,k) > 0.d0) then
                 temp = atomicAdd(PET_balance(1),pfdt*EvapTrans_de(i,j,k)*dx*dy*dz(k)*denh2o)
@@ -178,7 +178,7 @@ attributes(global) subroutine scan_new_particles( &
             endif
             ! pass add_f and kk in, use if condition.
             ! but I feel too much extra work. Probably just let it calculate and we never use it,
-        !end if
+        ! end if
     end if
 
 end subroutine scan_new_particles
