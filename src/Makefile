@@ -71,6 +71,6 @@ clean:
 	P_peri.* \
 	Send_Recv.* \
 	null \
-	Device_Utility.txt
-
+	Device_Utility.txt \
+        Debug*
 

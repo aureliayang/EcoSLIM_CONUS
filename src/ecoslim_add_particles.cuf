@@ -12,12 +12,51 @@ module add_particles
     use variable_list, only: dx, dy, pfdt
 
 contains
-attributes(global) subroutine add_init_particles( &
+
+attributes(global) subroutine scan_init_particles( &
+    d_isValid,nnx1,nny1,nz)
+
+    implicit none
+    integer,intent(out):: d_isValid(:)
+    integer,value:: nnx1, nny1, nz
+    integer:: i, j, k, ii
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    ! get i, j, k from ii
+    if(ii <= nnx1*nny1*nz) then
+
+        if(mod(ii,nnx1*nny1) == 0) then
+            k = ii/(nnx1*nny1)
+            j = nny1
+            i = nnx1
+        else
+            k = ii/(nnx1*nny1) + 1
+            if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
+                j = mod(ii,nnx1*nny1)/nnx1
+                i = nnx1
+            else
+                j = mod(ii,nnx1*nny1)/nnx1 + 1
+                i = mod(mod(ii,nnx1*nny1),nnx1)
+            end if
+        end if
+
+        if(Saturation_de(i,j,k) > 0.d0) then !active area
+            d_isValid(ii) = 1
+        else
+            d_isValid(ii) = 0
+        end if
+    end if
+
+end subroutine scan_init_particles
+
+attributes(global) subroutine add_init_particles(d_indices, &
     P,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dz)
 
     implicit none
     real(8),intent(inout):: P(:,:)
     real(8),intent(in):: dz(:)
+    integer,intent(in):: d_indices(:)
     integer,value:: np_ic, nind
     integer,value:: tout1, nnx1, nny1, nz, ix1, iy1
     real(8),value:: denh2o
@@ -46,7 +85,7 @@ attributes(global) subroutine add_init_particles( &
         if(Saturation_de(i,j,k) > 0.d0) then
             do ij = 1, np_ic
 
-                index = ii*np_ic - (ij - 1)
+                index = d_indices(ii)*np_ic - (ij - 1)
 
                 P(index,1) = dble(i-1+ix1)*dx + curand_uniform(h(ii))*dx ! should use global
                 P(index,2) = dble(j-1+iy1)*dy + curand_uniform(h(ii))*dy ! update that for random number
