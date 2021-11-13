@@ -56,6 +56,6 @@
 * If we do separation?
 * If we rearrange the array or just label the array?
 ## Others
-loop.txt is just for residual of previous code.
+* loop.txt is just for residual of previous code.
 
 
