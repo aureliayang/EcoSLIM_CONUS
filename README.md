@@ -6,7 +6,7 @@
 * It can be applied to real cases now. Optimization continues.  
 * Welcome to download and use. Enjoy!
 ## CONUS domain
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/images/conus.png)
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)
 ## Subdomain demonstration
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/images/subdomain.png)  
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/subdomain.png)  
 
