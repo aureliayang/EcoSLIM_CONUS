@@ -35,8 +35,8 @@
 * **nind,**
 * **Indname,**
 # Build (for users)
-* An example of environment: nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1
-* Build: make
+* An example of environment: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
+* Build: **make** in the src folder
 # Transfer schemes (for dev)
 * **neigh_list** uses *managed memory* and has the length of total number of GPUs. This is because the do loop using it can skip the non-neighbor quickly. However, if we compact it with pure neighbors, there should be extra work. We can think carefully about this to choose the best way.  
 * Label the destination of particles which will be transferred by P(ii,13+2\*nind), where ii is the number of particle. It saves the rank of the destination. It is the original pid attribute, but after using mpi and transfer, there is no sense for this attribute anymore. We can try to rebuild *pid* attribute later.  
