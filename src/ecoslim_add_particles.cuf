@@ -177,8 +177,8 @@ attributes(global) subroutine add_new_particles( &
 
                 index = np_active + d_indices(ii)*iflux_p_res - (ij - 1)
 
-                P(index,1) = dble(ix1+i-1)*dx + curand_uniform(h(index))*dx
-                P(index,2) = dble(iy1+j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
+                P(index,1) = dble(i-1)*dx + curand_uniform(h(index))*dx
+                P(index,2) = dble(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
                 P(index,13+2*nind) = dble(pid + d_indices(ii)*iflux_p_res - (ij - 1))
                 P(index,14+2*nind) = P(index,1)
                 P(index,15+2*nind) = P(index,2)
@@ -218,6 +218,9 @@ attributes(global) subroutine add_new_particles( &
                 P(index,8)  = 1.0d0  ! make particle active
                 P(index,9)  = 1.0d0
                 P(index,10) = 0.0d0  ! Particle hasn't exited domain
+
+                P(index,1) = P(index,1) + dble(ix1)*dx
+                P(index,2) = P(index,2) + dble(iy1)*dy
             enddo
         endif
     endif
