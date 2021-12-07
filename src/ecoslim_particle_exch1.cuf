@@ -1,0 +1,268 @@
+module exchange_particles1
+    use thrust
+    use cudafor
+    use compact_array
+    use particle_loop
+    use variable_list, only: N_recv, N_send, N_peri, N_inte, N_exit
+    use variable_list, only: neigh_list
+    ! neigh_list is allocated after getting the number of total GPUs.
+    ! It is 1 if neighbor exists while 0 if neighbor doesn't exist.
+    ! N_send has the same length of neigh_list and was built one by one.
+    ! N_recv is allocated or deallocated after initialization/update of grid.
+    ! N_recv has the length of its neighbors and has been initialized as 0.
+    use variable_list, only: holes, P_send, P_recv, P, P_exit
+    use variable_list, only: P_de, d_isValid, d_indices
+    use variable_list, only: dz_de, nz
+    use variable_list, only: ix1, iy1, nnx1, nny1, reflect
+    use variable_list, only: rank, t_rank, nind, tPB
+    use variable_list, only: np_active !, ranknum, filenum
+
+    use variable_list, only: out_age_de,out_mass_de,out_comp_de,out_np_de
+    use variable_list, only: et_age_de,et_mass_de,et_comp_de,et_np_de
+    use variable_list, only: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
+    use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
+    use variable_list, only: pfdt,moldiff,denh2o,dtfrac
+    use variable_list, only: inte_time
+
+    use variable_list, only: tran_time1, tran_time2, tran_time3, tran_time4, tran_time5
+    use variable_list, only: tran_time6, tran_time7, tran_time8, tran_time9, tran_time10
+    use variable_list, only: startEvent, stopEvent
+
+contains
+    subroutine particle_exchange1()
+        use mpi
+        implicit none
+        integer:: i, j, ierr, status(MPI_STATUS_SIZE,t_rank)
+        integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank), &
+                  rq2(t_rank), rq3(t_rank), rq4(t_rank)
+        integer:: left, right, nattri, sum_recv, sum_send
+        integer:: istat, temp
+        real:: tran_t1, tran_t2, tran_t3, tran_t4, tran_t5
+        real:: tran_t6, tran_t7, tran_t8, tran_t9, tran_t10
+
+        integer:: k, one = 0
+        ! integer:: ik, jk, status2(MPI_STATUS_SIZE)
+        integer:: d_indices_cpu(200000),d_isValid_cpu(200000)
+        integer,allocatable:: holes_cpu(:)
+        ! real(8):: P_cpu(19*4)
+        ! we have to send and receive numbers first
+        ! otherwise, when receive, we have to wait the receive of particle-number
+        ! it has two-fold of meanings: 1. waiting the communication itself (copy to recv buff)
+        ! 2. probably the number has not been sent by its neighbor yet since its neighbor
+        ! is doing the sending one by one.
+        ! but here, in order to send numbers first, we count them first in the particle
+        ! loop which will consume extra time. Extra time means it can also be obtained
+        ! in the thrustscan. But thrustscan can only be done one by one since d_indices
+        ! is repeatedly used, so we can't get the number of all neighbors at one time.
+
+                #if _TIMING == 1
+            tran_time1=0.; tran_time2=0.; tran_time3=0.; tran_time4=0.; tran_time5=0.
+            tran_time6=0.; tran_time7=0.; tran_time8=0.; tran_time9=0.; tran_time10=0.
+                #endif
+
+            nattri = 17 + 2*nind
+            nc1 = 0; nc3 = 0
+            do i = 0, t_rank-1 ! go through to send particles
+                if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
+                    nc1 = nc1 + 1 ! the number of neighbors
+
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(startEvent,0)
+                        #endif
+                    call MPI_ISEND(N_send(i+1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,rq1(nc1),ierr)
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(stopEvent,0)
+                        istat = cudaEventSynchronize(stopEvent)
+                        istat = cudaEventElapsedTime(tran_t2,startEvent,stopEvent)
+                        tran_time2 = tran_time2 + tran_t2
+                        #endif
+                    ! each neighbor use different sending buffer, no wait
+                    if(N_send(i+1) > 0) then ! gpu number
+                        nc3 = nc3 + 1 ! only the neighbor with particles
+
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
+                        call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                            P_de(N_inte+1:N_inte+N_peri,13+2*nind),d_isValid,N_peri,i)
+                            ! get d_isValid, set it 0 where the particle will be sent to neighbor i
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t1,startEvent,stopEvent)
+                            tran_time1 = tran_time1 + tran_t1
+                            #endif
+
+                        call thrustscan(d_isValid,N_peri,d_indices)
+
+                        allocate(holes(N_send(i+1)))
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
+                        call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                            holes,d_indices,d_isValid,N_peri)
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t3,startEvent,stopEvent)
+                            tran_time3 = tran_time3 + tran_t3
+                            #endif
+                        sum_send = sum(N_send(1:i)) ! have sent before this one
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
+                        call select2send<<<ceiling(dble(N_send(i+1))/tPB),tPB>>>(holes, &
+                            P_de,P_send,N_inte,N_send(i+1),sum_send,nattri)
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t4,startEvent,stopEvent)
+                            tran_time4 = tran_time4 + tran_t4
+                            #endif
+                        left  = sum_send*nattri + 1
+                        right = sum(N_send(1:i+1))*nattri
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
+                        call MPI_ISEND(P_send(left:right),N_send(i+1)*nattri, &
+                            MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq3(nc3),ierr)
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t5,startEvent,stopEvent)
+                            tran_time5 = tran_time5 + tran_t5
+                            #endif
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
+                        call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+                            holes,d_indices,d_isValid,P_de,N_inte,N_peri)
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t6,startEvent,stopEvent)
+                            tran_time6 = tran_time6 + tran_t6
+                            #endif
+                        N_peri = d_indices(N_peri); deallocate(holes)
+                    end if
+                end if
+            end do
+            np_active = N_inte + N_peri
+
+            !-----------------------------------------
+            ! receive part.
+            !-----------------------------------------
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+            nc2 = 0
+            do i = 0, t_rank-1
+                if(neigh_list(i+1) > 0) then
+                    nc2 = nc2 + 1 !neighbor number
+                    call MPI_IRECV(N_recv(i+1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,rq2(nc2),ierr)
+                end if
+            end do
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(tran_t7,startEvent,stopEvent)
+                tran_time7 = tran_time7 + tran_t7
+                #endif
+            !-----------------------------------------
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+            if(nc2 > 0) call MPI_WAITALL(nc2,rq2(1:nc2),status(:,1:nc2),ierr)
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(tran_t8,startEvent,stopEvent)
+                tran_time8 = tran_time8 + tran_t8
+                #endif
+            !-----------------------------------------
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+
+            nc4 = 0; nc5 = 0
+            do i = 0, t_rank-1
+                if(neigh_list(i+1) > 0) then
+                    nc4 = nc4 + 1
+                    if(N_recv(i+1) > 0) then
+                        nc5 = nc5 + 1
+                        left  = sum(N_recv(1:i))*nattri + 1
+                        right = sum(N_recv(1:i+1))*nattri
+                        call MPI_IRECV(P_recv(left:right),N_recv(i+1)*nattri, &
+                            MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq4(nc5),ierr)
+                    end if
+                end if
+            end do
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(tran_time9,startEvent,stopEvent)
+                #endif
+        !-----------------------------------------
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+
+            ! interior particles
+            #if _TEXTURE == 1
+                #if _SHARED == 1
+                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB, &
+                    tPB*(13+nind*2)*kind(0.d0)>>> ( &
+                    P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                    moldiff,denh2o,dtfrac,0,N_inte, &
+                    nind,ix1,iy1,nz,reflect,rank)
+                #else
+                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                    P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                    moldiff,denh2o,dtfrac,0,N_inte, &
+                    nind,ix1,iy1,nz,reflect,rank)
+                #endif
+            #else
+                call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                    P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
+                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
+                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                    moldiff,denh2o,dtfrac,0,N_inte, &
+                    nind,ix1,iy1,nz,reflect,rank)
+            #endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(inte_time,startEvent,stopEvent)
+                #endif
+        !-----------------------------------------
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+
+            if(nc5 > 0) then
+                sum_recv = sum(N_recv)
+                call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
+                call unpack_recv<<<ceiling(dble(sum_recv)/tPB),tPB>>>( &
+                    P_recv,P_de,np_active,sum_recv,nattri)
+                N_peri = N_peri + sum(N_recv)
+                np_active = N_inte + N_peri
+            endif
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(tran_time10,startEvent,stopEvent)
+                #endif
+
+    end subroutine particle_exchange1
+
+end module exchange_particles1

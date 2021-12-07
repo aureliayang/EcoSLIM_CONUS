@@ -136,7 +136,7 @@ module variable_list
     integer:: np_active_log, add_f
 
     real(8),allocatable,pinned:: P(:,:)
-    integer,allocatable,pinned:: N_send(:)
+    integer,allocatable,managed:: N_send(:)
     ! the same length as neigh_list, i.e., the total number of subdomains.
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
     integer,allocatable,pinned:: N_recv(:) ! for each subdomain, it has the number of neighbors
@@ -310,6 +310,7 @@ contains
         allocate(grid(t_rank,4),grid_old(ppx*qqy,4))
         ! allocate(neigh_listn(t_rank),neigh_listo(t_rank))
         allocate(neigh_list(t_rank),nump(t_rank))
+        allocate(N_send(t_rank),N_recv(t_rank))
         allocate(d_isValid(np),d_indices(np),h(np))
 
         allocate(out_np_cpu(1),ET_np_cpu(1))

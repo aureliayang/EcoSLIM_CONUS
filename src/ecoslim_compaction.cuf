@@ -55,7 +55,26 @@ contains
         end if
 
     end subroutine select2send
+!2--------------------------------------------------------------------
+    attributes(global) subroutine select2sendi(d_in,d_out,index,nattri,offset)
+        !original:        1 0 1 1 0 0 1 0  d_isValid
+        !index(or ii):    1 2 3 4 5 6 7 8  ii
+        !prefix sum:      1 1 2 3 3 3 4 4  d_indices
+        !ii-d_indices:    0 1 1 1 2 3 3 4
 
+        implicit none
+        real(8),intent(in):: d_in(:,:)
+        real(8),intent(out):: d_out(:)
+        integer:: ii
+        integer,value:: index, nattri, offset
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= nattri) then
+            d_out(offset-1+ii) = d_in(index,ii)
+        end if
+
+    end subroutine select2sendi
 !3--------------------------------------------------------------------
     attributes(global) subroutine unpack_recv(d_in, &
         d_out,offset,sumrecv,nattri)
@@ -181,6 +200,31 @@ contains
             end if
         end if
     end subroutine prepare_neighbor
+!7--------------------------------------------------------------------
+    attributes(global) subroutine prepare_neigh_all(d_in,d_isValid,&
+                                                   numElements,neighbor)
+        !numElements is the current number of elements left in P, i.e., updated np_active
+
+        implicit none
+        real(8),intent(in):: d_in(:)
+        ! the 8th attribution of P array
+        integer,intent(out):: d_isValid(:)
+        integer,value:: numElements
+        integer,value:: neighbor
+        ! numElements is the length to scan
+        ! neighbor is the rank of neighbor
+        integer:: ii   !global index in the array
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= numElements) then
+            if(idnint(d_in(ii)) /= neighbor) then
+                d_isValid(ii) = 0
+            else
+                d_isValid(ii) = 1
+            end if
+        end if
+    end subroutine prepare_neigh_all
 !8--------------------------------------------------------------------
     attributes(global) subroutine connect_recv(d_in,numElements,N_recv)
         ! connect the received particles to the bottom of P and

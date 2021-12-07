@@ -9,11 +9,13 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_add_particles.o \
     ecoslim_compaction.o \
     ecoslim_particle_loop.o \
-    ecoslim_particle_exch.o \
+    ecoslim_particle_exch1.o \
+    ecoslim_particle_exch2.o \
+    ecoslim_update_sort.o \
     ecoslim_pfb_read.o \
     EcoSLIM_CUDA_MPI.cuf
 
-FFLAGS = -Mpreprocess -D_TIMING=1 -D_TEXTURE=1 -D_SHARED=1
+FFLAGS = -Mpreprocess -D_TIMING=1 -D_TEXTURE=1 -D_SHARED=0
 
 all: test
 
@@ -42,8 +44,11 @@ ecoslim_compaction.o: ecoslim_compaction.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 ecoslim_particle_loop.o: ecoslim_particle_loop.cuf ecoslim_cuRAND_de.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
-ecoslim_particle_exch.o: ecoslim_particle_exch.cuf ecoslim_particle_loop.o \
-	ecoslim_cuRAND_de.o ecoslim_variable_list.o
+ecoslim_particle_exch1.o: ecoslim_particle_exch1.cuf ecoslim_particle_loop.o ecoslim_variable_list.o
+	mpif90 -c $< -o $@ $(FFLAGS)
+ecoslim_particle_exch2.o: ecoslim_particle_exch2.cuf ecoslim_particle_loop.o ecoslim_variable_list.o
+	mpif90 -c $< -o $@ $(FFLAGS)
+ecoslim_update_sort.o: ecoslim_update_sort.cuf ecoslim_particle_loop.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@

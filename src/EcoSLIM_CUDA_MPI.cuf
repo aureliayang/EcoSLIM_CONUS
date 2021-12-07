@@ -30,7 +30,9 @@ program EcoSLIM
     use add_particles
     use compact_array
     ! use exchange_zone
-    use exchange_particles
+    use exchange_particles1
+    use exchange_particles2
+    use UpdateC_SortP
 
     implicit none
     ! integer(8),allocatable,pinned:: p_num_cpu(:,:)
@@ -392,8 +394,8 @@ program EcoSLIM
 
     open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
     write(20,*) ' **** Transient Simulation Particle Accounting ****'
-    write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass PrecipIn &
-                            ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered'
+    write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass &
+                  PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered'
 
     open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin')
 
@@ -413,11 +415,11 @@ program EcoSLIM
     call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
         tPB >>> (nnx1,nny1,buff,neigh_list,rank,t_rank)
 
-    if(sum(neigh_list) > 0) then
-        allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
-    else
-        allocate(N_recv(1),N_send(1))
-    end if
+    ! if(sum(neigh_list) > 0) then
+    !     allocate(N_recv(sum(neigh_list)),N_send(sum(neigh_list)))
+    ! else
+    !     allocate(N_recv(1),N_send(1))
+    ! end if
 
         ! open(10,file='Neighbor.'//trim(adjustl(ranknum)))
         !     write(10,*) neigh_list
@@ -436,6 +438,8 @@ program EcoSLIM
         Vz_T  => Vz_de
         Ind_T => Ind_de
         dz_T  => dz_de
+        !d_isValid_T => d_isValid
+        !d_indices_T => d_indices
     #endif
 
 !--------------------------------------------------------------------
@@ -535,7 +539,7 @@ program EcoSLIM
         Vz_de = Vz
         Saturation_de = Saturation
         EvapTrans_de  = EvapTrans
-        if (mod(kk,add_f) == 0) EvapTrans_da_de  = EvapTrans_da
+        if (mod(kk,add_f) == 0) EvapTrans_da_de = EvapTrans_da
         CLMvars_de    = CLMvars(:,:,11)
         ! probably this can be deallocated after adding of particles
         ! Now just think about the hourly add of particles.
@@ -558,6 +562,9 @@ program EcoSLIM
         C_de = 0.d0
         ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
         ! the following adding of particles.
+
+        N_send = 0
+        N_recv = 0
 
         #if _TIMING == 1
         istat = cudaEventRecord(stopEvent,0)
@@ -827,7 +834,9 @@ program EcoSLIM
             istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
             #endif
 !----------------------------------------
-        call particle_exchange()
+        if(transfer == 1) call particle_exchange1()
+        if(transfer == 2) call particle_exchange2()
+        call Update_Sort()
 !----------------------------------------
         mean_age    = mean_age_de
         mean_comp   = mean_comp_de
@@ -859,6 +868,7 @@ program EcoSLIM
     #if _TEXTURE == 1
         nullify(EvapTrans_T,Saturation_T,Porosity_T)
         nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
+        !nullify(d_isValid_T,d_indices_T)
     #endif
 
     #if _TIMING == 1
