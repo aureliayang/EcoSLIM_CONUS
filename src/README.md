@@ -5,7 +5,7 @@
 * **nx,** Dimension in x direction
 * **ny,** Dimension in y direction
 * **nz,** Dimension in z direction
-* **nCLMsoil,** Layers coupled between CLM an ParFlow
+* **nCLMsoil,** Layers coupled between CLM and ParFlow
 * **ppx,** Split in x direction
 * **qqy,** Split in y direction
 * **transfer,** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is transfer with separation, 2 is transfer without separation
