@@ -10,7 +10,7 @@
 * **qqy,** Split in y direction
 * **transfer,** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is grouped transfer, 2 is one by one transfer
 * **separate,** Separate or not
-* **np_ic,** Number o particle per cell at the start of simulation
+* **np_ic,** Number of particle per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
 * **dx,** grid-cell size in x direction
 * **dy,** grid-cell size in y direction
