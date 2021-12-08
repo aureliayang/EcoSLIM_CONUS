@@ -5,7 +5,7 @@ module particle_loop
     use cudafor
     use curand_device
     use mrand, only: h
-    use variable_list, only: Zone_de, C_de, P_de
+    use variable_list, only: Zone_T, C_de, P_de
     use variable_list, only: dx, dy, pfdt, N_send, nz
     use variable_list, only: moldiff, denh2o, dtfrac, nind
 
@@ -15,7 +15,6 @@ module particle_loop
 
     use variable_list, only: EvapTrans_T,Saturation_T,Porosity_T
     use variable_list, only: Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T
-
 
 contains
     attributes(global) subroutine particles_separation(d_isValid, &
@@ -334,13 +333,13 @@ contains
 
             ! Zone/neighbor identification for cuda-aware transfer.
             ! keep an eye for ET particles
-
+            k = Zone_T(Ploc(1),Ploc(2))
             P_de(ii,13+2*nind) = -1.
             if(P_T(ii,10) /= 3.) then ! otherwise, particle is out of domain
-                if(Zone_de(Ploc(1),Ploc(2)) /= rank) then
+                if(k /= rank) then
                     if(P_T(ii,8) == 1. .or. (P_T(ii,8) == 0. .and. P_T(ii,10) == 2.)) then
-                        P_de(ii,13+2*nind) = Zone_de(Ploc(1),Ploc(2))
-                        temp = atomicAdd(N_send(Zone_de(Ploc(1),Ploc(2))+1),idnint(one))
+                        P_de(ii,13+2*nind) = k
+                        temp = atomicAdd(N_send(k+1),idnint(one))
                     endif
                 endif
             endif

@@ -210,7 +210,8 @@ module variable_list
     integer,allocatable,device,target:: d_isValid(:),d_indices(:),holes(:)
     integer,texture,pointer:: d_isValid_T(:),d_indices_T(:)
     ! real(8),allocatable,managed:: P_send(:,:),P_recv(:,:)
-    integer,allocatable,managed:: Zone_de(:,:),Zones_old(:,:)
+    integer,allocatable,managed,target:: Zone_de(:,:),Zones_old(:,:)
+    integer,texture,pointer:: Zone_T(:,:)
     ! Zone_de has to be written to restart files, so we use managed.
     ! old is old, using the new box to cut the old zone (Zones_old)
     ! new is new, using the old box to cut the new zone (Zone_de)

@@ -383,6 +383,7 @@ program EcoSLIM
     Ind_T => Ind_de
     dz_T  => dz_de
     P_T   => P_de
+    Zone_T => Zone_de
     d_isValid_T => d_isValid
     d_indices_T => d_indices
 
@@ -848,7 +849,7 @@ program EcoSLIM
     9090 continue
 
     nullify(EvapTrans_T,Saturation_T,Porosity_T)
-    nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T)
+    nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T,Zone_T)
     nullify(d_isValid_T,d_indices_T)
 
     #if _TIMING == 1
