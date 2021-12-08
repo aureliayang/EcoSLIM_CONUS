@@ -746,7 +746,7 @@ program EcoSLIM
                 istat = cudaEventRecord(startEvent,0)
                 #endif
             call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                holes,P_de,np_active,N_peri)
+                holes,np_active,N_peri)
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -757,7 +757,7 @@ program EcoSLIM
                 istat = cudaEventRecord(startEvent,0)
                 #endif
             call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,P_de,0,np_active)
+                holes,0,np_active)
                 ! if no compaction, you will need d_isValid and if condition to judge
                 ! during the interior particles' movement
                 #if _TIMING == 1
@@ -790,7 +790,7 @@ program EcoSLIM
                 istat = cudaEventRecord(startEvent,0)
                 #endif
             call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                P_de,N_inte,N_peri)
+                N_inte,N_peri)
                 ! if not connect, ther will be the risk that it is out of particles when do receiving
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)

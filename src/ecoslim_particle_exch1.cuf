@@ -82,7 +82,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),d_isValid,N_peri,i)
+                            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),N_peri,i)
                             ! get d_isValid, set it 0 where the particle will be sent to neighbor i
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
@@ -110,7 +110,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call select2send<<<ceiling(dble(N_send(i+1))/tPB),tPB>>>(holes, &
-                            P_de,P_send,N_inte,N_send(i+1),sum_send)
+                            P_send,N_inte,N_send(i+1),sum_send)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
                             istat = cudaEventSynchronize(stopEvent)
@@ -134,7 +134,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                            holes,P_de,N_inte,N_peri)
+                            holes,N_inte,N_peri)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
                             istat = cudaEventSynchronize(stopEvent)
@@ -226,7 +226,7 @@ contains
                 sum_recv = sum(N_recv)
                 call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
                 call unpack_recv<<<ceiling(dble(sum_recv)/tPB),tPB>>>( &
-                    P_recv,P_de,np_active,sum_recv)
+                    P_recv,np_active,sum_recv)
                 N_peri = N_peri + sum(N_recv)
                 np_active = N_inte + N_peri
             endif

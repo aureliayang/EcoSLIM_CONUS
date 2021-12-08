@@ -36,7 +36,7 @@ contains
 
             ! then separate inactive particles
             call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                P_de(:,8),d_isValid,np_active,0)
+                P_de(:,8),np_active,0)
             call thrustscan(d_isValid,np_active,d_indices)
             ! active and ET-inactive particles in overlap zone are sent
             ! out of domain, all outfolw-inactive, received ET-inactive are scanned here
@@ -48,10 +48,9 @@ contains
                 ! P_exit has to be deallocated after the use in main
                 call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,np_active)
-                call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(&
-                    holes,P_de,P_exit,N_exit)
+                call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(holes,P_exit,N_exit)
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,P_de,0,np_active)
+                    holes,0,np_active)
                 ! update the slots after np_active
                 np_active = temp
                 deallocate(holes,P_exit)

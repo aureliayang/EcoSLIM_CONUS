@@ -72,7 +72,7 @@ contains
         if(sum_send > 0) then
 
             call prepare_neigh_all<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),d_isValid,N_peri,-1)
+            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),N_peri,-1)
 
             call thrustscan(d_isValid,N_peri,d_indices)
 
@@ -82,10 +82,10 @@ contains
             holes,N_peri)
 
             call select2send<<<ceiling(dble(sum_send)/tPB),tPB>>>(holes, &
-            P_de,P_send,N_inte,sum_send,0)
+            P_send,N_inte,sum_send,0)
 
             call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-            holes,P_de,N_inte,N_peri)
+            holes,N_inte,N_peri)
 
             N_peri = d_indices(N_peri)
             np_active = N_inte + N_peri
@@ -149,7 +149,7 @@ contains
             sum_recv = sum(N_recv)
             call MPI_WAITALL(nc4,rq4(1:nc4),status(:,1:nc4),ierr)
             call unpack_recv<<<ceiling(dble(sum_recv)/tPB),tPB>>>( &
-                P_recv,P_de,np_active,sum_recv)
+                P_recv,np_active,sum_recv)
             N_peri = N_peri + sum_recv
             np_active = N_inte + N_peri
         endif
