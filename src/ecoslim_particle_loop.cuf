@@ -121,6 +121,18 @@ contains
                 gl(ii_l,1) = Saturation_T(Ploc(1),Ploc(2),Ploc(3))
                 gl(ii_l,2) = Porosity_T(Ploc(1),Ploc(2),Ploc(3))
 
+                if(gl(ii_l,1) <= 0.d0) then
+                    ! the problem is you cannot check if the particle has been in the inactive
+                    ! area after the last do while iteration.
+                    ! but it can be checked in the next do loop in the next timestep.
+                    ! however, this will make an inactive particle as active until next do loop.
+                    ! make sure there is no out of boundary during period.
+                    P_de(ii,8) = 0.d0
+                    ! flag as inactive due to inactive cells
+                    P_de(ii,10) = 4.d0
+                    goto 999
+                end if
+
                 ! check to make sure particles are in central part of the domain and if not
                 ! apply some boundary condition to them
                 ! check if particles are in domain, need to expand this to include better treatment of BC's
