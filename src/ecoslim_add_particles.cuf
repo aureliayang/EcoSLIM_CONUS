@@ -20,9 +20,12 @@ attributes(global) subroutine scan_init_particles(nnx1,nny1)
     implicit none
     ! integer,intent(out):: d_isValid(:)
     integer,value:: nnx1, nny1
-    integer:: i, j, k, ii, temp
+    integer:: i, j, k, ii, temp, ii_s
+    integer,parameter:: tPB = 256
+    integer,shared:: d_isValid_s(tPB)
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    ii_s = threadIdx%x
 
     ! get i, j, k from ii
     if(ii <= nnx1*nny1*nz) then
@@ -44,10 +47,12 @@ attributes(global) subroutine scan_init_particles(nnx1,nny1)
         end if
 
         if(Saturation_T(i,j,k) > 0.d0) then !active area
-            d_isValid(ii) = 1
+            d_isValid_s(ii_s) = 1
         else
-            d_isValid(ii) = 0
+            d_isValid_s(ii_s) = 0
         end if
+
+        d_isValid(ii) = d_isValid_s(ii_s)
     end if
 
 end subroutine scan_init_particles
