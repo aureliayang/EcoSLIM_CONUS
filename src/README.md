@@ -26,11 +26,11 @@
 * **ibinpntswrite,**
 * **etwrite,**
 * **icwrite,**
-* **V_mult,**
-* **clmtrans,**
-* **clmfile,**
+* **V_mult,** Velocity multiplier. Not supported now and only used for transfer test.
+* **clmtrans,** clm evap trans?
+* **clmfile,** clm output file?
 * **iflux_p_res,**
-* **denh2o,**
+* **denh2o,** density h2o
 * **moldiff,**
 * **dtfrac,**
 * **nind,**
