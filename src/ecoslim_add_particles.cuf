@@ -11,34 +11,35 @@ module add_particles
     use variable_list, only: EvapTrans_da_de, P_de
     use variable_list, only: dz_T, d_indices_T
     use variable_list, only: dx, dy, pfdt, denh2o, nind, nz
+    use variable_list, only: d_isValid
 
 contains
 
-attributes(global) subroutine scan_init_particles( &
-    d_isValid,nnx1,nny1)
+attributes(global) subroutine scan_init_particles(nnx1,nny1)
 
     implicit none
-    integer,intent(out):: d_isValid(:)
+    ! integer,intent(out):: d_isValid(:)
     integer,value:: nnx1, nny1
-    integer:: i, j, k, ii
+    integer:: i, j, k, ii, temp
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
     ! get i, j, k from ii
     if(ii <= nnx1*nny1*nz) then
 
-        if(mod(ii,nnx1*nny1) == 0) then
+        temp = mod(ii,nnx1*nny1)
+        if(temp == 0) then
             k = ii/(nnx1*nny1)
             j = nny1
             i = nnx1
         else
             k = ii/(nnx1*nny1) + 1
-            if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
-                j = mod(ii,nnx1*nny1)/nnx1
+            if(mod(temp,nnx1) == 0) then
+                j = temp/nnx1
                 i = nnx1
             else
-                j = mod(ii,nnx1*nny1)/nnx1 + 1
-                i = mod(mod(ii,nnx1*nny1),nnx1)
+                j = temp/nnx1 + 1
+                i = mod(temp,nnx1)
             end if
         end if
 
@@ -61,25 +62,26 @@ attributes(global) subroutine add_init_particles( &
     integer,value:: np_ic
     integer,value:: tout1, nnx1, nny1, ix1, iy1
     ! real(8),value:: denh2o
-    integer:: i, j, k, index, ij, ik, ii
+    integer:: i, j, k, index, ij, ik, ii, temp
     real(8):: Z
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
     ! get i, j, k from ii
     if(ii <= nnx1*nny1*nz) then
-        if(mod(ii,nnx1*nny1) == 0) then
+        temp = mod(ii,nnx1*nny1)
+        if(temp == 0) then
             k = ii/(nnx1*nny1)
             j = nny1
             i = nnx1
         else
             k = ii/(nnx1*nny1) + 1
-            if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
-                j = mod(ii,nnx1*nny1)/nnx1
+            if(mod(temp,nnx1) == 0) then
+                j = temp/nnx1
                 i = nnx1
             else
-                j = mod(ii,nnx1*nny1)/nnx1 + 1
-                i = mod(mod(ii,nnx1*nny1),nnx1)
+                j = temp/nnx1 + 1
+                i = mod(temp,nnx1)
             end if
         end if
 
@@ -130,34 +132,34 @@ attributes(global) subroutine add_init_particles( &
 end subroutine add_init_particles
 
 attributes(global) subroutine scan_new_particles( &
-    PET_balance,d_isValid,nnx1,nny1)
+    PET_balance,nnx1,nny1)
 
     implicit none
     real(8),intent(out):: PET_balance(:)
-    integer,intent(out):: d_isValid(:)
-    !real(8),intent(in):: dz(:)
+    ! integer,intent(out):: d_isValid(:)
+    ! real(8),intent(in):: dz(:)
     integer,value:: nnx1, nny1
     ! real(8),value:: denh2o
-    integer:: i, j, k, ii
+    integer:: i, j, k, ii, tempi
     real(8):: temp
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
     ! get i, j, k from ii
     if(ii <= nnx1*nny1*nz) then
-
-        if(mod(ii,nnx1*nny1) == 0) then
+        tempi = mod(ii,nnx1*nny1)
+        if(tempi == 0) then
             k = ii/(nnx1*nny1)
             j = nny1
             i = nnx1
         else
             k = ii/(nnx1*nny1) + 1
-            if(mod(mod(ii,nnx1*nny1),nnx1) == 0) then
-                j = mod(ii,nnx1*nny1)/nnx1
+            if(mod(tempi,nnx1) == 0) then
+                j = tempi/nnx1
                 i = nnx1
             else
-                j = mod(ii,nnx1*nny1)/nnx1 + 1
-                i = mod(mod(ii,nnx1*nny1),nnx1)
+                j = tempi/nnx1 + 1
+                i = mod(tempi,nnx1)
             end if
         end if
 

@@ -78,14 +78,12 @@ contains
 
             allocate(holes(sum_send))
 
-            call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-            holes,N_peri)
+            call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>(holes,N_peri)
 
             call select2send<<<ceiling(dble(sum_send)/tPB),tPB>>>(holes, &
             P_send,N_inte,sum_send,0)
 
-            call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-            holes,N_inte,N_peri)
+            call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>(holes,N_inte,N_peri)
 
             N_peri = d_indices(N_peri)
             np_active = N_inte + N_peri

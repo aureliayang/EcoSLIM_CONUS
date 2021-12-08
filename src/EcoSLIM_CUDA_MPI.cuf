@@ -393,7 +393,7 @@ program EcoSLIM
         pid = 0
 
         call scan_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB), &
-        tPB >>> (d_isValid,nnx1,nny1)
+        tPB >>> (nnx1,nny1)
 
         call thrustscan(d_isValid,nnx1*nny1*nz_c,d_indices)
 
@@ -588,7 +588,7 @@ program EcoSLIM
                     #endif
 
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> ( &
-                    PET_balance_de,d_isValid,nnx1,nny1)
+                    PET_balance_de,nnx1,nny1)
 
                     #if _TIMING == 1
                     istat = cudaEventRecord(stopEvent,0)
