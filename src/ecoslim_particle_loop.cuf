@@ -14,7 +14,7 @@ module particle_loop
     use variable_list, only: mean_age_de,mean_comp_de,total_mass_de
 
     use variable_list, only: EvapTrans_T,Saturation_T,Porosity_T
-    use variable_list, only: Vx_T,Vy_T,Vz_T,Ind_T,dz_T
+    use variable_list, only: Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T
 
 
 contains
@@ -47,12 +47,12 @@ contains
                 d_isValid_s(ii) = 1
             end if
 
-            ! Transfer local coordinates to global
-            P_s(ii,1) = P_s(ii,1) + dble(ix1)*dx
-            P_s(ii,2) = P_s(ii,2) + dble(iy1)*dy
+            ! ! Transfer local coordinates to global
+            ! P_s(ii,1) = P_s(ii,1) + dble(ix1)*dx
+            ! P_s(ii,2) = P_s(ii,2) + dble(iy1)*dy
 
             d_isValid(ii_g) = d_isValid_s(ii)
-            P_de(ii_g,1:2) = P_s(ii,1:2)
+            ! P_de(ii_g,1:2) = P_s(ii,1:2)
 
         end if
     end subroutine particles_separation
@@ -115,8 +115,12 @@ contains
                     end if
                 end do
 
-                gl(ii_l,1) = Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1)
-                gl(ii_l,2) = Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1)
+                Ploc(1) = Ploc(1) + 1
+                Ploc(2) = Ploc(2) + 1
+                Ploc(3) = Ploc(3) + 1
+
+                gl(ii_l,1) = Saturation_T(Ploc(1),Ploc(2),Ploc(3))
+                gl(ii_l,2) = Porosity_T(Ploc(1),Ploc(2),Ploc(3))
 
                 ! check to make sure particles are in central part of the domain and if not
                 ! apply some boundary condition to them
@@ -126,7 +130,7 @@ contains
 
                 if ((P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
                     (gl(ii_l,1) == 1.).and. &
-                    (Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) > 0.d0)) then
+                    (Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
 
                     temp = atomicAdd(Out_age_de(1), P_de(ii,4)*P_de(ii,6))
                     temp = atomicAdd(Out_mass_de(1), P_de(ii,6))
@@ -156,53 +160,49 @@ contains
                 end if
 
                 ! Find each particle's factional cell location
-                advdt(1) = (P_de(ii,1) - dble(Ploc(1))*dx)  / dx
-                advdt(2) = (P_de(ii,2) - dble(Ploc(2))*dy)  / dy
+                advdt(1) = (P_de(ii,1) - dble(Ploc(1)-1)*dx)  / dx
+                advdt(2) = (P_de(ii,2) - dble(Ploc(2)-1)*dy)  / dy
 
                 Z = 0.d0
-                do k = 1, Ploc(3)
+                do k = 1, Ploc(3)-1
                     Z = Z + dz_T(k)
                 end do
-                advdt(3) = (P_de(ii,3) - Z) / dz_T(Ploc(3)+1)
+                advdt(3) = (P_de(ii,3) - Z) / dz_T(Ploc(3))
 
                 ! Calculate local particle velocity using linear interpolation,
                 ! converting darcy flux to average linear velocity
 
-                Vpx = ((1.-advdt(1))*Vx_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                    + Vx_T(Ploc(1)+2,Ploc(2)+1,Ploc(3)+1)*advdt(1))   &
-                    /(gl(ii_l,2) &
-                    *gl(ii_l,1))
+                Vpx = ((1.-advdt(1))*Vx_T(Ploc(1),Ploc(2),Ploc(3)) &
+                    + Vx_T(Ploc(1)+1,Ploc(2),Ploc(3))*advdt(1))   &
+                    /(gl(ii_l,2)*gl(ii_l,1))
 
-                Vpy = ((1.-advdt(2))*Vy_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                        + Vy_T(Ploc(1)+1,Ploc(2)+2,Ploc(3)+1)*advdt(2)) &
-                        /(gl(ii_l,2) &
-                        *gl(ii_l,1))
+                Vpy = ((1.-advdt(2))*Vy_T(Ploc(1),Ploc(2),Ploc(3)) &
+                        + Vy_T(Ploc(1),Ploc(2)+1,Ploc(3))*advdt(2)) &
+                        /(gl(ii_l,2)*gl(ii_l,1))
 
-                Vpz = ((1.-advdt(3))*Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                        + Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+2)*advdt(3))  &
-                            /(gl(ii_l,2) &
-                        *gl(ii_l,1))
+                Vpz = ((1.-advdt(3))*Vz_T(Ploc(1),Ploc(2),Ploc(3)) &
+                        + Vz_T(Ploc(1),Ploc(2),Ploc(3)+1)*advdt(3))  &
+                            /(gl(ii_l,2)*gl(ii_l,1))
 
                 ! calculate particle dt
                 ! check each direction independently
                 advdt = pfdt
                 if (Vpx /= 0.) advdt(1) = dabs(dtfrac*(dx/Vpx))
                 if (Vpy /= 0.) advdt(2) = dabs(dtfrac*(dy/Vpy))
-                if (Vpz /= 0.) advdt(3) = dtfrac*(dz_T(Ploc(3)+1)/dabs(Vpz))
+                if (Vpz /= 0.) advdt(3) = dtfrac*(dz_T(Ploc(3))/dabs(Vpz))
 
                 particledt = min(advdt(1), advdt(2), advdt(3), &
                                 pfdt*dtfrac, delta_time-P_de(ii,4))
 
                 ! calculate Flux in cell and compare it with the ET flux out of the cell
-                if (EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
+                if (EvapTrans_T(Ploc(1),Ploc(2),Ploc(3)) < 0.d0) then
                 ! calculate ET flux volumetrically and compare to
-                z1 = dabs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
+                z1 = dabs(EvapTrans_T(Ploc(1),Ploc(2),Ploc(3)))*dx*dy*dz_T(Ploc(3))
 
                 ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
                 ! probability of being captured by roots
                 ! water volume in cell
-                z2 = dx*dy*dz_T(Ploc(3)+1)*(gl(ii_l,2) &
-                            *gl(ii_l,1))
+                z2 = dx*dy*dz_T(Ploc(3))*(gl(ii_l,2)*gl(ii_l,1))
 
                 if (curand_uniform(hh) < ((z1*particledt)/z2)) then   ! check if particle is 'captured' by the roots
                 !  this section made atomic since it could inovlve a data race
@@ -280,7 +280,7 @@ contains
                 end if
 
                 if (nind > 0) then
-                    k=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                    k=idnint(Ind_T(Ploc(1),Ploc(2),Ploc(3)))
                     if(k > 0 .and. k <= nind) then
                         P_de(ii,12+k) = P_de(ii,12+k) + particledt
                         P_de(ii,12+nind+k) = P_de(ii,12+nind+k) + temp
@@ -320,6 +320,8 @@ contains
             Ploc(1) = floor(P_de(ii,1) / dx)
             Ploc(2) = floor(P_de(ii,2) / dy)
 
+            Ploc(1) = Ploc(1) + 1
+            Ploc(2) = Ploc(2) + 1
             !Z = 0.d0
             !do k = 1, nz
             !    Z = Z + dz_T(k)
@@ -334,10 +336,10 @@ contains
 
             P_de(ii,13+2*nind) = -1.
             if(P_de(ii,10) /= 3.) then ! otherwise, particle is out of domain
-                if(Zone_de(Ploc(1)+1,Ploc(2)+1) /= rank) then
+                if(Zone_de(Ploc(1),Ploc(2)) /= rank) then
                     if(P_de(ii,8) == 1. .or. (P_de(ii,8) == 0. .and. P_de(ii,10) == 2.)) then
-                        P_de(ii,13+2*nind) = Zone_de(Ploc(1)+1,Ploc(2)+1)
-                        temp = atomicAdd(N_send(Zone_de(Ploc(1)+1,Ploc(2)+1)+1),idnint(one))
+                        P_de(ii,13+2*nind) = Zone_de(Ploc(1),Ploc(2))
+                        temp = atomicAdd(N_send(Zone_de(Ploc(1),Ploc(2))+1),idnint(one))
                     endif
                 endif
             endif
@@ -356,56 +358,68 @@ contains
         implicit none
         ! real(8),intent(inout):: P(:,:)
         ! real(8),intent(inout):: mean_age(:),total_mass(:),mean_comp(:)
+        integer,parameter:: tPB = 256
         integer,value:: ix1,iy1,np_active
-        integer:: Ploc(3), ii, k
-        real(8):: one, Z, temp
+        integer:: Ploc(3), ii, k, ii_s !5
+        real(8):: one, Z, temp !6
+
+        real(8),shared:: P_s(tPB,2)
+        real(8):: P_l(2)
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii_s = threadIdx%x
         one = 1.d0
 
         if(ii <= np_active) then
 
+            P_s(ii_s,1:2) = P_de(ii,1:2)
+
+            P_l(1) = P_de(ii,6)
+            P_l(2) = P_de(ii,8)
+
             ! Transfer global to local
-            P_de(ii,1) = P_de(ii,1) - dble(ix1)*dx
-            P_de(ii,2) = P_de(ii,2) - dble(iy1)*dy
+            P_s(ii_s,1) = P_s(ii_s,1) - dble(ix1)*dx
+            P_s(ii_s,2) = P_s(ii_s,2) - dble(iy1)*dy
 
             ! Find the "adjacent" "cell corresponding to the particle's location
-            Ploc(1) = floor(P_de(ii,1) / dx)
-            Ploc(2) = floor(P_de(ii,2) / dy)
-            ! if(Ploc(1) >= nnx1 + buff) Ploc(1) = nnx1 + buff - 1
-            ! if(Ploc(2) >= nny1 + buff) Ploc(2) = nny1 + buff - 1
+            Ploc(1) = floor(P_s(ii_s,1) / dx)
+            Ploc(2) = floor(P_s(ii_s,2) / dy)
 
             Z = 0.d0
             do k = 1, nz
                 Z = Z + dz_T(k)
-                if (Z >= P_de(ii,3)) then
+                if (Z >= P_T(ii,3)) then
                     Ploc(3) = k - 1
                     exit
                 end if
             end do
 
-            if(P_de(ii,8) == 0. .and. P_de(ii,10) == 2.) then
-                temp = atomicAdd(C_de(6,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),one)
-                temp = atomicAdd(C_de(7,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,6))  ! particle mass added to ET
-                temp = atomicAdd(C_de(8,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,4)*P_de(ii,6))  ! mass weighted age
-                temp = atomicAdd(C_de(9,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,7)*P_de(ii,6))  ! mass weighted contribution
+            Ploc(1) = Ploc(1) + 1
+            Ploc(2) = Ploc(2) + 1
+            Ploc(3) = Ploc(3) + 1
+
+            if(P_l(2) == 0. .and. P_T(ii,10) == 2.) then
+                temp = atomicAdd(C_de(6,Ploc(1),Ploc(2),Ploc(3)),one)
+                temp = atomicAdd(C_de(7,Ploc(1),Ploc(2),Ploc(3)),P_l(1))  ! particle mass added to ET
+                temp = atomicAdd(C_de(8,Ploc(1),Ploc(2),Ploc(3)),P_T(ii,4)*P_l(1))  ! mass weighted age
+                temp = atomicAdd(C_de(9,Ploc(1),Ploc(2),Ploc(3)),P_T(ii,7)*P_l(1))  ! mass weighted contribution
             end if
 
-            temp = atomicAdd(C_de(1,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,8)*P_de(ii,11)*P_de(ii,6))
-            temp = atomicAdd(C_de(2,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,8)*P_de(ii,4)*P_de(ii,6))
-            temp = atomicAdd(C_de(4,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,8)*P_de(ii,5)*P_de(ii,6))
-            temp = atomicAdd(C_de(3,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,8)*P_de(ii,6))
-            temp = atomicAdd(C_de(5,Ploc(1)+1,Ploc(2)+1,Ploc(3)+1),P_de(ii,8)*P_de(ii,12)*P_de(ii,6))
+            temp = atomicAdd(C_de(1,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,11)*P_l(1))
+            temp = atomicAdd(C_de(2,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,4)*P_l(1))
+            temp = atomicAdd(C_de(4,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,5)*P_l(1))
+            temp = atomicAdd(C_de(3,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_l(1))
+            temp = atomicAdd(C_de(5,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,12)*P_l(1))
 
             !--------------------------------------
             ! increment mean age, composition and mass
-            temp = atomicAdd(mean_age_de,   P_de(ii,8)*P_de(ii,4)*P_de(ii,6))
-            temp = atomicAdd(mean_comp_de,  P_de(ii,8)*P_de(ii,7)*P_de(ii,6))
-            temp = atomicAdd(total_mass_de, P_de(ii,8)*P_de(ii,6))
+            temp = atomicAdd(mean_age_de,   P_l(2)*P_T(ii,4)*P_l(1))
+            temp = atomicAdd(mean_comp_de,  P_l(2)*P_T(ii,7)*P_l(1))
+            temp = atomicAdd(total_mass_de, P_l(2)*P_l(1))
 
             !--------------------------------------
-            P_de(ii,1) = P_de(ii,1) + dble(ix1)*dx
-            P_de(ii,2) = P_de(ii,2) + dble(iy1)*dy
+            ! P_de(ii,1) = P_de(ii,1) + dble(ix1)*dx
+            ! P_de(ii,2) = P_de(ii,2) + dble(iy1)*dy
 
         end if
 
