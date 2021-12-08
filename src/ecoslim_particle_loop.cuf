@@ -70,18 +70,21 @@ contains
         integer,value:: offset,rank
         logical,value:: reflect
 
-        integer:: ii,k,Ploc(3)
-        real(8):: Vpx,Vpy,Vpz,Z,particledt,delta_time,advdt(3), &
-        z1,z2,z3,temp,one
+        integer:: ii,k,Ploc(3),ii_l
+        real(8):: Vpx,Vpy,Vpz,Z,particledt,delta_time, &
+        advdt(3),z1,z2,z3,temp,one
+
+        real(8),shared:: gl(256,2)
+
+        type(curandStateXORWOW):: hh
+
         !--------------------------------------
         one = 1.d0
         ii = offset + (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        !--------------------------------------
-        ! xgmin = xgmin - dble(ix1)*dx
-        ! ygmin = ygmin - dble(iy1)*dy
-        ! xgmax = xgmax - dble(ix1)*dx
-        ! ygmax = ygmax - dble(iy1)*dy
+        ii_l = threadIdx%x
 
+        hh = h(ii)
+        !--------------------------------------
         if(P_de(ii,8) == 1. .and. ii <= offset + np_active) then
 
             delta_time = 0.d0
@@ -112,6 +115,9 @@ contains
                     end if
                 end do
 
+                gl(ii_l,1) = Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1)
+                gl(ii_l,2) = Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1)
+
                 ! check to make sure particles are in central part of the domain and if not
                 ! apply some boundary condition to them
                 ! check if particles are in domain, need to expand this to include better treatment of BC's
@@ -119,7 +125,7 @@ contains
                     (P_de(ii,1) >= Xmax).or.(P_de(ii,2) >= Ymax).or.(P_de(ii,3) >= (Zmax-dz_T(nz)))) then
 
                 if ((P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
-                    (Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.).and. &
+                    (gl(ii_l,1) == 1.).and. &
                     (Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) > 0.d0)) then
 
                     temp = atomicAdd(Out_age_de(1), P_de(ii,4)*P_de(ii,6))
@@ -157,25 +163,25 @@ contains
                 do k = 1, Ploc(3)
                     Z = Z + dz_T(k)
                 end do
-                advdt(3) = (P_de(ii,3) - Z) / dz_T(Ploc(3) + 1)
+                advdt(3) = (P_de(ii,3) - Z) / dz_T(Ploc(3)+1)
 
                 ! Calculate local particle velocity using linear interpolation,
                 ! converting darcy flux to average linear velocity
 
                 Vpx = ((1.-advdt(1))*Vx_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                     + Vx_T(Ploc(1)+2,Ploc(2)+1,Ploc(3)+1)*advdt(1))   &
-                    /(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                    *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                    /(gl(ii_l,2) &
+                    *gl(ii_l,1))
 
                 Vpy = ((1.-advdt(2))*Vy_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                         + Vy_T(Ploc(1)+1,Ploc(2)+2,Ploc(3)+1)*advdt(2)) &
-                        /(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                        *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                        /(gl(ii_l,2) &
+                        *gl(ii_l,1))
 
                 Vpz = ((1.-advdt(3))*Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                         + Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+2)*advdt(3))  &
-                            /(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                        *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                            /(gl(ii_l,2) &
+                        *gl(ii_l,1))
 
                 ! calculate particle dt
                 ! check each direction independently
@@ -195,10 +201,10 @@ contains
                 ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
                 ! probability of being captured by roots
                 ! water volume in cell
-                z2 = dx*dy*dz_T(Ploc(3)+1)*(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                            *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                z2 = dx*dy*dz_T(Ploc(3)+1)*(gl(ii_l,2) &
+                            *gl(ii_l,1))
 
-                if (curand_uniform(h(ii)) < ((z1*particledt)/z2)) then   ! check if particle is 'captured' by the roots
+                if (curand_uniform(hh) < ((z1*particledt)/z2)) then   ! check if particle is 'captured' by the roots
                 !  this section made atomic since it could inovlve a data race
                 !  that is, each thread can only update the ET arrays one at a time
 
@@ -251,9 +257,9 @@ contains
 
                 ! Molecular Diffusion
                 if (moldiff > 0.d0) then
-                    z1 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
-                    z2 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
-                    z3 = 2.d0*dsqrt(3.d0)*(curand_uniform(h(ii))-0.5d0)
+                    z1 = 2.d0*dsqrt(3.d0)*(curand_uniform(hh)-0.5d0)
+                    z2 = 2.d0*dsqrt(3.d0)*(curand_uniform(hh)-0.5d0)
+                    z3 = 2.d0*dsqrt(3.d0)*(curand_uniform(hh)-0.5d0)
 
                     P_de(ii,1) = P_de(ii,1) + z1 * dsqrt(moldiff*2.d0*particledt)
                     P_de(ii,2) = P_de(ii,2) + z2 * dsqrt(moldiff*2.d0*particledt)
@@ -268,7 +274,7 @@ contains
                 ! placeholder for other interactions; potentially added later
                 !
                 ! place to track saturated / groundwater time if needed
-                if(Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.) then
+                if(gl(ii_l,1) == 1.) then
                     P_de(ii,5) = P_de(ii,5) + particledt
                     P_de(ii,12) = P_de(ii,12) + temp
                 end if
@@ -342,7 +348,7 @@ contains
             P_de(ii,2) = P_de(ii,2) + dble(iy1)*dy
 
         end if
-
+        h(ii) = hh
     end subroutine particles_independent
 
     attributes(global) subroutine Update_C_Array(ix1,iy1,np_active)
