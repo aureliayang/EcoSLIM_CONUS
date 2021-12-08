@@ -150,7 +150,7 @@ contains
         if(ii <= numElements .and. d_isValid_T(ii) > 0) then
             ii2 = d_indices_T(numElements) - d_indices_T(ii) + 1
             if (ii2 <= numElements-d_indices_T(numElements) .and. &
-            holes(ii2) <= d_indices_T(numElements)) then
+                holes(ii2) <= d_indices_T(numElements)) then
                 temp1 = offset+holes(ii2)
                 temp2 = offset+ii
                 d_in(temp1,:) = d_in(temp2,:)

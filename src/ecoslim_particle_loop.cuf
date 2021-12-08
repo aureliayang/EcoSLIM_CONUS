@@ -21,27 +21,39 @@ contains
     attributes(global) subroutine particles_separation(d_isValid, &
         xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
         implicit none
-        ! real(8),intent(inout):: P(:,:)
+
+        integer,parameter:: tPB = 256
         integer,intent(out):: d_isValid(:)
         real(8),value:: xmin3,ymin3,xmax3,ymax3
         integer,value:: np_active,ix1,iy1
-        integer:: ii
+        integer:: ii,ii_g
+        real(8),shared:: P_s(tPB,2), d_isValid_s(tPB)
 
-        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        if (ii <= np_active) then
+        ii_g = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii = threadIdx%x
+
+        if (ii_g <= np_active) then
+
+            P_s(ii,1:2) = P_de(ii_g,1:2)
+
             ! Transfer global to local
-            P_de(ii,1) = P_de(ii,1) - dble(ix1)*dx
-            P_de(ii,2) = P_de(ii,2) - dble(iy1)*dy
+            P_s(ii,1) = P_s(ii,1) - dble(ix1)*dx
+            P_s(ii,2) = P_s(ii,2) - dble(iy1)*dy
 
-            d_isValid(ii) = 1
-            if(P_de(ii,1) < xmin3 .or. P_de(ii,2) < ymin3 .or. P_de(ii,1) >= xmax3 &
-                .or. P_de(ii,2) >= ymax3) then
-                d_isValid(ii) = 0
+            if(P_s(ii,1) <  xmin3 .or. P_s(ii,2) <  ymin3 .or. &
+               P_s(ii,1) >= xmax3 .or. P_s(ii,2) >= ymax3) then
+                d_isValid_s(ii) = 0
+            else
+                d_isValid_s(ii) = 1
             end if
 
             ! Transfer local coordinates to global
-            P_de(ii,1) = P_de(ii,1) + dble(ix1)*dx
-            P_de(ii,2) = P_de(ii,2) + dble(iy1)*dy
+            P_s(ii,1) = P_s(ii,1) + dble(ix1)*dx
+            P_s(ii,2) = P_s(ii,2) + dble(iy1)*dy
+
+            d_isValid(ii_g) = d_isValid_s(ii)
+            P_de(ii_g,1:2) = P_s(ii,1:2)
+
         end if
     end subroutine particles_separation
 
@@ -52,22 +64,15 @@ contains
 
         implicit none
 
-        ! real(8),intent(inout):: P(:,:)
-        ! real(8),intent(inout):: out_age(:),out_mass(:),out_comp(:)
-        ! real(8),intent(inout):: et_age(:),et_mass(:),et_comp(:)
-        ! integer,intent(inout):: out_np(:),et_np(:)
-
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
-        ! real(8),value:: moldiff,denh2o,dtfrac
         integer,value:: np_active,ix1,iy1
         integer,value:: offset,rank
         logical,value:: reflect
 
-        integer:: ii,k,Ploc(3),itemp
-        real(8):: Clocx,Clocy,Clocz,Vpx,Vpy,Vpz,Z, &
-        particledt,delta_time,et_flux,water_vol,advdt(3), &
-        z1,z2,z3,Zr,temp,one,Ltemp
+        integer:: ii,k,Ploc(3)
+        real(8):: Vpx,Vpy,Vpz,Z,particledt,delta_time,advdt(3), &
+        z1,z2,z3,temp,one
         !--------------------------------------
         one = 1.d0
         ii = offset + (blockIdx%x - 1) * blockDim%x + threadIdx%x
@@ -145,30 +150,30 @@ contains
                 end if
 
                 ! Find each particle's factional cell location
-                Clocx = (P_de(ii,1) - dble(Ploc(1))*dx)  / dx
-                Clocy = (P_de(ii,2) - dble(Ploc(2))*dy)  / dy
+                advdt(1) = (P_de(ii,1) - dble(Ploc(1))*dx)  / dx
+                advdt(2) = (P_de(ii,2) - dble(Ploc(2))*dy)  / dy
 
                 Z = 0.d0
                 do k = 1, Ploc(3)
                     Z = Z + dz_T(k)
                 end do
-                Clocz = (P_de(ii,3) - Z) / dz_T(Ploc(3) + 1)
+                advdt(3) = (P_de(ii,3) - Z) / dz_T(Ploc(3) + 1)
 
                 ! Calculate local particle velocity using linear interpolation,
                 ! converting darcy flux to average linear velocity
 
-                Vpx = ((1.-Clocx)*Vx_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                    + Vx_T(Ploc(1)+2,Ploc(2)+1,Ploc(3)+1)*Clocx)   &
+                Vpx = ((1.-advdt(1))*Vx_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                    + Vx_T(Ploc(1)+2,Ploc(2)+1,Ploc(3)+1)*advdt(1))   &
                     /(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                     *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
 
-                Vpy = ((1.-Clocy)*Vy_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                        + Vy_T(Ploc(1)+1,Ploc(2)+2,Ploc(3)+1)*Clocy) &
+                Vpy = ((1.-advdt(2))*Vy_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                        + Vy_T(Ploc(1)+1,Ploc(2)+2,Ploc(3)+1)*advdt(2)) &
                         /(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                         *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
 
-                Vpz = ((1.-Clocz)*Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
-                        + Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+2)*Clocz)  &
+                Vpz = ((1.-advdt(3))*Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                        + Vz_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+2)*advdt(3))  &
                             /(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                         *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
 
@@ -185,17 +190,15 @@ contains
                 ! calculate Flux in cell and compare it with the ET flux out of the cell
                 if (EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) < 0.d0) then
                 ! calculate ET flux volumetrically and compare to
-                et_flux = dabs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
+                z1 = dabs(EvapTrans_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))*dx*dy*dz_T(Ploc(3)+1)
 
                 ! compare total water removed from cell by ET with total water available in cell to arrive at a particle
                 ! probability of being captured by roots
                 ! water volume in cell
-                water_vol = dx*dy*dz_T(Ploc(3)+1)*(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
+                z2 = dx*dy*dz_T(Ploc(3)+1)*(Porosity_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) &
                             *Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
 
-                Zr = curand_uniform(h(ii))
-
-                if (Zr < ((et_flux*particledt)/water_vol)) then   ! check if particle is 'captured' by the roots
+                if (curand_uniform(h(ii)) < ((z1*particledt)/z2)) then   ! check if particle is 'captured' by the roots
                 !  this section made atomic since it could inovlve a data race
                 !  that is, each thread can only update the ET arrays one at a time
 
@@ -243,7 +246,7 @@ contains
                 P_de(ii,3) = P_de(ii,3) + particledt * Vpz
                 P_de(ii,4) = P_de(ii,4) + particledt
 
-                Ltemp = dsqrt((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
+                temp = dsqrt((particledt*Vpx)**2 + (particledt*Vpy)**2 + &
                             (particledt*Vpz)**2)
 
                 ! Molecular Diffusion
@@ -256,25 +259,25 @@ contains
                     P_de(ii,2) = P_de(ii,2) + z2 * dsqrt(moldiff*2.d0*particledt)
                     P_de(ii,3) = P_de(ii,3) + z3 * dsqrt(moldiff*2.d0*particledt)
 
-                    Ltemp = Ltemp + &
+                    temp = temp + &
                                 dsqrt((z1*dsqrt(moldiff*2.d0*particledt))**2 + &
                                     (z2*dsqrt(moldiff*2.d0*particledt))**2 + &
                                     (z3*dsqrt(moldiff*2.d0*particledt))**2)
                 end if
-                P_de(ii,11) = P_de(ii,11) + Ltemp
+                P_de(ii,11) = P_de(ii,11) + temp
                 ! placeholder for other interactions; potentially added later
                 !
                 ! place to track saturated / groundwater time if needed
                 if(Saturation_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1) == 1.) then
                     P_de(ii,5) = P_de(ii,5) + particledt
-                    P_de(ii,12) = P_de(ii,12) + Ltemp
+                    P_de(ii,12) = P_de(ii,12) + temp
                 end if
 
                 if (nind > 0) then
-                    itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
-                    if(itemp > 0 .and. itemp <= nind) then
-                        P_de(ii,12+itemp) = P_de(ii,12+itemp) + particledt
-                        P_de(ii,12+nind+itemp) = P_de(ii,12+nind+itemp) + Ltemp
+                    k=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,Ploc(3)+1))
+                    if(k > 0 .and. k <= nind) then
+                        P_de(ii,12+k) = P_de(ii,12+k) + particledt
+                        P_de(ii,12+nind+k) = P_de(ii,12+nind+k) + temp
                     end  if
                 end if
 
