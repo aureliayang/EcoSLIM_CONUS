@@ -4,7 +4,7 @@ module UpdateC_SortP
     use compact_array
     use particle_loop
     use variable_list, only: N_exit, holes, P, P_exit
-    use variable_list, only: P_de, d_isValid, d_indices, nz
+    use variable_list, only: P_de, d_isValid, d_indices
     ! use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
     use variable_list, only: ix1, iy1, nind_c, tPB
     use variable_list, only: np_active, ranknum, filenum
@@ -21,7 +21,7 @@ contains
                 #endif
 
             call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
-                nz,ix1,iy1,np_active)
+                ix1,iy1,np_active)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)

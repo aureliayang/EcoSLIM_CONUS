@@ -49,7 +49,7 @@ module variable_list
 
     character(200):: runname, pname, DEMname, vtk_file, Indname
 
-    integer:: nx, ny, nz, nzclm, nCLMsoil
+    integer:: nx_c, ny_c, nz_c, nzclm, nCLMsoil
     ! number of cells in the domain and cells+1 in x, y, and z directions
 
     integer:: ppx, qqy ! split in x and y directions
@@ -66,7 +66,7 @@ module variable_list
     real(8),constant:: dx, dy, pfdt, dtfrac, denh2o, moldiff
     real(8):: dx_c, dy_c, pfdt_c, dtfrac_c, denh2o_c, moldiff_c
 
-    integer,constant:: nattri, nind
+    integer,constant:: nattri, nind, nx, ny, nz
     integer:: nind_c
 
     integer:: pft1, pft2, tout1, pfnt, n_cycle
@@ -242,18 +242,18 @@ contains
         !if (rank /= ppx*qqy) then
             allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
 
-            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
-                     Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
-                     Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1))
+            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
+                     Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
+                     Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1))
 
-            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                       Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                      EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                       Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                      EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
 
-            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
             allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
-            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
 
             ! Intialize everything to Zero
             Vx = 0.0d0
@@ -271,17 +271,17 @@ contains
 
             !-------------------------------------
             ! allocate arrays on GPU
-            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz), &
-                     Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz), &
-                     Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz+1), &
-                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
-            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                     Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                     EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
-                     EvapTrans_da_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz), &
+            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
+                     Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
+                     Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1), &
+                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     EvapTrans_da_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
                      CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
                      Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
-            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz))
+            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
 
             Zone_de = -1
 

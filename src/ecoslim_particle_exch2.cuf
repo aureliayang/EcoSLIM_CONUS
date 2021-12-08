@@ -12,7 +12,6 @@ module exchange_particles2
     ! N_recv has the length of its neighbors and has been initialized as 0.
     use variable_list, only: holes, P_send, P_recv, P, P_exit
     use variable_list, only: P_de, d_isValid, d_indices
-    use variable_list, only: dz_de, nz
     use variable_list, only: ix1, iy1, nnx1, nny1, reflect
     use variable_list, only: rank, t_rank, nind_c, tPB
     use variable_list, only: np_active !, ranknum, filenum
@@ -91,10 +90,7 @@ contains
             N_peri = d_indices(N_peri)
             np_active = N_inte + N_peri
 
-            P_send_cpu = P_send
-
-            !write(30,*) N_peri, sum_send, 'send'
-            !flush(30)
+            P_send_cpu(1:sum_send*nattri_c) = P_send(1:sum_send*nattri_c)
 
             do i = 1, sum_send
                 nc3 = nc3 + 1
@@ -137,7 +133,7 @@ contains
         call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-            0,N_inte,ix1,iy1,nz,reflect,rank)
+            0,N_inte,ix1,iy1,reflect,rank)
 
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)

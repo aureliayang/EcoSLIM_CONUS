@@ -11,7 +11,7 @@ module create_subdomain
 
     use variable_list, only: p_num, c_sum
     use variable_list, only: d_indices
-    use variable_list, only: nx, ny, ppx, qqy, tPB ! , rank, t_rank !,ierr, buff
+    use variable_list, only: nx_c, ny_c, ppx, qqy, tPB ! , rank, t_rank !,ierr, buff
     use variable_list, only: grid_old, grid
     ! grid is on each rank while grid_old is only on ppx*qqy
     use variable_list, only: Zonet_old, Zonet_new
@@ -39,10 +39,10 @@ contains
         grid = 0   ! this is legal
         grid(1,1) = 0
         grid(1,2) = 0
-        grid(1,3) = nx
-        grid(1,4) = ny
+        grid(1,3) = nx_c
+        grid(1,4) = ny_c
         Zonet_new = -1
-        Zonet_new(1:nx,1:ny) = 0
+        Zonet_new(1:nx_c,1:ny_c) = 0
 
         dir = 1
         if(qqy > ppx) dir = -1

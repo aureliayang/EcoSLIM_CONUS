@@ -130,9 +130,12 @@ program EcoSLIM
     endif ! rank = 0, write logfile through channel 11
 
     ! read domain number of cells and number of particles to be injected
-    read(10,*) nx
-    read(10,*) ny
-    read(10,*) nz
+    read(10,*) nx_c
+    nx = nx_c
+    read(10,*) ny_c
+    ny = ny_c
+    read(10,*) nz_c
+    nz = nz_c
     read(10,*) nCLMsoil
     read(10,*) ppx
     read(10,*) qqy
@@ -153,9 +156,9 @@ program EcoSLIM
         end if
         ! write nx, ny, nz, and np in the log file
         write(11,*) 'Grid information'
-        write(11,*) 'nx:',nx
-        write(11,*) 'ny:',ny
-        write(11,*) 'nz:',nz
+        write(11,*) 'nx:',nx_c
+        write(11,*) 'ny:',ny_c
+        write(11,*) 'nz:',nz_c
         write(11,*)
         write(11,*) 'Particle IC Information'
         write(11,*) 'np IC:',np_ic
@@ -170,7 +173,7 @@ program EcoSLIM
                           ! layer setup)
     n_constituents = 9
 
-    allocate(dz(nz),dz_de(nz))
+    allocate(dz(nz_c),dz_de(nz_c))
     ! have to do this here since the following read of dz
 
     ! read dx, dy as scalars
@@ -179,7 +182,7 @@ program EcoSLIM
     read(10,*) dy_c
     dy = dy_c
     ! read dz as an array
-    read(10,*) dz(1:nz)
+    read(10,*) dz(1:nz_c)
     ! dz2 = dz
     ! read in (constant for now) ParFlow dt
     read(10,*) pfdt_c
@@ -235,7 +238,7 @@ program EcoSLIM
         write(11,*) 'Grid Dimensions'
         write(11,'(" dx:",e12.5)') dx_c
         write(11,'(" dy:",e12.5)') dy_c
-        write(11,'(" dz:",*(e12.5,", "))') dz(1:nz)
+        write(11,'(" dz:",*(e12.5,", "))') dz(1:nz_c)
         write(11,*)
         write(11,*) 'Timestepping Information'
         write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt_c
@@ -274,16 +277,16 @@ program EcoSLIM
     call alloc_arrays_const()
     ! now we know the total dimension
 
-    allocate(Saturation_cpu(nx,ny,nz),Porosity_cpu(nx,ny,nz))
-    allocate(EvapTrans_cpu(nx,ny,nz),CLMvars_cpu(nx,ny,nzclm))
-    allocate(Vx_cpu(nx+1,ny,nz),Vy_cpu(nx,ny+1,nz),Vz_cpu(nx,ny,nz+1))
+    allocate(Saturation_cpu(nx_c,ny_c,nz_c),Porosity_cpu(nx_c,ny_c,nz_c))
+    allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
+    allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
 
-    allocate(Zonet_old(-buff+1:nx+buff,-buff+1:ny+buff)) ! Zonet_old is not necessary
-    allocate(Zonet_new(-buff+1:nx+buff,-buff+1:ny+buff))
-    allocate(p_num(nx,ny),c_sum(max(nx,ny)))
+    allocate(Zonet_old(-buff+1:nx_c+buff,-buff+1:ny_c+buff)) ! Zonet_old is not necessary
+    allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
+    allocate(p_num(nx_c,ny_c),c_sum(max(nx_c,ny_c)))
     grid = 0
     Zonet_new = -1
-    Zonet_new(1:nx,1:ny) = 0
+    Zonet_new(1:nx_c,1:ny_c) = 0
     p_num = 1
 
     call global_xyz()
@@ -345,7 +348,7 @@ program EcoSLIM
 
     ! Porosity = 0.3d0
     fname = trim(adjustl(pname))//'.out.porosity.pfb'
-    call pfb_read(Porosity_cpu,fname,nx,ny,nz)
+    call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
     Porosity(1+ix2-ix1:nnx2+ix2-ix1,1+iy2-iy1:nny2+iy2-iy1,:) = &
     Porosity_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
@@ -353,13 +356,13 @@ program EcoSLIM
         ! Saturation = 0.8d0
         write(filenum,'(i5.5)') pft1-1
         fname = trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Saturation_cpu,fname,nx,ny,nz)
+        call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
         Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
         Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
             ! allocate(h_cpu(np))
             ! h_cpu = h
             ! write(*,*) rank,'h_before',h_cpu(1)
-        call createRand_init<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> (nx,ny,nz, &
+        call createRand_init<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> (nx_c,ny_c,nz_c, &
             rank,np_ic,nnx1,nny1)
             ! h_cpu = h
             ! write(*,*) rank,'h_after',h_cpu(1)
@@ -387,12 +390,12 @@ program EcoSLIM
         np_active = 0
         pid = 0
 
-        call scan_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB), &
-        tPB >>> (d_isValid,nnx1,nny1,nz)
+        call scan_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB), &
+        tPB >>> (d_isValid,nnx1,nny1)
 
-        call thrustscan(d_isValid,nnx1*nny1*nz,d_indices)
+        call thrustscan(d_isValid,nnx1*nny1*nz_c,d_indices)
 
-        np_active = d_indices(nnx1*nny1*nz)
+        np_active = d_indices(nnx1*nny1*nz_c)
         np_active = np_ic*np_active
         pid = np_active
 
@@ -402,8 +405,8 @@ program EcoSLIM
             goto 9090
         endif
 
-        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> &
-        (np_ic,tout1,nnx1,nny1,nz,ix1,iy1)
+        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> &
+        (np_ic,tout1,nnx1,nny1,ix1,iy1)
 
     end if
 
@@ -466,31 +469,31 @@ program EcoSLIM
         !call read_h5_file(Vx,1)
         !Vx = 240.d0
         fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Vx_cpu,fname,nx+1,ny,nz)
-        Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz) = &
-        Vx_cpu(ix2+1:ix2+nnx2+1,iy2+1:iy2+nny2,1:nz)
+        call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
+        Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c) = &
+        Vx_cpu(ix2+1:ix2+nnx2+1,iy2+1:iy2+nny2,1:nz_c)
 
         !fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
         !call read_h5_file(Vy,2)
         !Vy = 240.d0
         fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Vy_cpu,fname,nx,ny+1,nz)
-        Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz) = &
-        Vy_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2+1,1:nz)
+        call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
+        Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c) = &
+        Vy_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2+1,1:nz_c)
 
         !fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
         !call read_h5_file(Vz,3)
         !Vz = 0.d0
         fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Vz_cpu,fname,nx,ny,nz+1)
-        Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz+1) = &
-        Vz_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,1:nz+1)
+        call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
+        Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1) = &
+        Vz_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,1:nz_c+1)
 
         !fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
         !call read_h5_file(Saturation,0)
         !Saturation = 0.8d0
         fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Saturation_cpu,fname,nx,ny,nz)
+        call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
         Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
         Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
@@ -501,7 +504,7 @@ program EcoSLIM
             ! EvapTrans = 0.d0
             ! EvapTrans(2,:,1) = 1.d-8
             fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(EvapTrans_cpu,fname,nx,ny,nz)
+            call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
             EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
             EvapTrans_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
@@ -582,8 +585,8 @@ program EcoSLIM
                     istat = cudaEventRecord(startEvent,0)
                     #endif
 
-                call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
-                    PET_balance_de,d_isValid,nnx1,nny1,nz)
+                call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> ( &
+                    PET_balance_de,d_isValid,nnx1,nny1)
 
                     #if _TIMING == 1
                     istat = cudaEventRecord(stopEvent,0)
@@ -639,7 +642,7 @@ program EcoSLIM
 
                     call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
                         tPB >>> (iflux_p_res,np_active,pid, &
-                        nnx1,nny1,nz,ix1,iy1,kk,tout1)
+                        nnx1,nny1,ix1,iy1,kk,tout1)
 
                         #if _TIMING == 1
                         istat = cudaEventRecord(stopEvent,0)
@@ -804,7 +807,7 @@ program EcoSLIM
         call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-            N_inte,N_peri,ix1,iy1,nz,reflect,rank)
+            N_inte,N_peri,ix1,iy1,reflect,rank)
 
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)

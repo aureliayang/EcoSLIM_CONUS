@@ -6,7 +6,7 @@ module subdomain_bound
     use cudafor
 
     use variable_list, only: ppx, qqy, rank, buff
-    use variable_list, only: nx, ny, nz
+    use variable_list, only: nx_c, ny_c, nz_c
     use variable_list, only: dx, dy, dz
     use variable_list, only: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
     use variable_list, only: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
@@ -39,10 +39,10 @@ contains
             Xgmin = 0.0d0
             Ygmin = 0.0d0
             Zgmin = 0.0d0
-            Xgmax = dble(nx)*dx
-            Ygmax = dble(ny)*dy
+            Xgmax = dble(nx_c)*dx
+            Ygmax = dble(ny_c)*dy
             Zgmax = 0.0d0
-            do k = 1, nz
+            do k = 1, nz_c
                 Zgmax = Zgmax + dz(k)
             end do
 
@@ -98,7 +98,7 @@ contains
             Xmax1 = dble(nnx1)*dx
             Ymax1 = dble(nny1)*dy
             Zmax1 = 0.0d0
-            do k = 1, nz
+            do k = 1, nz_c
                 Zmax1 = Zmax1 + dz(k)
             end do
 
@@ -108,7 +108,7 @@ contains
             Xmax2 = dble(nnx1)*dx + dble(buff)*dx
             Ymax2 = dble(nny1)*dy + dble(buff)*dy
             Zmax2 = 0.0d0
-            do k = 1, nz
+            do k = 1, nz_c
                 Zmax2 = Zmax2 + dz(k)
             end do
 
@@ -118,7 +118,7 @@ contains
             Xmax3 = dble(nnx1)*dx - dble(buff)*dx
             Ymax3 = dble(nny1)*dy - dble(buff)*dy
             Zmax3 = 0.0d0
-            do k = 1, nz
+            do k = 1, nz_c
                 Zmax3 = Zmax3 + dz(k)
             end do
 
@@ -128,7 +128,7 @@ contains
             Xgmax = Xgmax - dble(ix1)*dx
             Ygmax = Ygmax - dble(iy1)*dy
             Zgmax = 0.0d0
-            do k = 1, nz
+            do k = 1, nz_c
                 Zgmax = Zgmax + dz(k)
             end do
         ! end if

@@ -7,7 +7,7 @@ module utilities
     ! subroutine receive_Zone_de
     use mpi
     use cudafor
-    use variable_list, only: nx, ny
+    use variable_list, only: nx_c, ny_c
     use variable_list, only: buff, ppx, qqy, rank, status
     use variable_list, only: Zonet_old, Zonet_new, Zone_de, Zones_old
     use variable_list, only: grid, grid_old
@@ -31,13 +31,13 @@ contains
             ix2  = ix1
             nnx2 = nnx2 - buff
         endif
-        if(ix1+nnx1 == nx) nnx2 = nnx2 - buff
+        if(ix1+nnx1 == nx_c) nnx2 = nnx2 - buff
 
         if(iy1 == 0) then
             iy2  = iy1
             nny2 = nny2 - buff
         endif
-        if(iy1+nny1 == ny) nny2 = nny2 - buff
+        if(iy1+nny1 == ny_c) nny2 = nny2 - buff
 
     end subroutine copy_grid
 

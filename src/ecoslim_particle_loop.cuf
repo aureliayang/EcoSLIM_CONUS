@@ -6,7 +6,7 @@ module particle_loop
     use curand_device
     use mrand, only: h
     use variable_list, only: Zone_de, C_de, P_de
-    use variable_list, only: dx, dy, pfdt, N_send
+    use variable_list, only: dx, dy, pfdt, N_send, nz
     use variable_list, only: moldiff, denh2o, dtfrac, nind
 
     use variable_list, only: out_age_de,out_mass_de,out_comp_de,out_np_de
@@ -45,11 +45,10 @@ contains
         end if
     end subroutine particles_separation
 
-
     attributes(global) subroutine particles_independent( &
         xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
         xmin,ymin,zmin,xmax,ymax,zmax, &
-        offset,np_active,ix1,iy1,nz,reflect,rank)
+        offset,np_active,ix1,iy1,reflect,rank)
 
         implicit none
 
@@ -61,7 +60,7 @@ contains
         real(8),value:: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         ! real(8),value:: moldiff,denh2o,dtfrac
-        integer,value:: np_active,ix1,iy1,nz
+        integer,value:: np_active,ix1,iy1
         integer,value:: offset,rank
         logical,value:: reflect
 
@@ -343,13 +342,12 @@ contains
 
     end subroutine particles_independent
 
-    attributes(global) subroutine Update_C_Array(nz,ix1,iy1, &
-        np_active)
+    attributes(global) subroutine Update_C_Array(ix1,iy1,np_active)
 
         implicit none
         ! real(8),intent(inout):: P(:,:)
         ! real(8),intent(inout):: mean_age(:),total_mass(:),mean_comp(:)
-        integer,value:: nz,ix1,iy1,np_active
+        integer,value:: ix1,iy1,np_active
         integer:: Ploc(3), ii, k
         real(8):: one, Z, temp
 
