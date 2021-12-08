@@ -63,8 +63,11 @@ module variable_list
     CHARACTER(20),allocatable:: conc_header(:)
     ! name for variables written in the C array above.  Dimensioned as l above.
 
-    real(8),constant:: dx, dy, pfdt
-    real(8):: dx_c, dy_c, pfdt_c
+    real(8),constant:: dx, dy, pfdt, dtfrac, denh2o, moldiff
+    real(8):: dx_c, dy_c, pfdt_c, dtfrac_c, denh2o_c, moldiff_c
+
+    integer,constant:: nattri, nind
+    integer:: nind_c
 
     integer:: pft1, pft2, tout1, pfnt, n_cycle
     ! parflow start and stop file numbers number of ParFlow timesteps
@@ -89,7 +92,7 @@ module variable_list
     real(8),allocatable:: DEM(:,:) ! DEM and grid points for concentration output
     real(8),allocatable:: Pnts(:,:) ! use in vtk
 
-    integer:: nind, pid
+    integer:: pid
 
     integer:: i, j, k, l, ik, ji, ij, ii
 
@@ -103,7 +106,7 @@ module variable_list
     ! vtk_file = concentration file
     ! DEMname = DEM file name
 
-    real(8):: V_mult, dtfrac, denh2o, moldiff
+    real(8):: V_mult
     ! Multiplier for forward/backward particle tracking
     ! If V_mult = 1, forward tracking
     ! If V_mult = -1, backward tracking
@@ -181,8 +184,6 @@ module variable_list
     ! the particle array, not sure if the one on host is necessary
     real(8),allocatable,device:: C_de(:,:,:,:)
 
-    #if _TEXTURE == 1
-
     real(8),allocatable,device,target:: Vx_de(:,:,:)
     real(8),allocatable,device,target:: Vy_de(:,:,:)
     real(8),allocatable,device,target:: Vz_de(:,:,:)
@@ -197,30 +198,16 @@ module variable_list
     real(8),texture,pointer:: EvapTrans_T(:,:,:),Saturation_T(:,:,:),Porosity_T(:,:,:)
     real(8),texture,pointer:: Vx_T(:,:,:),Vy_T(:,:,:),Vz_T(:,:,:),Ind_T(:,:,:),dz_T(:)
 
-    #else
-
-    real(8),allocatable,device:: Vx_de(:,:,:)
-    real(8),allocatable,device:: Vy_de(:,:,:)
-    real(8),allocatable,device:: Vz_de(:,:,:)
-    real(8),allocatable,device:: dz_de(:)
-    real(8),allocatable,device:: Ind_de(:,:,:)
-    real(8),allocatable,device:: Saturation_de(:,:,:)
-    real(8),allocatable,device:: Porosity_de(:,:,:)
-    real(8),allocatable,device:: EvapTrans_de(:,:,:)
-    real(8),allocatable,device:: EvapTrans_da_de(:,:,:)
-    real(8),allocatable,device:: CLMvars_de(:,:)
-
-    #endif
-
     real(8),allocatable,device:: PET_balance_de(:),PET_balance_da_de(:)
     ! initialization of PET_balance
 
     integer,allocatable,device:: out_np_de(:),ET_np_de(:)
     real(8),allocatable,device:: out_age_de(:),out_mass_de(:),out_comp_de(:)
     real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
-    real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),mean_mass_de(:),total_mass_de(:)
+    real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),total_mass_de(:)
 
-    integer,allocatable,device:: d_isValid(:),d_indices(:),holes(:)
+    integer,allocatable,device,target:: d_isValid(:),d_indices(:),holes(:)
+    integer,texture,pointer:: d_isValid_T(:),d_indices_T(:)
     ! real(8),allocatable,managed:: P_send(:,:),P_recv(:,:)
     integer,allocatable,managed:: Zone_de(:,:),Zones_old(:,:)
     ! Zone_de has to be written to restart files, so we use managed.
@@ -321,7 +308,7 @@ contains
         allocate(out_np_de(1),ET_np_de(1))
         allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
         allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
-        allocate(mean_age_de(1),mean_comp_de(1),mean_mass_de(1),total_mass_de(1))
+        allocate(mean_age_de(1),mean_comp_de(1),total_mass_de(1))
 
         allocate(conc_header(n_constituents))
         ! Set up output options for VTK grid output
@@ -342,12 +329,12 @@ contains
         PET_balance = 0.0d0
         PET_balance_da = 0.0d0
 
-        allocate(P(np,17+nind*2))
+        allocate(P(np,17+nind_c*2))
         P = 0.d0    ! clear out all particle attributes
         P(1:np,7:9) = 1.d0
         ! make all particles active to start with and original from 1 = GW/IC
         ! this is necessary since we need P array for restart.
-        allocate(P_send(200*(17+nind*2)),P_recv(200*(17+nind*2)))
+        allocate(P_send(tPB*(17+nind_c*2)),P_recv(tPB*(17+nind_c*2)))
 
     end subroutine alloc_arrays_const
 

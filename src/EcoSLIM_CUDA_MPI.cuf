@@ -219,12 +219,15 @@ program EcoSLIM
     ! read in IC number of particles for flux
     read(10,*) iflux_p_res
     ! read in density h2o
-    read(10,*) denh2o
+    read(10,*) denh2o_c
+    denh2o = denh2o_c
     ! read in diffusivity
     ! moldiff = (1.15e-9)*3600.d0
-    read(10,*) moldiff
+    read(10,*) moldiff_c
+    moldiff = moldiff_c
     ! fraction of dx/Vx
-    read(10,*) dtfrac
+    read(10,*) dtfrac_c
+    dtfrac = dtfrac_c
 
     if(rank == 0) then
         ! wite out log file
@@ -248,20 +251,21 @@ program EcoSLIM
         write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
         write(11,*)
         write(11,*) 'Physical Constants'
-        write(11,*) 'denh2o: ',denh2o,' M/L^3'
-        write(11,*) 'Molecular Diffusivity: ',moldiff,' '
+        write(11,*) 'denh2o: ',denh2o_c,' M/L^3'
+        write(11,*) 'Molecular Diffusivity: ',moldiff_c,' '
         !write(11,*) 'Fractionation: ',Efract,' '
         write(11,*)
         write(11,*) 'Numerical Stability Information'
-        write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac
+        write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac_c
     endif
 
-    read(10,*) nind
+    read(10,*) nind_c
+    nind = nind_c
     read(10,*) Indname
     if(rank == 0) then
         write(11,*)
         write(11,*) 'Indicator File'
-        write(11,*) nind, 'Indicators'
+        write(11,*) nind_c, 'Indicators'
     endif
 
     ! end of SLIM input
@@ -367,6 +371,17 @@ program EcoSLIM
     Saturation_de = Saturation
     P_de = P
 
+    EvapTrans_T  => EvapTrans_de
+    Saturation_T => Saturation_de
+    Porosity_T   => Porosity_de
+    Vx_T  => Vx_de
+    Vy_T  => Vy_de
+    Vz_T  => Vz_de
+    Ind_T => Ind_de
+    dz_T  => dz_de
+    d_isValid_T => d_isValid
+    d_indices_T => d_indices
+
     ! Define initial particles' locations and mass
     if (np_ic > 0)  then
         np_active = 0
@@ -388,7 +403,7 @@ program EcoSLIM
         endif
 
         call add_init_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> &
-        (d_indices,P_de,np_ic,nind,denh2o,tout1,nnx1,nny1,nz,ix1,iy1,dz_de)
+        (np_ic,tout1,nnx1,nny1,nz,ix1,iy1)
 
     end if
 
@@ -428,19 +443,6 @@ program EcoSLIM
 
     ! Intialize cuRand device API and this part need to check through again.
     call createRand_loop<<< ceiling(dble(np)/tPB),tPB >>> (np, rank, pfnt)
-
-    #if _TEXTURE == 1
-        EvapTrans_T  => EvapTrans_de
-        Saturation_T => Saturation_de
-        Porosity_T   => Porosity_de
-        Vx_T  => Vx_de
-        Vy_T  => Vy_de
-        Vz_T  => Vz_de
-        Ind_T => Ind_de
-        dz_T  => dz_de
-        !d_isValid_T => d_isValid
-        !d_indices_T => d_indices
-    #endif
 
 !--------------------------------------------------------------------
     pfkk = mod((outkk-1),(pft2-pft1+1))+pft1-1    ! outkk is tout1+1
@@ -566,11 +568,11 @@ program EcoSLIM
         N_send = 0
         N_recv = 0
 
-        #if _TIMING == 1
-        istat = cudaEventRecord(stopEvent,0)
-        istat = cudaEventSynchronize(stopEvent)
-        istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
-        #endif
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
+            #endif
 
 !----------------------------------------
         if (clmtrans) then
@@ -581,7 +583,7 @@ program EcoSLIM
                     #endif
 
                 call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz)/tPB),tPB >>> ( &
-                    PET_balance_de,d_isValid,nnx1,nny1,nz,dz_de,denh2o)
+                    PET_balance_de,d_isValid,nnx1,nny1,nz)
 
                     #if _TIMING == 1
                     istat = cudaEventRecord(stopEvent,0)
@@ -636,8 +638,8 @@ program EcoSLIM
                         #endif
 
                     call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
-                        tPB >>> (d_indices,P_de,iflux_p_res,np_active,pid,nind, &
-                        nnx1,nny1,nz,ix1,iy1,dz_de,denh2o,kk,tout1)
+                        tPB >>> (iflux_p_res,np_active,pid, &
+                        nnx1,nny1,nz,ix1,iy1,kk,tout1)
 
                         #if _TIMING == 1
                         istat = cudaEventRecord(stopEvent,0)
@@ -680,7 +682,7 @@ program EcoSLIM
                 istat = cudaEventRecord(startEvent,0)
                 #endif
             call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                P_de,d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
+                d_isValid,xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -728,7 +730,7 @@ program EcoSLIM
                 istat = cudaEventRecord(startEvent,0)
                 #endif
             call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,np_active)
+                holes,np_active)
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
                 istat = cudaEventSynchronize(stopEvent)
@@ -750,7 +752,7 @@ program EcoSLIM
                 istat = cudaEventRecord(startEvent,0)
                 #endif
             call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                holes,d_indices,d_isValid,P_de,0,np_active)
+                holes,P_de,0,np_active)
                 ! if no compaction, you will need d_isValid and if condition to judge
                 ! during the interior particles' movement
                 #if _TIMING == 1
@@ -799,34 +801,10 @@ program EcoSLIM
             istat = cudaEventRecord(startEvent,0)
             #endif
         ! peripheric particles
-        #if _TEXTURE == 1
-        #if _SHARED == 1
-        call particles_independent_T<<<ceiling(dble(N_peri)/tPB),tPB, &
-            tPB*(13+nind*2)*kind(0.d0)>>> ( &
-            P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-            et_age_de,et_mass_de,et_comp_de,et_np_de, &
-            xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-            xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-            moldiff,denh2o,dtfrac,N_inte,N_peri, &
-            nind,ix1,iy1,nz,reflect,rank)
-        #else
-        call particles_independent_T<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
-            P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-            et_age_de,et_mass_de,et_comp_de,et_np_de, &
-            xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-            xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-            moldiff,denh2o,dtfrac,N_inte,N_peri, &
-            nind,ix1,iy1,nz,reflect,rank)
-        #endif
-        #else
         call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
-            P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-            et_age_de,et_mass_de,et_comp_de,et_np_de, &
             xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
             xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-            moldiff,denh2o,dtfrac,N_inte,N_peri, &
-            nind,ix1,iy1,nz,reflect,rank)
-        #endif
+            N_inte,N_peri,ix1,iy1,nz,reflect,rank)
 
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
@@ -865,11 +843,9 @@ program EcoSLIM
     end do
     9090 continue
 
-    #if _TEXTURE == 1
-        nullify(EvapTrans_T,Saturation_T,Porosity_T)
-        nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
-        !nullify(d_isValid_T,d_indices_T)
-    #endif
+    nullify(EvapTrans_T,Saturation_T,Porosity_T)
+    nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T)
+    nullify(d_isValid_T,d_indices_T)
 
     #if _TIMING == 1
     Total_time2 = mpi_wtime()
@@ -917,7 +893,7 @@ end program EcoSLIM
 !    write(10,*) np_active
 !    write(10,*) pid
 !    P = P_de
-!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind_c),i=1,np_active)
 !close(10)
 
 !open(10,file='P_separa.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
@@ -925,12 +901,12 @@ end program EcoSLIM
 !    write(10,*) np_active
 !    write(10,*) pid
 !    P = P_de
-!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind_c),i=1,np_active)
 !close(10)
 
 !open(10,file='P_peri.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
 !    write(10,*) np_active
 !    write(10,*) pid
 !    P = P_de
-!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind),i=1,np_active)
+!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind_c),i=1,np_active)
 !close(10)

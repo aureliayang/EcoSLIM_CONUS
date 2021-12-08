@@ -15,7 +15,7 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_pfb_read.o \
     EcoSLIM_CUDA_MPI.cuf
 
-FFLAGS = -Mpreprocess -D_TIMING=1 -D_TEXTURE=1 -D_SHARED=0
+FFLAGS = -Mpreprocess -D_TIMING=1
 
 all: test
 

@@ -4,9 +4,9 @@ module UpdateC_SortP
     use compact_array
     use particle_loop
     use variable_list, only: N_exit, holes, P, P_exit
-    use variable_list, only: P_de, d_isValid, d_indices, dz_de, nz
-    use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
-    use variable_list, only: ix1, iy1, nind, tPB
+    use variable_list, only: P_de, d_isValid, d_indices, nz
+    ! use variable_list, only: mean_age_de, mean_comp_de, total_mass_de
+    use variable_list, only: ix1, iy1, nind_c, tPB
     use variable_list, only: np_active, ranknum, filenum
     use variable_list, only: exit_time, C_time
     use variable_list, only: startEvent, stopEvent
@@ -20,8 +20,8 @@ contains
                 istat = cudaEventRecord(startEvent,0)
                 #endif
 
-            call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>(P_de,dz_de, &
-                nz,ix1,iy1,mean_age_de,mean_comp_de,total_mass_de,np_active)
+            call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
+                nz,ix1,iy1,np_active)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -44,14 +44,14 @@ contains
             N_exit = np_active - temp
 
             if(N_exit > 0) then
-                allocate(holes(N_exit),P_exit(N_exit,17+2*nind))
+                allocate(holes(N_exit),P_exit(N_exit,17+2*nind_c))
                 ! P_exit has to be deallocated after the use in main
                 call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,d_indices,d_isValid,np_active)
+                    holes,np_active)
                 call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(&
                     holes,P_de,P_exit,N_exit)
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                    holes,d_indices,d_isValid,P_de,0,np_active)
+                    holes,P_de,0,np_active)
                 ! update the slots after np_active
                 np_active = temp
                 deallocate(holes,P_exit)

@@ -16,7 +16,7 @@ module subdomain_bound
     use variable_list, only: fh1, fh2
     use variable_list, only: ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
     use variable_list, only: DEM, DEMname, fname, Pnts
-    use variable_list, only: np, nind, np_active, pid
+    use variable_list, only: np, nind_c, np_active, pid
     use variable_list, only: P, grid, Zone_de, Zonet_new
 
 contains
@@ -75,16 +75,6 @@ contains
             write(17,*) 'TIMING defined'
             #else
             write(17,*) 'TIMING not defined'
-            #endif
-            #if _TEXTURE == 1
-            write(17,*) 'TEXTURE defined'
-            #else
-            write(17,*) 'TEXTURE not defined'
-            #endif
-            #if _SHARED == 1
-            write(17,*) 'SHARED defined'
-            #else
-            write(17,*) 'SHARED not defined'
             #endif
             write(17,*)
             write(17,*) '## Domain Info'
@@ -165,7 +155,7 @@ contains
             call MPI_FILE_READ(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
 
             if (np_active < np) then   ! check if we have particles left
-                call MPI_FILE_READ(fh2,P(1:np_active,1:nind*2+17),np_active*(nind*2+17), &
+                call MPI_FILE_READ(fh2,P(1:np_active,1:nind_c*2+17),np_active*(nind_c*2+17), &
                                     MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
                 call MPI_FILE_CLOSE(fh2, ierr)
 

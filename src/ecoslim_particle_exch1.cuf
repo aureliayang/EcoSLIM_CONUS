@@ -14,14 +14,11 @@ module exchange_particles1
     use variable_list, only: P_de, d_isValid, d_indices
     use variable_list, only: dz_de, nz
     use variable_list, only: ix1, iy1, nnx1, nny1, reflect
-    use variable_list, only: rank, t_rank, nind, tPB
+    use variable_list, only: rank, t_rank, nind_c, tPB
     use variable_list, only: np_active !, ranknum, filenum
 
-    use variable_list, only: out_age_de,out_mass_de,out_comp_de,out_np_de
-    use variable_list, only: et_age_de,et_mass_de,et_comp_de,et_np_de
     use variable_list, only: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
     use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
-    use variable_list, only: pfdt,moldiff,denh2o,dtfrac
     use variable_list, only: inte_time
 
     use variable_list, only: tran_time1, tran_time2, tran_time3, tran_time4, tran_time5
@@ -35,7 +32,7 @@ contains
         integer:: i, j, ierr, status(MPI_STATUS_SIZE,t_rank)
         integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(t_rank), &
                   rq2(t_rank), rq3(t_rank), rq4(t_rank)
-        integer:: left, right, nattri, sum_recv, sum_send
+        integer:: left, right, nattri_c, sum_recv, sum_send
         integer:: istat, temp
         real:: tran_t1, tran_t2, tran_t3, tran_t4, tran_t5
         real:: tran_t6, tran_t7, tran_t8, tran_t9, tran_t10
@@ -60,7 +57,9 @@ contains
             tran_time6=0.; tran_time7=0.; tran_time8=0.; tran_time9=0.; tran_time10=0.
                 #endif
 
-            nattri = 17 + 2*nind
+            nattri_c = 17 + 2*nind_c
+            nattri = nattri_c
+
             nc1 = 0; nc3 = 0
             do i = 0, t_rank-1 ! go through to send particles
                 if(neigh_list(i+1) > 0) then ! the number of GPUs, if >0 it's neighbor
@@ -84,7 +83,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                            P_de(N_inte+1:N_inte+N_peri,13+2*nind),d_isValid,N_peri,i)
+                            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),d_isValid,N_peri,i)
                             ! get d_isValid, set it 0 where the particle will be sent to neighbor i
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
@@ -100,7 +99,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call prepare_holes<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                            holes,d_indices,d_isValid,N_peri)
+                            holes,N_peri)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
                             istat = cudaEventSynchronize(stopEvent)
@@ -112,19 +111,19 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call select2send<<<ceiling(dble(N_send(i+1))/tPB),tPB>>>(holes, &
-                            P_de,P_send,N_inte,N_send(i+1),sum_send,nattri)
+                            P_de,P_send,N_inte,N_send(i+1),sum_send)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
                             istat = cudaEventSynchronize(stopEvent)
                             istat = cudaEventElapsedTime(tran_t4,startEvent,stopEvent)
                             tran_time4 = tran_time4 + tran_t4
                             #endif
-                        left  = sum_send*nattri + 1
-                        right = sum(N_send(1:i+1))*nattri
+                        left  = sum_send*nattri_c + 1
+                        right = sum(N_send(1:i+1))*nattri_c
                             #if _TIMING == 1
                             istat = cudaEventRecord(startEvent,0)
                             #endif
-                        call MPI_ISEND(P_send(left:right),N_send(i+1)*nattri, &
+                        call MPI_ISEND(P_send(left:right),N_send(i+1)*nattri_c, &
                             MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq3(nc3),ierr)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
@@ -136,7 +135,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call compaction_inplace<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                            holes,d_indices,d_isValid,P_de,N_inte,N_peri)
+                            holes,P_de,N_inte,N_peri)
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
                             istat = cudaEventSynchronize(stopEvent)
@@ -190,9 +189,9 @@ contains
                     nc4 = nc4 + 1
                     if(N_recv(i+1) > 0) then
                         nc5 = nc5 + 1
-                        left  = sum(N_recv(1:i))*nattri + 1
-                        right = sum(N_recv(1:i+1))*nattri
-                        call MPI_IRECV(P_recv(left:right),N_recv(i+1)*nattri, &
+                        left  = sum(N_recv(1:i))*nattri_c + 1
+                        right = sum(N_recv(1:i+1))*nattri_c
+                        call MPI_IRECV(P_recv(left:right),N_recv(i+1)*nattri_c, &
                             MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,rq4(nc5),ierr)
                     end if
                 end if
@@ -209,34 +208,10 @@ contains
                 #endif
 
             ! interior particles
-            #if _TEXTURE == 1
-                #if _SHARED == 1
-                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB, &
-                    tPB*(13+nind*2)*kind(0.d0)>>> ( &
-                    P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                    moldiff,denh2o,dtfrac,0,N_inte, &
-                    nind,ix1,iy1,nz,reflect,rank)
-                #else
-                call particles_independent_T<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
-                    P_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                    moldiff,denh2o,dtfrac,0,N_inte, &
-                    nind,ix1,iy1,nz,reflect,rank)
-                #endif
-            #else
-                call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
-                    P_de,dz_de,out_age_de,out_mass_de,out_comp_de,out_np_de, &
-                    et_age_de,et_mass_de,et_comp_de,et_np_de, &
-                    xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                    xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-                    moldiff,denh2o,dtfrac,0,N_inte, &
-                    nind,ix1,iy1,nz,reflect,rank)
-            #endif
+            call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
+                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
+                0,N_inte,ix1,iy1,nz,reflect,rank)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -252,7 +227,7 @@ contains
                 sum_recv = sum(N_recv)
                 call MPI_WAITALL(nc5,rq4(1:nc5),status(:,1:nc5),ierr)
                 call unpack_recv<<<ceiling(dble(sum_recv)/tPB),tPB>>>( &
-                    P_recv,P_de,np_active,sum_recv,nattri)
+                    P_recv,P_de,np_active,sum_recv)
                 N_peri = N_peri + sum(N_recv)
                 np_active = N_inte + N_peri
             endif
