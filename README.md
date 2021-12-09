@@ -7,7 +7,9 @@
 * Halo cells are used around each subdomain to store particles out of boundary and then transfer these particles. 
 * The purpose of this development is to handle the particle tracking at the continental US scale with long timescale.
 * It can be applied to real cases now. Optimization continues.  
+* Load balancing is coming soon!
 * Welcome to download and use. Enjoy!
+* Please refer to README.md in src folder for details.
 ## CONUS domain
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)
 ## Subdomain demonstration
