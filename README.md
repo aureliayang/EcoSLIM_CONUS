@@ -11,6 +11,9 @@
 * Optimization continues. Load balancing is coming soon!
 * Users please refer to ***README.md*** in ***src*** folder for details.
 * Welcome to download and use. Enjoy!
+## Acknowledgements
+Thanks so much to the software engineers fo their guidance in the development:
+***NVIDIA Carl Ponder; Priceton University Bei Wang***
 ## CONUS domain
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)
 ## Subdomain demonstration
