@@ -9,7 +9,7 @@
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
 * It can be applied to real cases now. Irregular boundaries are supported.   
 * Optimization continues. Load balancing is coming soon!
-* Users please refer to README.md in ***src*** folder for details.
+* Users please refer to ***README.md*** in ***src*** folder for details.
 * Welcome to download and use. Enjoy!
 ## CONUS domain
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)
