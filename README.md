@@ -12,9 +12,9 @@
 * Users please refer to ***README.md*** in ***src*** folder for details.
 * Welcome to download and use. Enjoy!
 ## Acknowledgements
-* Thanks so much to the following software engineers for their guidance in the development:  
+* Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
-* Thanks so much to THE CONUS2.0 team for providing the CONUS2.0 ParFlow model for tests
+* Thanks so much to the CONUS2.0 team for offering the CONUS2.0 ParFlow model for tests
 * Thanks so much to Prof. Reed Maxwell and Prof. Laura Condon for the support in the application of conputational resources: We won the **NACR Accelerated Scientific Discovery program** this fall. We will run particle tracking based on the CONUS2.0 model on the coming NCAR supercomputer ***Derecho*** using 100 NVIDIA A100 GPUs
   
 ## CONUS domain
