@@ -3,7 +3,7 @@
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/demo.png)  
                                        ***(Maxwell et al., Ecohydrology, 2019)***
                                                                       
-## **Leveraging the latest parallel architecture, to accelerate the understanding of water cycle!**
+## *Leveraging the latest parallel architecture, to accelerate the understanding of water cycle!*
 * A parallel version EcoSLIM based on domain decomposition using the latest multi-GPU with CUDA-aware MPI technique. 
 * Halo cells are used around each subdomain to store particles out of boundary and then transfer them to neighbors. 
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
