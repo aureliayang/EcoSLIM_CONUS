@@ -1,4 +1,4 @@
-# EcoSLIM_CONUS
+# EcoSLIM-CONUS
 ## A lagrangian particle tracking code
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/demo.png)  
                                        ***(Maxwell et al., Ecohydrology, 2019)***
