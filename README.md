@@ -18,7 +18,7 @@
 * Thanks so much to ***Prof. Reed Maxwell*** and ***Prof. Laura Condon*** for their support in the application of computational resources: We won the **NACR Accelerated Scientific Discovery program** 2021 fall. We will run particle tracking based on the CONUS2.0 ParFlow model on the coming NCAR supercomputer ***Derecho*** using 100 NVIDIA A100 GPUs
   
 ## CONUS2.0 domain
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)  
 ***(Zhang et al., 2021)***
 ## Subdomain demonstration
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/subdomain.png)  
