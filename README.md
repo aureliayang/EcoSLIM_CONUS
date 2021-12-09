@@ -19,7 +19,7 @@
   
 ## CONUS2.0 domain
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)  
-***(Zhang et al., 2021)***
+***(Zhang et al., Earth System Science Data, 2021)***
 ## Subdomain demonstration
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/subdomain.png)  
 
