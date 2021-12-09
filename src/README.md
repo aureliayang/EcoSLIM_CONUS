@@ -36,7 +36,7 @@
 * **nind,**
 * **Indname,**
 # Build (for users)
-* An example of environment:  
+* An example of environment on Della GPU cluster at Princeton University:  
   **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
 * Build: **make** in the src folder
 # Transfer schemes (for dev)
