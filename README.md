@@ -21,7 +21,6 @@ Each GPU node is equipped with 2 NVIDIA A100 GPUs and 2 2.60-GHz AMD EPYC 7H12 s
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
 * Thanks so much to ***the CONUS2.0 team*** for offering the CONUS2.0 ParFlow model for code tests 
 * Thanks so much to ***Prof. Reed Maxwell*** at Princeton University and ***Prof. Laura Condon*** at the University of Arizona for their support in the application of computational resources: We won the **NACR Accelerated Scientific Discovery program** 2021 fall. We will run particle tracking based on the CONUS2.0 ParFlow model on the coming NCAR supercomputer ***Derecho*** using ***100 NVIDIA A100 GPUs***
- 
 ## CONUS2.0 domain
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/conus.png)  
 ***(Zhang et al., Earth System Science Data, 2021)***
