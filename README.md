@@ -12,7 +12,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * Welcome to download and use. Enjoy!
 ## Parallel performance
 Currently, optimization continues, so only the particle loop kernel got tested on Della-GPU cluster at Princeton University.  
-Each GPU node is equipped with 2 NVIDIA A100 GPUs and 128 cores of 2.60-GHz AMD EPYC 7H12.  
+Each GPU node is equipped with 2 NVIDIA A100 GPUs and 2 2.60-GHz AMD EPYC 7H12 sockets. Each socket has 64 cores without hyperthreading.
+
 
 
 ## Acknowledgements
