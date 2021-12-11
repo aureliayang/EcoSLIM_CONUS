@@ -12,7 +12,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * Welcome to download and use. Enjoy!
 ## Parallel performance
 Currently, optimization continues, so **only the particle loop kernel** got tested on the Della-GPU cluster at Princeton University. Each GPU node is equipped with **2 NVIDIA A100 GPUs** and **2 2.60-GHz AMD EPYC 7H12 sockets**. Each socket has 64 cores without hyperthreading.  
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/test1.png)  
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/test.png)  
 Test based on Hillslope model (ER_Shrub case in Maxwell et al., Ecohydrology, 2019) shows more than 10-fold speedup (2-A100 relative to 128-thread) on one node and good parallel scalability across two nodes. LB is Load Balancing. S*n* represents LB schemes. Speedup by S3 using 4-GPU is smaller due to the uneven split in y direction (5 grid-cells).
 ## Acknowledgements
 * Thanks so much to the following software engineers for their guidance in the code development:  
