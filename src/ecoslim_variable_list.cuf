@@ -4,6 +4,7 @@ module variable_list
     ! subroutine allocate_arrays_const
     ! subroutine deallocate_temp
 
+!--------------------------------------------------------------------
     ! P = Particle array [np,attributes]
     ! np = Number of particles
     ! P(np,1) = X coordinate [L]
@@ -35,9 +36,9 @@ module variable_list
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
-    ! integer:: world_group, work_group, manage_group, manage_ranks(1)
+    integer:: world_group, work_group, work_comm, m_rank
 
-    ! integer:: work_comm, manage_comm
+    integer,allocatable:: work_ranks(:)
 
     character(len=MPI_MAX_PROCESSOR_NAME):: hostname
 
@@ -60,7 +61,7 @@ module variable_list
     integer:: n_constituents
     ! number of timesteps ParFlow; numer of C vectors written for VTK output
 
-    CHARACTER(20),allocatable:: conc_header(:)
+    character(20),allocatable:: conc_header(:)
     ! name for variables written in the C array above.  Dimensioned as l above.
 
     real(8),constant:: dx, dy, pfdt, dtfrac, denh2o, moldiff
@@ -287,7 +288,6 @@ contains
 
             Zone_de = -1
 
-            ! allocate(p_num(nnx1,nny1))
         ! end if
     end subroutine alloc_arrays_temp
 

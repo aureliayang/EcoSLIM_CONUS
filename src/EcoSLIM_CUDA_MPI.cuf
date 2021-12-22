@@ -151,8 +151,8 @@ program EcoSLIM
         ! check to make sure we don't assign more particles for IC than we have allocated
         ! in total
         if (np_ic > np) then
-        write(11,*) 'warning NP_IC greater than IC'
-        np = np_ic
+            write(11,*) 'warning NP_IC greater than IC'
+            np = np_ic
         end if
         ! write nx, ny, nz, and np in the log file
         write(11,*) 'Grid information'
@@ -209,9 +209,9 @@ program EcoSLIM
     allocate(Time_Next(pfnt-tout1))
     Time_Next = 0.d0
     do kk = 1, pfnt-tout1
-        Time_Next(kk) = float(kk+tout1)*pfdt
+        Time_Next(kk) = dble(kk+tout1)*pfdt
     end do
-    Time_first = float(outkk-1)*pfdt
+    Time_first = dble(outkk-1)*pfdt
 
     ! read in velocity multiplier
     read(10,*) V_mult
@@ -269,10 +269,23 @@ program EcoSLIM
         write(11,*)
         write(11,*) 'Indicator File'
         write(11,*) nind_c, 'Indicators'
+        flush(11)
+        close(11)
     endif
 
     ! end of SLIM input
     close(10)
+!--------------------------------------------------------------------
+    ! define the dynamic working group
+    allocate(work_ranks(t_rank))
+    do i = 1, t_rank
+        work_ranks(i) = i - 1
+    end do
+    m_rank = ppx*qqy - 1
+    call MPI_COMM_GROUP(MPI_COMM_WORLD, world_group, ierr)
+    call MPI_GROUP_INCL(world_group, m_rank+1, work_ranks(1:m_rank+1), work_group, ierr)
+    call MPI_COMM_CREATE(MPI_COMM_WORLD, work_group, work_comm, ierr)
+
 !--------------------------------------------------------------------
     call alloc_arrays_const()
     ! now we know the total dimension
@@ -340,11 +353,6 @@ program EcoSLIM
         !     write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
         !     write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
         ! close(10)
-
-    if(rank == 0) then
-        flush(11)
-        close(11)
-    endif
 
     ! Porosity = 0.3d0
     fname = trim(adjustl(pname))//'.out.porosity.pfb'
@@ -890,6 +898,9 @@ program EcoSLIM
     flush(30);close(30)
 
     ! call close_hdf5_interface()
+    call MPI_COMM_FREE(work_comm, ierr)
+    call MPI_GROUP_FREE(world_group, ierr)
+    call MPI_GROUP_FREE(work_group, ierr)
     call MPI_FINALIZE(ierr)
 
 end program EcoSLIM

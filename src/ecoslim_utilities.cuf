@@ -38,7 +38,6 @@ contains
             nny2 = nny2 - buff
         endif
         if(iy1+nny1 == ny_c) nny2 = nny2 - buff
-
     end subroutine copy_grid
 
     subroutine receive_Zone_de(request2)

@@ -30,7 +30,7 @@ contains
         ! exitedf (fh3) is to write files of exited particles, it includes particles for all timesteps.
         ! logf (fh4) is also log file to record the summary of particles of every timestep
 
-        use mpi
+        ! use mpi
         implicit none
         character(200):: message
         integer:: k, ierr
@@ -72,9 +72,9 @@ contains
 
             open(17,file='Load_info.'//trim(adjustl(ranknum))//'.txt')
             #if _TIMING == 1
-            write(17,*) 'TIMING defined'
+                write(17,*) 'TIMING defined'
             #else
-            write(17,*) 'TIMING not defined'
+                write(17,*) 'TIMING not defined'
             #endif
             write(17,*)
             write(17,*) '## Domain Info'
