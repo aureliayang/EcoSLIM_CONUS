@@ -7,7 +7,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * Halo cells are used around each subdomain to store particles out of boundary and then transfer them to neighbors. 
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
 * It can be applied to real cases now. Irregular boundaries are supported.   
-* Optimization continues. Load balancing is coming soon! Please refer to README.md in src for algorithms.
+* Optimization continues. Load balancing is coming soon! Please refer to ***README.md*** in ***src*** for algorithms.
 * Users please refer to ***README.md*** in ***src*** folder for details.
 * Welcome to download and use. Enjoy!
 ## Parallel performance
