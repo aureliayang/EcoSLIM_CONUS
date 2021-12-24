@@ -57,7 +57,9 @@
 * This will keep the length of peripherical particles and compact at the end of the send
 ## Separation
 * If we do separation?
-* If we rearrange the array or just label the array?
+* If we rearrange the array or just label the array?  
+# Load Balancing (LB)
+The idea of LB in EcoSLIM is borrowed from 
 
 
 
