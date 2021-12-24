@@ -10,6 +10,7 @@
 * **qqy,** Split in y direction
 * **transfer,** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is packed transfer, 2 is one by one transfer
 * **separate,** Separate or not
+* **LB,** LB frequency, e.g., 24 means every 24 hours
 * **hdf5,** hdf5 I/O, coming soon, modules ready in ***test*** folder
 * **np_ic,** Number of particles per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
