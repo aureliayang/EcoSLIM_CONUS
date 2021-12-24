@@ -2,7 +2,7 @@
 ## A lagrangian particle tracking code
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/demo.png)                                 
 A particle tracking code simulates water ages and source-water mixing, working seamlessly with the integrated hydrologic model ParFlow-CLM ***(Maxwell et al., Ecohydrology, 2019)***.                                                               
-## *Leveraging the latest parallel architecture, to accelerate the understanding of water cycle under the changing world!*
+## *Leveraging the latest parallel architecture, to accelerate the understanding of water cycle in the changing world!*
 * A parallel version EcoSLIM based on domain decomposition using the latest multi-GPU with CUDA-aware MPI technique. 
 * Halo cells are used around each subdomain to store particles out of boundary and then transfer them to neighbors. 
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
