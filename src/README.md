@@ -60,7 +60,7 @@
 * If we rearrange the array or just label the array?  
 # Load Balancing (LB)
 * The idea of LB in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the own characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***).  
-* Code is started with a number of GPUs (subdomains) fewer than the total number of GPUs used. Manager rank periodically check the number of particles on each GPU. If the number is larger than a given number, a new GPU will be started to help this GPU/subdomain.  
+* Code is started with a number of GPUs (subdomains) fewer than the total number of GPUs used. Manager rank periodically checks the number of particles on each GPU. If the number of particles on a GPU is larger than a given number, one more GPU will be started to help that GPU/subdomain.  
 * For a subdomain with more than one GPU, source particle from positive PME will be added into the GPU with the fewest number of particles. 
 
 
