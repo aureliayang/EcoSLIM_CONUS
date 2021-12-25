@@ -974,9 +974,11 @@ program EcoSLIM
     end do
     9090 continue
 
-    nullify(EvapTrans_T,Saturation_T,Porosity_T)
-    nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T,Zone_T)
-    nullify(d_isValid_T,d_indices_T)
+    if(rank <= m_rank) then
+        nullify(EvapTrans_T,Saturation_T,Porosity_T)
+        nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T,Zone_T)
+        nullify(d_isValid_T,d_indices_T)
+    end if
 
     #if _TIMING == 1
     Total_time2 = mpi_wtime()
@@ -1014,6 +1016,7 @@ program EcoSLIM
     flush(19);close(19)
     flush(20);close(20)
     flush(30);close(30)
+    ! be careful here? some ranks might not have these files
 
     ! call close_hdf5_interface()
     call MPI_COMM_FREE(work_comm, ierr)
