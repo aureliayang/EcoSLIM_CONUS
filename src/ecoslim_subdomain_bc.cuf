@@ -46,30 +46,6 @@ contains
                 Zgmax = Zgmax + dz(k)
             end do
 
-            ! write(loadf,'(a,i5.5,a)') 'Load_info.', rank, '.txt'
-            ! write(restartf,'(a,i5.5,a)') 'Particle_restart.',rank,'.bin'
-            ! write(exitedf,'(a,i5.5,a)') 'Exited_particles.',rank,'.bin'
-            ! write(logf,'(a,i5.5,a)') 'Log_particles.',rank,'.txt'
-
-            ! call MPI_FILE_OPEN(MPI_COMM_SELF,loadf,MPI_MODE_WRONLY+MPI_MODE_CREATE, &
-            ! MPI_INFO_NULL,fh1,ierr)
-
-            ! write(message,'(A,A)') '## Domain Info', NEW_LINE(' ')
-            ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-
-            ! write(message,'("Xmin:",e12.5," Xmax:",e12.5,A)') Xgmin, Xgmax, NEW_LINE(' ')
-            ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-
-            ! write(message,'("Ymin:",e12.5," Ymax:",e12.5,A)') Ygmin, Ygmax, NEW_LINE(' ')
-            ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-
-            ! write(message,'("Zmin:",e12.5," Zmax:",e12.5,A)') Zgmin, Zgmax, NEW_LINE(' ')
-            ! call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-            ! MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-
             open(17,file='Load_info.'//trim(adjustl(ranknum))//'.txt')
             #if _TIMING == 1
                 write(17,*) 'TIMING defined'

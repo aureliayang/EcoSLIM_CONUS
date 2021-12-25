@@ -71,6 +71,7 @@ contains
                     call thrustscan(c_sum,ndim2,d_indices)
                 endif
                 max_dim = max(ppx*qqy,ndim1*ndim2)
+                ! I don't know why and try to remove later
                 call build_tree<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,dir,j)
                 call update_zone_new<<<ceiling(dble(max_dim)/tPB),tPB>>>(n,j)
             end do

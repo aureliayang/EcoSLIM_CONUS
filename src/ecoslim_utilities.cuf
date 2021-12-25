@@ -16,13 +16,15 @@ module utilities
     use variable_list, only: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
 
 contains
-    subroutine copy_grid()
-        implicit none
+    subroutine copy_grid(map_sub)
 
-        ix1  = grid(rank+1,1)
-        nnx1 = grid(rank+1,3)
-        iy1  = grid(rank+1,2)
-        nny1 = grid(rank+1,4)
+        implicit none
+        integer:: map_sub
+
+        ix1  = grid(map_sub+1,1)
+        nnx1 = grid(map_sub+1,3)
+        iy1  = grid(map_sub+1,2)
+        nny1 = grid(map_sub+1,4)
 
         ix2 = ix1 - buff; nnx2 = nnx1 + 2*buff
         iy2 = iy1 - buff; nny2 = nny1 + 2*buff
