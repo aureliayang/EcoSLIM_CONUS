@@ -36,7 +36,7 @@ module variable_list
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
-    integer:: world_group, work_group, work_comm, m_rank
+    integer:: world_group, work_group, work_comm, m_rank, m_rank_o
 
     integer,allocatable:: work_ranks(:)
 
@@ -170,14 +170,14 @@ module variable_list
     real(8),allocatable,pinned:: C(:,:,:,:)
     ! Concentration array, in i,j,k with l (first index) as consituent or
     ! property. These are set by user at runtime using input
-    real(8),allocatable,pinned:: dz(:), dz2(:)
+    real(8),allocatable,pinned:: dz(:)
 
     integer,parameter:: buff = 1  ! Buffer can be specified by user, for GW 1km or 2km is enough
     integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2  ! this is the old
     integer:: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
     integer,allocatable:: nump(:) ! gather active particles to jusdge if DDC
-    integer:: decom = 0
-    integer:: transfer
+    integer:: transfer, map_sub, LB
+    integer,allocatable:: l_GPUs(:,:), t_GPUs(:), c_GPU(:)
 
 !-------------------------------------
     ! GPU variables
@@ -296,10 +296,13 @@ contains
         implicit none
 
         reflect = .true.
-        allocate(grid(t_rank,4),grid_old(ppx*qqy,4))
+        np_active = 0
+        pid = 0
+        allocate(grid(ppx*qqy,4),grid_old(ppx*qqy,4))
         ! allocate(neigh_listn(t_rank),neigh_listo(t_rank))
-        allocate(neigh_list(t_rank),nump(t_rank))
-        allocate(N_send(t_rank),N_recv(t_rank))
+        allocate(neigh_list(ppx*qqy),nump(t_rank))
+        allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,t_rank),c_GPU(ppx*qqy))
+        allocate(N_send(ppx*qqy),N_recv(t_rank)) ! not sure, double-check
         allocate(d_isValid(np),d_indices(np),h(np))
 
         allocate(out_np_cpu(1),ET_np_cpu(1))
@@ -315,7 +318,7 @@ contains
         allocate(conc_header(n_constituents))
         ! Set up output options for VTK grid output
         ! icwrite = 1
-        vtk_file=trim(runname)//'_cgrid'  ! duplicated with the latter output?
+        vtk_file = trim(runname)//'_cgrid'  ! duplicated with the latter output?
         conc_header(1) = 'Concentration'
         conc_header(2) = 'Age'
         conc_header(3) = 'Mass'
@@ -331,12 +334,20 @@ contains
         PET_balance = 0.0d0
         PET_balance_da = 0.0d0
 
-        allocate(P(np,17+nind_c*2))
+        allocate(P(np,17+nind_c*2),P_de(np,17+nind_c*2))
         P = 0.d0    ! clear out all particle attributes
         P(1:np,7:9) = 1.d0
         ! make all particles active to start with and original from 1 = GW/IC
         ! this is necessary since we need P array for restart.
+        P_de = P
+        dz_de  = dz
+        dz_T  => dz_de
+        P_T   => P_de
+        d_isValid_T => d_isValid
+        d_indices_T => d_indices
+
         allocate(P_send(tPB*(17+nind_c*2)),P_recv(tPB*(17+nind_c*2)))
+        allocate(work_ranks(t_rank))
 
     end subroutine alloc_arrays_const
 
