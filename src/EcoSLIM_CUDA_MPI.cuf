@@ -310,7 +310,7 @@ program EcoSLIM
 
     do i = 1, ppx*qqy
         t_GPUs(i) = 1
-        l_GPUs(i,t_GPUs(i)) = rank
+        l_GPUs(i,t_GPUs(i)) = i-1
         c_GPU(i) = l_GPUs(i,t_GPUs(i))
     end do
 
