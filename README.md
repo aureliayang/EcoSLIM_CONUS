@@ -1,5 +1,4 @@
 # EcoSLIM_CONUS  
-***LB testing, code might not be available now! Dec-25-2021***
 ## A lagrangian particle tracking code
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/demo.png)                                 
 A particle tracking code simulates water ages and source-water mixing, working seamlessly with the integrated hydrologic model ParFlow-CLM ***(Maxwell et al., Ecohydrology, 2019)***.                                                               
@@ -7,10 +6,10 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * A parallel version EcoSLIM based on domain decomposition using the latest multi-GPU with CUDA-aware MPI technique. 
 * Halo cells are used around each subdomain to store particles out of boundary and then transfer them to neighbors. 
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
-* It can be applied to real cases now. Irregular boundaries are supported.   
-* Optimization continues. Load balancing is coming soon! Please refer to ***README.md*** in ***src*** for algorithms.
+* It can be applied to real cases now. Irregular boundaries are supported.    
 * Users please refer to ***README.md*** in ***src*** folder for details.
-* Welcome to download and use. Enjoy!
+* Welcome to download and use. Enjoy!  
+* Optimization continues.
 ## Parallel performance
 Currently, optimization continues, so **only the particle loop kernel** got tested on the Della-GPU cluster at Princeton University. Each GPU node is equipped with **2 NVIDIA A100 GPUs** and **2 2.60-GHz AMD EPYC 7H12 sockets**. Each socket has 64 cores without hyperthreading.  
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/test.png)  
