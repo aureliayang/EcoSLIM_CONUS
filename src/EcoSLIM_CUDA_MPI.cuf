@@ -718,8 +718,8 @@ program EcoSLIM
         ! the same time, but they are all read-only operations, so it doesn't matter.
         !!!!! ****since add_f is large, after new GPU is added, in the following add_f steps, in fact,
         !!!!! ****there are no particles on this new GPU, so we need if condition for the following work.
-        if(np_active > 0) then
-            if(separate) then
+
+            if(separate .and. np_active > 0) then
                     #if _TIMING == 1
                     istat = cudaEventRecord(startEvent,0)
                     #endif
@@ -853,11 +853,17 @@ program EcoSLIM
                 istat = cudaEventSynchronize(stopEvent)
                 istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
                 #endif
+                write(30,*) kk,'ok1'
+                flush(30)
             !----------------------------------------
             if(transfer == 1) call particle_exchange1()
             if(transfer == 2) call particle_exchange2()
-            call Update_Sort()
-        end if
+            write(30,*) kk,'ok2'
+            flush(30)
+            if(np_active > 0) call Update_Sort()
+            write(30,*) kk,'ok3'
+            flush(30)
+
         !----------------------------------------
         mean_age    = mean_age_de
         mean_comp   = mean_comp_de
@@ -886,7 +892,7 @@ program EcoSLIM
     end if
 
     ! gather np_active on the maximum rank
-    if(LB > 0 .and. mod(kk,LB) == 0 .and. m_rank+1 < t_rank) then
+    if(LB > 0 .and. mod(kk,LB) == 0) then
 
         m_rank_o = m_rank
         call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
@@ -895,6 +901,7 @@ program EcoSLIM
             do i = 1, ppx*qqy
 
                 temp = nump(l_GPUs(i,1) + 1)
+                c_GPU(i) = l_GPUs(i,1)
                 if(t_GPUs(i) > 1) then
                     do j = 2, t_GPUs(i)
                         if(nump(l_GPUs(i,j) + 1) < temp) then
@@ -905,7 +912,7 @@ program EcoSLIM
                     end do
                 end if
 
-                if(temp > 9e7 .and. m_rank+1 < t_rank) then
+                if(temp > 1e5 .and. (m_rank+1) < t_rank) then
                     m_rank = m_rank + 1
                     t_GPUs(i) = t_GPUs(i) + 1
                     l_GPUs(i,t_GPUs(i)) = m_rank
@@ -923,7 +930,7 @@ program EcoSLIM
 
         if (m_rank > m_rank_o) then
 
-            call MPI_COMM_FREE(work_comm,ierr)
+            if(rank <= m_rank_o) call MPI_COMM_FREE(work_comm,ierr)
             call MPI_GROUP_FREE(work_group,ierr)
             call MPI_GROUP_INCL(world_group,m_rank+1,work_ranks(1:m_rank+1),work_group,ierr)
             call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)
@@ -962,7 +969,10 @@ program EcoSLIM
                     Zone_T => Zone_de
 
                     call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-                    tPB >>> (nnx1,nny1,buff,neigh_list,map_sub,t_rank)
+                    tPB >>> (nnx1,nny1,buff,neigh_list,map_sub,ppx*qqy)
+
+                    write(30,*) kk
+                    flush(30)
 
                 end if
             end if
@@ -1019,7 +1029,7 @@ program EcoSLIM
     ! be careful here? some ranks might not have these files
 
     ! call close_hdf5_interface()
-    call MPI_COMM_FREE(work_comm, ierr)
+    if(rank <= m_rank) call MPI_COMM_FREE(work_comm, ierr)
     call MPI_GROUP_FREE(work_group, ierr)
     call MPI_GROUP_FREE(world_group, ierr)
     call MPI_FINALIZE(ierr)
