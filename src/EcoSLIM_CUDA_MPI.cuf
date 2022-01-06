@@ -285,9 +285,9 @@ program EcoSLIM
     allocate(Saturation_cpu(nx_c,ny_c,nz_c),Porosity_cpu(nx_c,ny_c,nz_c))
     allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
     allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
+
     allocate(rq1(t_rank))
 
-    allocate(Zonet_old(-buff+1:nx_c+buff,-buff+1:ny_c+buff)) ! Zonet_old is not necessary
     allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
     allocate(p_num(nx_c,ny_c),c_sum(max(nx_c,ny_c)))
     grid = 0
@@ -853,17 +853,10 @@ program EcoSLIM
                 istat = cudaEventSynchronize(stopEvent)
                 istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
                 #endif
-                write(30,*) kk,'ok1'
-                flush(30)
             !----------------------------------------
             if(transfer == 1) call particle_exchange1()
             if(transfer == 2) call particle_exchange2()
-            write(30,*) kk,'ok2'
-            flush(30)
             if(np_active > 0) call Update_Sort()
-            write(30,*) kk,'ok3'
-            flush(30)
-
         !----------------------------------------
         mean_age    = mean_age_de
         mean_comp   = mean_comp_de
@@ -970,9 +963,6 @@ program EcoSLIM
 
                     call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
                     tPB >>> (nnx1,nny1,buff,neigh_list,map_sub,ppx*qqy)
-
-                    write(30,*) kk
-                    flush(30)
 
                 end if
             end if

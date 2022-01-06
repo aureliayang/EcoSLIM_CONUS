@@ -192,8 +192,7 @@ attributes(global) subroutine scan_new_particles( &
 end subroutine scan_new_particles
 
 attributes(global) subroutine add_new_particles( &
-    iflux_p_res,np_active,pid,nnx1, &
-    nny1,ix1,iy1,kk,tout1)
+    iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk,tout1)
     ! CLMvars is only CLMvars(i,j,11)
 
     implicit none

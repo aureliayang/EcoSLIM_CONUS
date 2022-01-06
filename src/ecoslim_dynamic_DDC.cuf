@@ -2,6 +2,7 @@ module create_subdomain
     ! subroutine gridinfo
     ! attributes(global) subroutine column_sum
     ! attributes(global) subroutine build_tree
+    ! attributes(global) subroutine update_zone_new
     !--------------------------------------------
     ! this module is used to decompose the modeling domain based on
     ! p_num. For init, p_num=1, so the domain will be evenly decomposed.
@@ -14,7 +15,7 @@ module create_subdomain
     use variable_list, only: nx_c, ny_c, ppx, qqy, tPB ! , rank, t_rank !,ierr, buff
     use variable_list, only: grid_old, grid
     ! grid is on each rank while grid_old is only on ppx*qqy
-    use variable_list, only: Zonet_old, Zonet_new
+    use variable_list, only: Zonet_new
 
 contains
     subroutine gridinfo()
@@ -35,7 +36,6 @@ contains
         !integer:: indices_cpu(9)
 
         grid_old  = grid
-        Zonet_old = Zonet_new
         grid = 0   ! this is legal
         grid(1,1) = 0
         grid(1,2) = 0

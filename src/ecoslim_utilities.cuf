@@ -9,7 +9,7 @@ module utilities
     use cudafor
     use variable_list, only: nx_c, ny_c
     use variable_list, only: buff, ppx, qqy, rank, status
-    use variable_list, only: Zonet_old, Zonet_new, Zone_de, Zones_old
+    use variable_list, only: Zonet_new, Zone_de, Zones_old
     use variable_list, only: grid, grid_old
     use variable_list, only: dx, dy, np_active, p_num
     use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2  ! this is the old

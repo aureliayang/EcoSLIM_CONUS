@@ -222,7 +222,6 @@ module variable_list
     ! it should use integer(8) for CONUS !!!
     ! p_sum on workers needs to be deallocated
     ! c_sum is only on manager
-    integer,allocatable,managed:: Zonet_old(:,:)
     integer,allocatable,device:: Zonet_new(:,:)
     ! only on rank ppx*qqy. Zonet_new is written into restart files.
     integer,allocatable,device:: grid(:,:)

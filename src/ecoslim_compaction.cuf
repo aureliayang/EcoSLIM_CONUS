@@ -177,7 +177,7 @@ contains
             end if
         end if
     end subroutine prepare_neighbor
-!7--------------------------------------------------------------------
+!8--------------------------------------------------------------------
     attributes(global) subroutine prepare_neigh_all(d_in,numElements,neighbor)
         !numElements is the current number of elements left in P, i.e., updated np_active
 
@@ -201,7 +201,7 @@ contains
             end if
         end if
     end subroutine prepare_neigh_all
-!8--------------------------------------------------------------------
+!9--------------------------------------------------------------------
     attributes(global) subroutine connect_recv(numElements,N_recv)
         ! connect the received particles to the bottom of P and
         ! update P(:,8) of the received particles
@@ -217,7 +217,7 @@ contains
             P_de(numElements+ii,:) = P_de(numElements+N_recv+ii,:)
         end if
     end subroutine connect_recv
-!9--------------------------------------------------------------------
+!10--------------------------------------------------------------------
     attributes(global) subroutine scan_zone(nnx1,nny1,buff, &
                                             neigh_list,rank,t_rank)
 
