@@ -2,7 +2,6 @@ module variable_list
 
     ! subroutine allocate_arrays_temp
     ! subroutine allocate_arrays_const
-    ! subroutine deallocate_temp
 
 !--------------------------------------------------------------------
     ! P = Particle array [np,attributes]
@@ -240,7 +239,6 @@ contains
         implicit none
         !--------------------------------------------------------------------
         ! allocate arrays
-        !if (rank /= ppx*qqy) then
             allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
 
             allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
@@ -286,7 +284,6 @@ contains
 
             Zone_de = -1
 
-        ! end if
     end subroutine alloc_arrays_temp
 
     subroutine alloc_arrays_const()

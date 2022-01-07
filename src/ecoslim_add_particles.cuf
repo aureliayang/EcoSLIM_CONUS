@@ -12,6 +12,7 @@ module add_particles
     use variable_list, only: dz_T, d_indices_T
     use variable_list, only: dx, dy, pfdt, denh2o, nind, nz
     use variable_list, only: d_isValid
+    use variable_list, only: PET_balance_de
 
 contains
 
@@ -136,15 +137,11 @@ attributes(global) subroutine add_init_particles( &
     end if
 end subroutine add_init_particles
 
-attributes(global) subroutine scan_new_particles( &
-    PET_balance,nnx1,nny1)
+attributes(global) subroutine scan_new_particles(nnx1,nny1)
 
     implicit none
-    real(8),intent(out):: PET_balance(:)
-    ! integer,intent(out):: d_isValid(:)
-    ! real(8),intent(in):: dz(:)
+    ! real(8),intent(out):: PET_balance(:)
     integer,value:: nnx1, nny1
-    ! real(8),value:: denh2o
     integer:: i, j, k, ii, tempi
     real(8):: temp
 
@@ -152,7 +149,9 @@ attributes(global) subroutine scan_new_particles( &
 
     ! get i, j, k from ii
     if(ii <= nnx1*nny1*nz) then
+
         tempi = mod(ii,nnx1*nny1)
+
         if(tempi == 0) then
             k = ii/(nnx1*nny1)
             j = nny1
@@ -169,14 +168,15 @@ attributes(global) subroutine scan_new_particles( &
         end if
 
         ! if(Saturation_de(i,j,k) > 0.d0) then !active area
-
+        ! there is no PME > 0 in the inactive area
             if(EvapTrans_T(i,j,k) > 0.d0) then
-                temp = atomicAdd(PET_balance(1),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
+                temp = atomicAdd(PET_balance_de(1),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
             else
-                temp = atomicAdd(PET_balance(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
+                temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
             endif
 
             if(EvapTrans_da_de(i,j,k) > 0.d0) then
+                ! EvapTrans_da_de doesn't have texture
                 if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 1
                 ! only the top layer (k = nz) will introduce new particles
                 ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
@@ -192,7 +192,7 @@ attributes(global) subroutine scan_new_particles( &
 end subroutine scan_new_particles
 
 attributes(global) subroutine add_new_particles( &
-    iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk,tout1)
+    iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk)
     ! CLMvars is only CLMvars(i,j,11)
 
     implicit none
@@ -200,21 +200,22 @@ attributes(global) subroutine add_new_particles( &
     ! real(8),intent(in):: dz(:)
     ! integer,intent(in):: d_indices(:)
     integer,value:: iflux_p_res, np_active, pid
-    integer,value:: kk, tout1, nnx1, nny1, ix1, iy1
+    integer,value:: nnx1, nny1, ix1, iy1, kk
     ! real(8),value:: denh2o
-    integer:: i, j, k, index, ij, ik, ii, itemp, Ploc(3)
-    real(8):: Z
+    integer:: i, j, k, index, ij, ii, itemp, temp, Ploc(3)
+    ! real(8):: Z
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
     if(ii <= nnx1*nny1) then
         ! get i, j from ii
-        if(mod(ii,nnx1) == 0) then
+        temp = mod(ii,nnx1)
+        if(temp == 0) then
             j = ii/nnx1
             i = nnx1
         else
             j = ii/nnx1 + 1
-            i = mod(ii,nnx1)
+            i = temp
         end if
         k = nz
 
@@ -222,6 +223,8 @@ attributes(global) subroutine add_new_particles( &
             do ij = 1, iflux_p_res
 
                 index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
+
+                ! P_s(ii_l,1) = P_de(index,1)
 
                 P_de(index,1) = dble(i-1)*dx + curand_uniform(h(index))*dx
                 P_de(index,2) = dble(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
