@@ -20,20 +20,20 @@ program EcoSLIM
     use mrand
     ! use thrust
     use utilities
-    use particle_loop
     use mpiDeviceUtil
     ! use variable_list
     ! use hdf5_file_read
     ! use hdf5_file_write
     use subdomain_bound
     use create_subdomain
-    use add_particles
-    use compact_array
-    use exchange_particles1
-    use exchange_particles2
-    use UpdateC_SortP
-    use load_balancing
-    use separate_particles
+    use compaction_utility
+    use eco_particle_loop
+    use eco_particle_add
+    use eco_particle_exch1
+    use eco_particle_exch2
+    use eco_updateC_sortP
+    use eco_particle_lb
+    use eco_particle_separ
 
     implicit none
     ! integer(8),allocatable,pinned:: p_num_cpu(:,:)

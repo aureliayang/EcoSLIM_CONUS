@@ -1,4 +1,4 @@
-module add_particles
+module eco_particle_add
     ! attributes(global) subroutine add_init_particles
     ! attributes(global) subroutine river_init_particles
     ! attributes(global) subroutine scan_new_particles
@@ -276,4 +276,4 @@ attributes(global) subroutine add_new_particles( &
 
 end subroutine add_new_particles
 
-end module add_particles
+end module eco_particle_add

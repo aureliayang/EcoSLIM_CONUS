@@ -1,9 +1,8 @@
-module load_balancing
+module eco_particle_lb
 
     use cudafor
     use variable_list
     use subdomain_bound
-    ! use compact_array
     use utilities
 
 contains
@@ -103,4 +102,4 @@ contains
             end if
         end if
     end subroutine load_balance
-end module load_balancing
+end module eco_particle_lb

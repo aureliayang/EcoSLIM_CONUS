@@ -1,4 +1,4 @@
-module compact_array
+module compaction_utility
     use cudafor
     use variable_list, only: P_de
     use variable_list, only: d_indices_T, d_isValid_T, P_T
@@ -218,4 +218,4 @@ contains
         end if
     end subroutine connect_recv
 
-end module compact_array
+end module compaction_utility

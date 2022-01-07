@@ -1,4 +1,4 @@
-module particle_loop
+module eco_particle_loop
     ! attributes(global) subroutine particles_independent
 
     use cudafor
@@ -325,4 +325,4 @@ contains
         h(ii) = hh
     end subroutine particles_independent
 
-end module particle_loop
+end module eco_particle_loop

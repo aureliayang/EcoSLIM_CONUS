@@ -1,7 +1,7 @@
-module UpdateC_SortP
+module eco_updateC_sortP
     use thrust
     use cudafor
-    use compact_array
+    use compaction_utility
     use variable_list, only: N_exit, holes, P, P_exit
     use variable_list, only: P_de, d_isValid, d_indices, P_T, C_de
     use variable_list, only: ix1, iy1, nind_c, tPB
@@ -136,4 +136,4 @@ contains
 
     end subroutine Update_C_Array
 
-end module UpdateC_SortP
+end module eco_updateC_sortP

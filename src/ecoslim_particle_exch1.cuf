@@ -1,8 +1,8 @@
-module exchange_particles1
+module eco_particle_exch1
     use thrust
     use cudafor
-    use compact_array
-    use particle_loop
+    use compaction_utility
+    use eco_particle_loop
     use variable_list, only: N_recv, N_send, N_peri, N_inte, N_exit
     use variable_list, only: neigh_list, nattri
     ! neigh_list is allocated after getting the number of total GPUs.
@@ -250,4 +250,4 @@ contains
             end if
     end subroutine particle_exchange1
 
-end module exchange_particles1
+end module eco_particle_exch1

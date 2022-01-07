@@ -1,8 +1,8 @@
-module separate_particles
+module eco_particle_separ
 
     use cudafor
     use thrust
-    use compact_array
+    use compaction_utility
     use variable_list, only: holes
     use variable_list, only: dx, dy
     use variable_list, only: startEvent, stopEvent
@@ -178,5 +178,5 @@ contains
     end subroutine particles_separation
 
 
-end module separate_particles
+end module eco_particle_separ
 
