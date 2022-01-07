@@ -22,14 +22,13 @@ program EcoSLIM
     use utilities
     use particle_loop
     use mpiDeviceUtil
-    use variable_list
+    ! use variable_list
     ! use hdf5_file_read
     ! use hdf5_file_write
     use subdomain_bound
     use create_subdomain
     use add_particles
     use compact_array
-    ! use exchange_zone
     use exchange_particles1
     use exchange_particles2
     use UpdateC_SortP

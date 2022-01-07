@@ -9,13 +9,13 @@ module load_balancing
 contains
     subroutine load_balance(Porosity_cpu)
 
-    use mpi
+        use mpi
 
-    implicit none
-    integer:: m_rank_o, temp
-    integer:: i, j, ierr
-    logical:: flag
-    real(8):: Porosity_cpu(:,:,:)
+        implicit none
+        integer:: m_rank_o, temp
+        integer:: i, j, ierr
+        logical:: flag
+        real(8):: Porosity_cpu(:,:,:)
 
         ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
         ! setting LB > 0 also works, but extra time will be consumed.
