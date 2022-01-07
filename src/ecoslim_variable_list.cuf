@@ -36,9 +36,11 @@ module variable_list
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
-    integer:: world_group, work_group, work_comm, m_rank, m_rank_o
+    integer:: world_group, work_group, work_comm, m_rank, rq2
 
     integer,allocatable:: work_ranks(:)
+
+    integer,allocatable:: rq1(:)
 
     character(len=MPI_MAX_PROCESSOR_NAME):: hostname
 
@@ -97,7 +99,7 @@ module variable_list
 
     integer:: i, j, k, l, ik, ji, ij, ii
 
-    character*200 filenum, filenumout, fname, ranknum
+    character(200) filenum, filenumout, fname, ranknum
     character(9), parameter:: dsetname = 'hdf5_data'
     ! runname = SLIM runname
     ! filenum = ParFlow file number
@@ -113,7 +115,7 @@ module variable_list
     ! If V_mult = -1, backward tracking
     ! density of water (M/L3), molecular diffusion (L2/T), fractionation
 
-    logical clmtrans, clmfile, reflect, separate  ! reflect has not been read
+    logical:: clmtrans, clmfile, reflect, separate  ! reflect has not been read
     ! logical for mode of operation with CLM, will add particles with P-ET > 0
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
@@ -145,8 +147,6 @@ module variable_list
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
     integer,allocatable,pinned:: N_recv(:) ! for each subdomain, it has the number of neighbors
     integer:: N_exit, N_peri, N_inte ! a scalar variable.
-    real(8),allocatable,device:: P_exit(:,:)
-    real(8),allocatable,device:: P_send(:),P_recv(:)
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.
     integer,allocatable,pinned:: out_np_cpu(:),ET_np_cpu(:)
@@ -173,10 +173,9 @@ module variable_list
     real(8),allocatable,pinned:: dz(:)
 
     integer,parameter:: buff = 1  ! Buffer can be specified by user, for GW 1km or 2km is enough
-    integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2  ! this is the old
-    integer:: nnx1n,nny1n,nnx2n,nny2n,ix1n,iy1n,ix2n,iy2n
-    integer,allocatable:: nump(:) ! gather active particles to jusdge if DDC
-    integer:: transfer, map_sub, LB
+    integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
+    integer,allocatable:: nump(:) ! gather active particles to jusdge if LB
+    integer:: transfer, map_sub, LB, th_value
     integer,allocatable:: l_GPUs(:,:), t_GPUs(:), c_GPU(:)
 
 !-------------------------------------
@@ -184,6 +183,7 @@ module variable_list
     real(8),allocatable,device,target:: P_de(:,:)
     real(8),texture,pointer:: P_T(:,:)
     ! the particle array, not sure if the one on host is necessary
+
     real(8),allocatable,device:: C_de(:,:,:,:)
 
     real(8),allocatable,device,target:: Vx_de(:,:,:)
@@ -208,24 +208,23 @@ module variable_list
     real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
     real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),total_mass_de(:)
 
+    real(8),allocatable,device:: P_exit(:,:),P_send(:),P_recv(:)
+
     integer,allocatable,device,target:: d_isValid(:),d_indices(:),holes(:)
     integer,texture,pointer:: d_isValid_T(:),d_indices_T(:)
-    ! real(8),allocatable,managed:: P_send(:,:),P_recv(:,:)
-    integer,allocatable,managed,target:: Zone_de(:,:),Zones_old(:,:)
+
+    integer,allocatable,managed,target:: Zone_de(:,:)
     integer,texture,pointer:: Zone_T(:,:)
-    ! Zone_de has to be written to restart files, so we use managed.
-    ! old is old, using the new box to cut the old zone (Zones_old)
-    ! new is new, using the old box to cut the new zone (Zone_de)
-    ! Zones_old is allocated in the zone exchange subroutine
 
     integer(8),allocatable,device:: p_num(:,:), c_sum(:)
     ! it should use integer(8) for CONUS !!!
     ! p_sum on workers needs to be deallocated
     ! c_sum is only on manager
+
     integer,allocatable,device:: Zonet_new(:,:)
     ! only on rank ppx*qqy. Zonet_new is written into restart files.
+
     integer,allocatable,device:: grid(:,:)
-    integer,allocatable,managed:: grid_old(:,:)
     ! grid is on GPU, and should be initialized each time doing DDC as
     ! grid = 0
     ! grid(1,1) = 0;  grid(1,2) = 0
@@ -233,8 +232,8 @@ module variable_list
     ! it is also written into restart files.
 
     integer,allocatable,managed:: neigh_list(:)
-    ! t_rank-1, and should be initilized at the very beginning
-    integer,allocatable,managed:: neigh_listo(:), neigh_listn(:)
+    ! ppx*qqy, and should be initilized at the very beginning
+    ! its dimension depends on the initial number of GPUs
 !-------------------------------------
 contains
     subroutine alloc_arrays_temp()
@@ -295,11 +294,13 @@ contains
         implicit none
 
         reflect = .true.
+
         np_active = 0
+
         pid = 0
-        allocate(grid(ppx*qqy,4),grid_old(ppx*qqy,4))
-        ! allocate(neigh_listn(t_rank),neigh_listo(t_rank))
-        allocate(neigh_list(ppx*qqy),nump(t_rank))
+
+        allocate(grid(ppx*qqy,4))
+        allocate(neigh_list(ppx*qqy),nump(t_rank),rq1(t_rank))
         allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,t_rank),c_GPU(ppx*qqy))
         allocate(N_send(ppx*qqy),N_recv(t_rank)) ! not sure, double-check
         allocate(d_isValid(np),d_indices(np),h(np))
@@ -338,32 +339,24 @@ contains
         P(1:np,7:9) = 1.d0
         ! make all particles active to start with and original from 1 = GW/IC
         ! this is necessary since we need P array for restart.
-        P_de = P
+
+        P_de   = P
         dz_de  = dz
-        dz_T  => dz_de
-        P_T   => P_de
+        dz_T   => dz_de
+        P_T    => P_de
         d_isValid_T => d_isValid
         d_indices_T => d_indices
 
         allocate(P_send(tPB*(17+nind_c*2)),P_recv(tPB*(17+nind_c*2)))
         allocate(work_ranks(t_rank))
 
+        allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
+        allocate(p_num(nx_c,ny_c),c_sum(max(nx_c,ny_c)))
+        grid = 0
+        Zonet_new = -1
+        Zonet_new(1:nx_c,1:ny_c) = 0
+        p_num = 1
+
     end subroutine alloc_arrays_const
-
-    subroutine deallocate_temp()
-        implicit none
-
-        if (rank /= ppx*qqy) then
-            deallocate(Vx_de,Vy_de,Vz_de,C_de,Ind_de,Saturation_de, &
-            Porosity_de,EvapTrans_de,CLMvars_de,p_num)
-            ! zone_de will be deallocated in exchange zone after the use
-            deallocate(Vx,Vy,Vz,C,Ind,Saturation,Porosity,EvapTrans, &
-            EvapTrans_da,CLMvars,DEM,Pnts)
-            ! Pnts is allocated in DEM_visual. It is used in vtk write and
-            ! it has to be deallocated and re-allocated once the topology of
-            ! the modeling domain is changed.
-        endif
-
-    end subroutine deallocate_temp
 
 end module variable_list

@@ -1,0 +1,107 @@
+module load_balancing
+
+    use cudafor
+    use variable_list
+    use subdomain_bound
+    use compact_array
+    use utilities
+
+contains
+    subroutine load_balance(Porosity_cpu)
+
+    use mpi
+
+    implicit none
+    integer:: m_rank_o, temp
+    integer:: i, j, ierr
+    logical:: flag
+    real(8):: Porosity_cpu(:,:,:)
+
+        ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
+        ! setting LB > 0 also works, but extra time will be consumed.
+
+        m_rank_o = m_rank
+        call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
+        ! gather np_active on the maximum rank
+
+        if(rank == t_rank - 1) then
+            do i = 1, ppx*qqy
+
+                temp = nump(l_GPUs(i,1) + 1)
+                c_GPU(i) = l_GPUs(i,1)
+                if(t_GPUs(i) > 1) then
+                    do j = 2, t_GPUs(i)
+                        if(nump(l_GPUs(i,j) + 1) < temp) then
+                            ! l_GPUs store the ranks of the GPUs, so plus one
+                            temp = nump(l_GPUs(i,j) + 1)
+                            c_GPU(i) = l_GPUs(i,j)
+                        end if
+                    end do
+                end if
+
+                if(temp > th_value .and. (m_rank+1) < t_rank) then
+                    m_rank = m_rank + 1
+                    t_GPUs(i) = t_GPUs(i) + 1
+                    l_GPUs(i,t_GPUs(i)) = m_rank
+                    c_GPU(i) = m_rank
+                    call MPI_ISEND(l_GPUs(i,1),1,MPI_INTEGER,m_rank,40,MPI_COMM_WORLD,rq1(m_rank),ierr)
+                end if
+
+            end do
+        end if
+
+        if(m_rank_o + 1 < t_rank) then
+            call MPI_BCAST(m_rank,1,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+            call MPI_BCAST(t_GPUs,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+            call MPI_BCAST(l_GPUs,ppx*qqy*t_rank,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+        end if
+        call MPI_BCAST(c_GPU,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+
+        if (m_rank > m_rank_o) then
+
+            if(rank <= m_rank_o) call MPI_COMM_FREE(work_comm,ierr)
+            call MPI_GROUP_FREE(work_group,ierr)
+            call MPI_GROUP_INCL(world_group,m_rank+1,work_ranks(1:m_rank+1),work_group,ierr)
+            call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)
+
+            if(rank >= m_rank_o+1 .and. rank <= m_rank) then
+
+                call MPI_TEST(rq2,flag,status,ierr)
+
+                if(flag == .true. .or. map_sub >= 0) then
+
+                    call copy_grid(map_sub)
+                    ! make sure grid is on all ranks by bcast
+
+                    call alloc_arrays_temp()
+
+                    Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
+                    Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
+
+                    call local_xyz()
+
+                    ! Porosity = 0.3d0
+                    fname = trim(adjustl(pname))//'.out.porosity.pfb'
+                    call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
+                    Porosity(1+ix2-ix1:nnx2+ix2-ix1,1+iy2-iy1:nny2+iy2-iy1,:) = &
+                    Porosity_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+
+                    Ind_de = Ind
+                    Porosity_de   = Porosity
+                    EvapTrans_T  => EvapTrans_de
+                    Saturation_T => Saturation_de
+                    Porosity_T   => Porosity_de
+                    Vx_T  => Vx_de
+                    Vy_T  => Vy_de
+                    Vz_T  => Vz_de
+                    Ind_T => Ind_de
+                    Zone_T => Zone_de
+
+                    call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
+                    tPB >>> (nnx1,nny1,buff,neigh_list,map_sub,ppx*qqy)
+
+                end if
+            end if
+        end if
+    end subroutine load_balance
+end module load_balancing

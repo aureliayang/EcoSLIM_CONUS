@@ -1,18 +1,17 @@
 module subdomain_bound
     ! subroutine global_xyz
     ! subroutine local_xyz
-    ! subroutine DEM_for_visual
     ! subroutine read_restarts
     use cudafor
 
     use variable_list, only: ppx, qqy, rank, buff
     use variable_list, only: nx_c, ny_c, nz_c
-    use variable_list, only: dx, dy, dz
+    use variable_list, only: dx_c, dy_c, dz
     use variable_list, only: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
     use variable_list, only: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
     use variable_list, only: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
     use variable_list, only: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
-    use variable_list, only: loadf, restartf, exitedf, logf, ranknum
+    use variable_list, only: restartf, ranknum
     use variable_list, only: fh1, fh2
     use variable_list, only: ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
     use variable_list, only: DEM, DEMname, fname, Pnts
@@ -22,92 +21,84 @@ module subdomain_bound
 contains
     subroutine global_xyz()
         ! get the boundary of the whole domain.
-        ! set the names of log files
-        ! open loadf (fh1) and output the domain boundary to loadf
 
-        ! loadf (fh1) looks like the log file, recodring all the warning info
-        ! restartf (fh2) is used to read and write restart files
-        ! exitedf (fh3) is to write files of exited particles, it includes particles for all timesteps.
-        ! logf (fh4) is also log file to record the summary of particles of every timestep
-
-        ! use mpi
         implicit none
         character(200):: message
         integer:: k, ierr
 
-            ! set up domain boundaries
-            Xgmin = 0.0d0
-            Ygmin = 0.0d0
-            Zgmin = 0.0d0
-            Xgmax = dble(nx_c)*dx
-            Ygmax = dble(ny_c)*dy
-            Zgmax = 0.0d0
-            do k = 1, nz_c
-                Zgmax = Zgmax + dz(k)
-            end do
+        ! set up domain boundaries
+        Xgmin = 0.0d0
+        Ygmin = 0.0d0
+        Zgmin = 0.0d0
+        Xgmax = dble(nx_c)*dx_c
+        Ygmax = dble(ny_c)*dy_c
+        ! Zgmax = 0.0d0
+        ! do k = 1, nz_c
+        !     Zgmax = Zgmax + dz(k)
+        ! end do
+        Zgmax = sum(dz)
 
-            open(17,file='Load_info.'//trim(adjustl(ranknum))//'.txt')
+        open(17,file='Load_info.'//trim(adjustl(ranknum))//'.txt')
             #if _TIMING == 1
-                write(17,*) 'TIMING defined'
+        write(17,*) 'TIMING defined'
             #else
-                write(17,*) 'TIMING not defined'
+        write(17,*) 'TIMING not defined'
             #endif
-            write(17,*)
-            write(17,*) '## Domain Info'
-            write(17,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
-            write(17,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
-            write(17,'("Zmin:",e12.5," Zmax:",e12.5)') Zgmin, Zgmax
-            write(17,*)
+        write(17,*)
+        write(17,*) '## Domain Info'
+        write(17,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
+        write(17,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
+        write(17,'("Zmin:",e12.5," Zmax:",e12.5)') Zgmin, Zgmax
+        write(17,*)
 
     end subroutine global_xyz
 
     subroutine local_xyz()
+
         implicit none
         integer:: k
 
-        ! if (rank /= ppx*qqy) then
+        ! set up subdomain boundaries
+        Xmin1 = 0.0d0
+        Ymin1 = 0.0d0
+        Zmin1 = 0.0d0
+        Xmax1 = dble(nnx1)*dx_c
+        Ymax1 = dble(nny1)*dy_c
+        Zmax1 = 0.0d0
+        do k = 1, nz_c
+            Zmax1 = Zmax1 + dz(k)
+        end do
 
-            ! set up subdomain boundaries
-            Xmin1 = 0.0d0
-            Ymin1 = 0.0d0
-            Zmin1 = 0.0d0
-            Xmax1 = dble(nnx1)*dx
-            Ymax1 = dble(nny1)*dy
-            Zmax1 = 0.0d0
-            do k = 1, nz_c
-                Zmax1 = Zmax1 + dz(k)
-            end do
+        Xmin2 = -dble(buff)*dx_c
+        Ymin2 = -dble(buff)*dy_c
+        Zmin2 = 0.0d0
+        Xmax2 = dble(nnx1)*dx_c + dble(buff)*dx_c
+        Ymax2 = dble(nny1)*dy_c + dble(buff)*dy_c
+        Zmax2 = 0.0d0
+        do k = 1, nz_c
+            Zmax2 = Zmax2 + dz(k)
+        end do
 
-            Xmin2 = -dble(buff)*dx
-            Ymin2 = -dble(buff)*dy
-            Zmin2 = 0.0d0
-            Xmax2 = dble(nnx1)*dx + dble(buff)*dx
-            Ymax2 = dble(nny1)*dy + dble(buff)*dy
-            Zmax2 = 0.0d0
-            do k = 1, nz_c
-                Zmax2 = Zmax2 + dz(k)
-            end do
+        Xmin3 = dble(buff)*dx_c
+        Ymin3 = dble(buff)*dy_c
+        Zmin3 = 0.0d0
+        Xmax3 = dble(nnx1)*dx_c - dble(buff)*dx_c
+        Ymax3 = dble(nny1)*dy_c - dble(buff)*dy_c
+        Zmax3 = 0.0d0
+        do k = 1, nz_c
+            Zmax3 = Zmax3 + dz(k)
+        end do
 
-            Xmin3 = dble(buff)*dx
-            Ymin3 = dble(buff)*dy
-            Zmin3 = 0.0d0
-            Xmax3 = dble(nnx1)*dx - dble(buff)*dx
-            Ymax3 = dble(nny1)*dy - dble(buff)*dy
-            Zmax3 = 0.0d0
-            do k = 1, nz_c
-                Zmax3 = Zmax3 + dz(k)
-            end do
+        Xgmin = Xgmin - dble(ix1)*dx_c
+        Ygmin = Ygmin - dble(iy1)*dy_c
+        Zgmin = 0.0d0
+        Xgmax = Xgmax - dble(ix1)*dx_c
+        Ygmax = Ygmax - dble(iy1)*dy_c
+        Zgmax = 0.0d0
+        do k = 1, nz_c
+            Zgmax = Zgmax + dz(k)
+        end do
 
-            Xgmin = Xgmin - dble(ix1)*dx
-            Ygmin = Ygmin - dble(iy1)*dy
-            Zgmin = 0.0d0
-            Xgmax = Xgmax - dble(ix1)*dx
-            Ygmax = Ygmax - dble(iy1)*dy
-            Zgmax = 0.0d0
-            do k = 1, nz_c
-                Zgmax = Zgmax + dz(k)
-            end do
-        ! end if
     end subroutine local_xyz
 
     subroutine read_restarts ()

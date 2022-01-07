@@ -33,6 +33,7 @@ program EcoSLIM
     use exchange_particles1
     use exchange_particles2
     use UpdateC_SortP
+    use load_balancing
 
     implicit none
     ! integer(8),allocatable,pinned:: p_num_cpu(:,:)
@@ -40,9 +41,8 @@ program EcoSLIM
     real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
     real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
     real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
-    integer,allocatable:: rq1(:)
-    integer:: istat, temp, rq2
-    logical:: flag
+
+    integer:: istat, temp
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -144,6 +144,7 @@ program EcoSLIM
     read(10,*) transfer
     read(10,*) separate
     read(10,*) LB
+    read(10,*) th_value
     ! read in number of particles for IC (if np_ic = -1 then restart from a file)
     read(10,*) np_ic
 
@@ -286,15 +287,6 @@ program EcoSLIM
     allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
     allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
 
-    allocate(rq1(t_rank))
-
-    allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
-    allocate(p_num(nx_c,ny_c),c_sum(max(nx_c,ny_c)))
-    grid = 0
-    Zonet_new = -1
-    Zonet_new(1:nx_c,1:ny_c) = 0
-    p_num = 1
-
     call global_xyz()
     ! restart file info inside, so have to call it before restart.
 
@@ -313,6 +305,7 @@ program EcoSLIM
         l_GPUs(i,t_GPUs(i)) = i-1
         c_GPU(i) = l_GPUs(i,t_GPUs(i))
     end do
+    ! all GPUs have this information
 
     if(rank < ppx*qqy) then
         map_sub = rank
@@ -395,8 +388,6 @@ program EcoSLIM
                 ! write(*,*) rank,'h_after',h_cpu(1)
         endif
 
-        ! dz_de  = dz
-        ! P_de = P
         Ind_de = Ind
         Porosity_de   = Porosity
         Saturation_de = Saturation
@@ -409,10 +400,6 @@ program EcoSLIM
         Vz_T  => Vz_de
         Ind_T => Ind_de
         Zone_T => Zone_de
-        ! dz_T  => dz_de
-        ! P_T   => P_de
-        ! d_isValid_T => d_isValid
-        ! d_indices_T => d_indices
 
         ! Define initial particles' locations and mass
         if (np_ic > 0)  then
@@ -475,6 +462,7 @@ program EcoSLIM
     if(rank >= m_rank+1 .and. rank < t_rank) then
         call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
     end if
+    ! if the initial number of GPUs equals the total number, this will be skipped.
 
     call MPI_Barrier(MPI_COMM_WORLD,ierr)
 !--------------------------------------------------------------------
@@ -884,90 +872,7 @@ program EcoSLIM
         flush(17);flush(20)
     end if
 
-    ! gather np_active on the maximum rank
-    if(LB > 0 .and. mod(kk,LB) == 0) then
-
-        m_rank_o = m_rank
-        call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
-
-        if(rank == t_rank - 1) then
-            do i = 1, ppx*qqy
-
-                temp = nump(l_GPUs(i,1) + 1)
-                c_GPU(i) = l_GPUs(i,1)
-                if(t_GPUs(i) > 1) then
-                    do j = 2, t_GPUs(i)
-                        if(nump(l_GPUs(i,j) + 1) < temp) then
-                            ! l_GPUs store the ranks of the GPUs, so plus one
-                            temp = nump(l_GPUs(i,j) + 1)
-                            c_GPU(i) = l_GPUs(i,j)
-                        end if
-                    end do
-                end if
-
-                if(temp > 1e5 .and. (m_rank+1) < t_rank) then
-                    m_rank = m_rank + 1
-                    t_GPUs(i) = t_GPUs(i) + 1
-                    l_GPUs(i,t_GPUs(i)) = m_rank
-                    c_GPU(i) = m_rank
-                    call MPI_ISEND(l_GPUs(i,1),1,MPI_INTEGER,m_rank,40,MPI_COMM_WORLD,rq1(m_rank),ierr)
-                end if
-
-            end do
-        end if
-
-        call MPI_BCAST(m_rank,1,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
-        call MPI_BCAST(t_GPUs,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
-        call MPI_BCAST(l_GPUs,ppx*qqy*t_rank,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
-        call MPI_BCAST(c_GPU,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
-
-        if (m_rank > m_rank_o) then
-
-            if(rank <= m_rank_o) call MPI_COMM_FREE(work_comm,ierr)
-            call MPI_GROUP_FREE(work_group,ierr)
-            call MPI_GROUP_INCL(world_group,m_rank+1,work_ranks(1:m_rank+1),work_group,ierr)
-            call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)
-
-            if(rank >= m_rank_o+1 .and. rank <= m_rank) then
-
-                call MPI_TEST(rq2,flag,status,ierr)
-
-                if(flag == .true. .or. map_sub >= 0) then
-
-                    call copy_grid(map_sub)
-                    ! make sure grid is on all ranks by bcast
-
-                    call alloc_arrays_temp()
-
-                    Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
-                    Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
-
-                    call local_xyz()
-
-                    ! Porosity = 0.3d0
-                    fname = trim(adjustl(pname))//'.out.porosity.pfb'
-                    call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
-                    Porosity(1+ix2-ix1:nnx2+ix2-ix1,1+iy2-iy1:nny2+iy2-iy1,:) = &
-                    Porosity_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
-
-                    Ind_de = Ind
-                    Porosity_de   = Porosity
-                    EvapTrans_T  => EvapTrans_de
-                    Saturation_T => Saturation_de
-                    Porosity_T   => Porosity_de
-                    Vx_T  => Vx_de
-                    Vy_T  => Vy_de
-                    Vz_T  => Vz_de
-                    Ind_T => Ind_de
-                    Zone_T => Zone_de
-
-                    call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-                    tPB >>> (nnx1,nny1,buff,neigh_list,map_sub,ppx*qqy)
-
-                end if
-            end if
-        end if
-    end if
+    if(LB > 0 .and. mod(kk,LB) == 0) call load_balance(Porosity_cpu)
 
     call MPI_Barrier(MPI_COMM_WORLD,ierr)
 

@@ -13,6 +13,7 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_exch2.o \
     ecoslim_update_sort.o \
     ecoslim_pfb_read.o \
+	ecoslim_load_balance.o \
     EcoSLIM_CUDA_MPI.cuf
 
 FFLAGS = -Mpreprocess -D_TIMING=1
@@ -52,6 +53,8 @@ ecoslim_update_sort.o: ecoslim_update_sort.cuf ecoslim_particle_loop.o ecoslim_v
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
+ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_compaction.o ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
+	mpif90 -c $< -o $@
 
 .PHONY: clean
 clean:

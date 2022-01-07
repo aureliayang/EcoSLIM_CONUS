@@ -6,10 +6,11 @@ SLIM_LW      ! SLIM run name, path to PF-CLM next, followed by DEM
 50                !nz
 10                !nCLMsoil
 2                 !ppx
-2                 !qqy
+1                 !qqy
 1                 !transfer scheme
 True              !separate or not
 20                !LB frequency, must be n*add_f
+1e5               !th_value
 1                 !particles per cell at start of simulation
 20000000          !np Total
 1000.             !dx
