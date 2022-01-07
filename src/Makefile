@@ -1,36 +1,36 @@
 # Last Change:  2021-07-20 22:29:28
 CUF=ecoslim_thrustscan.o \
-    ecoslim_cuRAND_de.o \
+    ecoslim_device_rand.o \
     ecoslim_variable_list.o \
     ecoslim_subdomain_bc.o \
     ecoslim_device_utility.o \
     ecoslim_dynamic_DDC.o \
     ecoslim_utilities.o \
-    ecoslim_add_particles.o \
+    ecoslim_particle_add.o \
     ecoslim_compaction.o \
     ecoslim_particle_loop.o \
     ecoslim_particle_exch1.o \
     ecoslim_particle_exch2.o \
-    ecoslim_update_sort.o \
+    ecoslim_updatec_sortp.o \
     ecoslim_pfb_read.o \
 	ecoslim_load_balance.o \
-	ecoslim_separation.o \
-    EcoSLIM_CUDA_MPI.cuf
+	ecoslim_particle_separ.o \
+    EcoSLIM.cuf
 
 FFLAGS = -Mpreprocess -D_TIMING=1
 
 all: test
 
-test: ecoslim_cthrustscan.o ${CUF}
+test: ecoslim_thrustscanc.o ${CUF}
 	mpif90 -o $@ $^ $(FFLAGS) -lstdc++
 
-ecoslim_cthrustscan.o: ecoslim_cthrustscan.cu
+ecoslim_thrustscanc.o: ecoslim_thrustscanc.cu
 	nvcc -c $^ -o $@ -std=c++14
-ecoslim_cuRAND_de.o: ecoslim_cuRAND_de.cuf
+ecoslim_device_rand.o: ecoslim_device_rand.cuf
 	mpif90 -c $^ -o $@
 ecoslim_thrustscan.o: ecoslim_thrustscan.cuf
 	mpif90 -c $^ -o $@
-ecoslim_variable_list.o: ecoslim_variable_list.cuf ecoslim_cuRAND_de.o
+ecoslim_variable_list.o: ecoslim_variable_list.cuf ecoslim_device_rand.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_subdomain_bc.o: ecoslim_subdomain_bc.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
@@ -40,23 +40,23 @@ ecoslim_dynamic_DDC.o: ecoslim_dynamic_DDC.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 ecoslim_utilities.o: ecoslim_utilities.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@
-ecoslim_add_particles.o: ecoslim_add_particles.cuf ecoslim_cuRAND_de.o ecoslim_variable_list.o
+ecoslim_particle_add.o: ecoslim_particle_add.cuf ecoslim_device_rand.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 ecoslim_compaction.o: ecoslim_compaction.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@
-ecoslim_particle_loop.o: ecoslim_particle_loop.cuf ecoslim_cuRAND_de.o ecoslim_variable_list.o
+ecoslim_particle_loop.o: ecoslim_particle_loop.cuf ecoslim_device_rand.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_exch1.o: ecoslim_particle_exch1.cuf ecoslim_particle_loop.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_exch2.o: ecoslim_particle_exch2.cuf ecoslim_particle_loop.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
-ecoslim_update_sort.o: ecoslim_update_sort.cuf ecoslim_variable_list.o
+ecoslim_updatec_sortp.o: ecoslim_updatec_sortp.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
 ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
-ecoslim_separation.o: ecoslim_separation.cuf ecoslim_compaction.o ecoslim_variable_list.o
+ecoslim_particle_separ.o: ecoslim_particle_separ.cuf ecoslim_compaction.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 
 .PHONY: clean

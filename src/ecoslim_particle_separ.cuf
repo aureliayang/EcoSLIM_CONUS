@@ -1,0 +1,182 @@
+module separate_particles
+
+    use cudafor
+    use thrust
+    use compact_array
+    use variable_list, only: holes
+    use variable_list, only: dx, dy
+    use variable_list, only: startEvent, stopEvent
+    use variable_list, only: d_isValid, d_indices
+    use variable_list, only: np_active, np, N_inte, N_peri, tPB
+    use variable_list, only: xmin3,ymin3,xmax3,ymax3,ix1,iy1
+    use variable_list, only: sort_time1,sort_time2,sort_time3,sort_time4,sort_time5
+    use variable_list, only: sort_time6,sort_time7,sort_time8,sort_time9,sort_time10
+
+contains
+
+    subroutine separ_particles (flag)
+
+        implicit none
+
+        integer:: istat
+        logical:: flag
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+            xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time1,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        call thrustscan(d_isValid,np_active,d_indices)
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time2,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        N_inte = d_indices(np_active)
+        N_peri = np_active - N_inte
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time3,startEvent,stopEvent)
+            #endif
+
+        if(np_active + N_peri >= np) then
+            write(17,*) ' **Warning particles separation out of bound'
+            write(17,*) ' **Exiting code gracefully writing restart'
+            ! goto 9090
+            flag = .true.
+        endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        allocate(holes(N_peri))
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time4,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+            holes,np_active)
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time5,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        call select2np_active<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+            holes,np_active,N_peri)
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time6,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+            holes,0,np_active)
+            ! if no compaction, you will need d_isValid and if condition to judge
+            ! during the interior particles' movement
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time7,startEvent,stopEvent)
+            #endif
+
+        !        #if _TIMING == 1
+        !        istat = cudaEventRecord(startEvent,0)
+        !        #endif
+        !    !N_inte = d_indices(np_active);
+        !        #if _TIMING == 1
+        !        istat = cudaEventRecord(stopEvent,0)
+        !        istat = cudaEventSynchronize(stopEvent)
+        !        istat = cudaEventElapsedTime(sort_time8,startEvent,stopEvent)
+        !        #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        deallocate(holes)
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time9,startEvent,stopEvent)
+            #endif
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+        call connect_recv<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
+            N_inte,N_peri)
+            ! if not connect, ther will be the risk that it is out of particles when do receiving
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(sort_time10,startEvent,stopEvent)
+            #endif
+    end subroutine separ_particles
+
+    attributes(global) subroutine particles_separation( &
+        xmin3_m,ymin3_m,xmax3_m,ymax3_m,np_active_m,ix1_m,iy1_m)
+        implicit none
+
+        integer,parameter:: tPB = 256
+        ! integer,intent(out):: d_isValid(:)
+        real(8),value:: xmin3_m,ymin3_m,xmax3_m,ymax3_m
+        integer,value:: np_active_m,ix1_m,iy1_m
+        integer:: ii,ii_g
+        real(8),shared:: P_s(tPB,2), d_isValid_s(tPB)
+
+        ii_g = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii = threadIdx%x
+
+        if (ii_g <= np_active_m) then
+
+            P_s(ii,1:2) = P_de(ii_g,1:2)
+
+            ! Transfer global to local
+            P_s(ii,1) = P_s(ii,1) - dble(ix1_m)*dx
+            P_s(ii,2) = P_s(ii,2) - dble(iy1_m)*dy
+
+            if(P_s(ii,1) <  xmin3_m .or. P_s(ii,2) <  ymin3_m .or. &
+            P_s(ii,1) >= xmax3_m .or. P_s(ii,2) >= ymax3_m) then
+                d_isValid_s(ii) = 0
+            else
+                d_isValid_s(ii) = 1
+            end if
+
+            ! ! Transfer local coordinates to global
+            ! P_s(ii,1) = P_s(ii,1) + dble(ix1)*dx
+            ! P_s(ii,2) = P_s(ii,2) + dble(iy1)*dy
+
+            d_isValid(ii_g) = d_isValid_s(ii)
+            ! P_de(ii_g,1:2) = P_s(ii,1:2)
+
+        end if
+    end subroutine particles_separation
+
+
+end module separate_particles
+
