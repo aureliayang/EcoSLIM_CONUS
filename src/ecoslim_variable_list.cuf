@@ -299,8 +299,8 @@ contains
 
         pid = 0
 
-        allocate(grid(ppx*qqy,4))
-        allocate(neigh_list(ppx*qqy),nump(t_rank),rq1(t_rank))
+        allocate(grid(ppx*qqy,4),neigh_list(ppx*qqy))
+        allocate(work_ranks(t_rank),nump(t_rank),rq1(t_rank))
         allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,t_rank),c_GPU(ppx*qqy))
         allocate(N_send(ppx*qqy),N_recv(t_rank)) ! not sure, double-check
         allocate(d_isValid(np),d_indices(np),h(np))
@@ -348,7 +348,6 @@ contains
         d_indices_T => d_indices
 
         allocate(P_send(tPB*(17+nind_c*2)),P_recv(tPB*(17+nind_c*2)))
-        allocate(work_ranks(t_rank))
 
         allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
         allocate(p_num(nx_c,ny_c),c_sum(max(nx_c,ny_c)))

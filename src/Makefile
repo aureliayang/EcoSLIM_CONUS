@@ -53,7 +53,7 @@ ecoslim_update_sort.o: ecoslim_update_sort.cuf ecoslim_particle_loop.o ecoslim_v
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
-ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_compaction.o ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
+ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 
 .PHONY: clean

@@ -1,13 +1,10 @@
 module utilities
     ! subroutine copy_grid
-    ! subroutine receive_Zone_de
-    use mpi
+    ! attributes(global) subroutine scan_zone
+
     use cudafor
-    use variable_list, only: nx_c, ny_c
-    use variable_list, only: buff, ppx, qqy, rank, status
-    use variable_list, only: Zonet_new, Zone_de
-    use variable_list, only: grid
-    use variable_list, only: dx, dy, np_active, p_num
+    use variable_list, only: Zone_T, grid
+    use variable_list, only: nx_c, ny_c, buff
     use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
 
 contains
@@ -37,26 +34,57 @@ contains
         if(iy1+nny1 == ny_c) nny2 = nny2 - buff
     end subroutine copy_grid
 
-    subroutine receive_Zone_de(request2)
-        ! we use send and recv now, and will consider scatter and gather later
-        use mpi
-        implicit none
-        integer:: ncount1, request1(ppx*qqy), request2
-        integer:: i, ierr
+    attributes(global) subroutine scan_zone(nnx1_m,nny1_m,buff_m, &
+                                            neigh_list_m,rank_m,t_rank_m)
 
-        if(rank /= ppx*qqy) then
-            call MPI_IRECV(Zone_de,(nnx1+2*buff)*(nny1+2*buff),MPI_INTEGER, &
-            ppx*qqy,41,MPI_COMM_WORLD,request2,ierr)
-        else
-            ncount1 = 0
-            do i = 0, ppx*qqy - 1
-                ncount1 = ncount1 + 1
-                 ix1 = grid(i+1,1);  iy1 = grid(i+1,2)
-                nnx1 = grid(i+1,3); nny1 = grid(i+1,4)
-                call MPI_ISEND(Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff), &
-                (nnx1+2*buff)*(nny1+2*buff),MPI_INTEGER,i,41,MPI_COMM_WORLD,request1(ncount1),ierr)
-            end do
-        endif
-    end subroutine receive_Zone_de
+        implicit none
+        integer,intent(out):: neigh_list_m(:)
+        integer,value:: nnx1_m,nny1_m,buff_m,rank_m,t_rank_m
+        integer:: ii,i,j,temp,lock,length
+        integer:: nx, ny, mod_temp
+
+        ! 1  2  3  4  5  6
+        ! 0  1  2  3  4  5
+        ! -1 -1 -1 -1 -1 -1  5  6
+        ! -1  1  1  1  1 -1  4  5
+        ! -1  1  1  1  1 -1  3  4
+        ! -1  1  1  1  1 -1  2  3
+        ! -1  1  1  1  1 -1  1  2
+        ! -1 -1 -1 -1 -1 -1  0  1
+        ! nnx1_m = 4; nny1_m = 4; buff_m = 1
+        ! the (i,j) is that in Zone_de
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        lock = 1
+        nx = nnx1_m + 2*buff_m
+        ny = nny1_m + 2*buff_m
+        mod_temp = mod(ii,nx)
+        length = nx * ny
+        ! this is the total length of zone array when it was transformed to 1D
+
+        if(ii <= length) then
+            if(mod_temp == 0) then
+                j = ii/nx - buff_m ! 2 - 1
+                i = nnx1_m + buff_m  ! 4 + 1
+            else
+                j = ii/nx - buff_m + 1
+                i = mod_temp - buff_m
+            end if
+        end if
+
+        if(ii <= t_rank_m) neigh_list_m(ii) = 0
+        ! for this scan, we only have t_rank_m elements
+        ! in fact, ppx*qqy is passed to t_rank_m
+        ! map_sub is passed to rank_m
+
+        if(ii <= length) then
+            if(Zone_T(i,j) >= 0 .and. Zone_T(i,j) /= rank_m) then
+            ! since there is -1 for halo
+                temp = atomicAdd(neigh_list_m(Zone_T(i,j)+1),lock)
+            end if
+        end if
+
+        if(ii <= t_rank_m .and. neigh_list_m(ii) > 0) neigh_list_m(ii) = 1
+    end subroutine scan_zone
 
 end module utilities

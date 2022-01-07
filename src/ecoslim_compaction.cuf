@@ -1,6 +1,6 @@
 module compact_array
     use cudafor
-    use variable_list, only: Zone_de, P_de
+    use variable_list, only: P_de
     use variable_list, only: d_indices_T, d_isValid_T, P_T
     use variable_list, only: nattri, d_isValid
 
@@ -217,42 +217,5 @@ contains
             P_de(numElements+ii,:) = P_de(numElements+N_recv+ii,:)
         end if
     end subroutine connect_recv
-!10--------------------------------------------------------------------
-    attributes(global) subroutine scan_zone(nnx1,nny1,buff, &
-                                            neigh_list,rank,t_rank)
-
-        implicit none
-        ! integer,intent(in):: zone(:,:)
-        integer,intent(out):: neigh_list(:)
-        integer,value:: nnx1,nny1,buff,rank,t_rank
-        integer:: ii,i,j,temp,lock,length
-
-            ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-            lock = 1
-            length = (nnx1+2*buff)*(nny1+2*buff)
-            ! this is the total length of zone array when it was transformed to 1D
-
-            if(ii <= length) then
-                if(mod(ii, nnx1 + 2*buff) == 0) then
-                    j = ii/(nnx1 + 2*buff) - buff
-                    i = nnx1 + buff
-                else
-                    j = ii/(nnx1 + 2*buff) - buff + 1
-                    i = mod(ii,nnx1 + 2*buff) - buff
-                end if
-            end if
-
-            if(ii <= t_rank) neigh_list(ii) = 0
-            ! for this scan, we only have t_rank elements
-
-            if(ii <= length) then
-                if(Zone_de(i,j) >= 0 .and. Zone_de(i,j) /= rank) then
-                ! since there is -1 for halo
-                    temp = atomicAdd(neigh_list(Zone_de(i,j)+1),lock)
-                end if
-            end if
-
-            if(ii <= t_rank .and. neigh_list(ii) > 0) neigh_list(ii) = 1
-    end subroutine scan_zone
 
 end module compact_array
