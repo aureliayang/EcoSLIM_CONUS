@@ -1,7 +1,7 @@
 module eco_updateC_sortP
     use thrust
     use cudafor
-    use compaction_utility
+    use eco_compact_util
     use variable_list, only: N_exit, holes, P, P_exit
     use variable_list, only: P_de, d_isValid, d_indices, P_T, C_de
     use variable_list, only: ix1, iy1, nind_c, tPB

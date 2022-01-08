@@ -2,7 +2,7 @@ module eco_particle_separ
 
     use cudafor
     use thrust
-    use compaction_utility
+    use eco_compact_util
     use variable_list, only: holes
     use variable_list, only: dx, dy
     use variable_list, only: startEvent, stopEvent
@@ -58,6 +58,7 @@ contains
             write(17,*) ' **Exiting code gracefully writing restart'
             ! goto 9090
             flag = .true.
+            return
         endif
 
             #if _TIMING == 1

@@ -35,11 +35,9 @@ module variable_list
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
-    integer:: world_group, work_group, work_comm, m_rank, rq2
+    integer:: world_group, work_group, work_comm, max_rank, rq2
 
-    integer,allocatable:: work_ranks(:)
-
-    integer,allocatable:: rq1(:)
+    integer,allocatable:: rq1(:), work_ranks(:)
 
     character(len=MPI_MAX_PROCESSOR_NAME):: hostname
 
@@ -126,7 +124,7 @@ module variable_list
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time, add_time
-    real:: sort_time, peri_time, inte_time, exit_time, C_time
+    real:: peri_time, inte_time, exit_time, C_time
     real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
     real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
     real:: scan_time, thrust_time, copy_time, add2_time, reduce_time = 0.
@@ -137,7 +135,7 @@ module variable_list
 
     integer,parameter:: tPB = 256 ! block size, is it the larger the better?
     integer:: fh0, fh1, fh2, fh3, fh4
-    character(200):: loadf, restartf, exitedf, logf
+    character(200):: restartf
     integer:: np_active_log, add_f
 
     real(8),allocatable,pinned:: P(:,:)
@@ -235,57 +233,6 @@ module variable_list
     ! its dimension depends on the initial number of GPUs
 !-------------------------------------
 contains
-    subroutine alloc_arrays_temp()
-        implicit none
-        !--------------------------------------------------------------------
-        ! allocate arrays
-            allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
-
-            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
-                     Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
-                     Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1))
-
-            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                       Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                      EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-
-            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-            allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
-            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-
-            ! Intialize everything to Zero
-            Vx = 0.0d0
-            Vy = 0.0d0
-            Vz = 0.0d0
-            Saturation = 0.0d0
-            Porosity = 0.0d0
-            EvapTrans = 0.0d0
-            EvapTrans_da = 0.0d0
-            C = 0.0d0
-            Ind = 1.0d0
-            ! Ind is initialized when reading it.
-            ! CLMvars is initialized when reading it.
-            ! DEM is initialized when reading it.
-
-            !-------------------------------------
-            ! allocate arrays on GPU
-            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
-                     Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
-                     Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1), &
-                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     EvapTrans_da_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
-                     Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
-            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-
-            Zone_de = -1
-
-    end subroutine alloc_arrays_temp
-
     subroutine alloc_arrays_const()
 
         implicit none
@@ -354,5 +301,76 @@ contains
         p_num = 1
 
     end subroutine alloc_arrays_const
+
+    subroutine alloc_arrays_temp(Porosity_cpu)
+        implicit none
+        real(8):: Porosity_cpu(:,:,:)
+        !--------------------------------------------------------------------
+        ! allocate arrays
+            allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+
+            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
+                     Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
+                     Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1))
+
+            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                       Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                      EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+
+            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+            allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
+            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+
+            ! Intialize everything to Zero
+            Vx = 0.0d0
+            Vy = 0.0d0
+            Vz = 0.0d0
+            Saturation = 0.0d0
+            Porosity = 0.0d0
+            EvapTrans = 0.0d0
+            EvapTrans_da = 0.0d0
+            C = 0.0d0
+            Ind = 1.0d0
+            ! Ind is initialized when reading it.
+            ! CLMvars is initialized when reading it.
+            ! DEM is initialized when reading it.
+
+            !-------------------------------------
+            ! allocate arrays on GPU
+            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
+                     Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
+                     Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1), &
+                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     EvapTrans_da_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
+                     CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
+                     Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+
+            Zone_de = -1
+
+            ! Porosity = 0.3d0
+            fname = trim(adjustl(pname))//'.out.porosity.pfb'
+            call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
+            Porosity(1+ix2-ix1:nnx2+ix2-ix1,1+iy2-iy1:nny2+iy2-iy1,:) = &
+            Porosity_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+            Ind_de = Ind
+            Porosity_de   = Porosity
+            EvapTrans_T  => EvapTrans_de
+            Saturation_T => Saturation_de
+            Porosity_T   => Porosity_de
+            Vx_T  => Vx_de
+            Vy_T  => Vy_de
+            Vz_T  => Vz_de
+            Ind_T => Ind_de
+            Zone_T => Zone_de
+
+            Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
+            Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
+
+    end subroutine alloc_arrays_temp
 
 end module variable_list

@@ -23,8 +23,6 @@ contains
         ! get the boundary of the whole domain.
 
         implicit none
-        character(200):: message
-        integer:: k, ierr
 
         ! set up domain boundaries
         Xgmin = 0.0d0
@@ -64,40 +62,44 @@ contains
         Zmin1 = 0.0d0
         Xmax1 = dble(nnx1)*dx_c
         Ymax1 = dble(nny1)*dy_c
-        Zmax1 = 0.0d0
-        do k = 1, nz_c
-            Zmax1 = Zmax1 + dz(k)
-        end do
+        ! Zmax1 = 0.0d0
+        ! do k = 1, nz_c
+        !     Zmax1 = Zmax1 + dz(k)
+        ! end do
+        Zmax1 = sum(dz)
 
         Xmin2 = -dble(buff)*dx_c
         Ymin2 = -dble(buff)*dy_c
         Zmin2 = 0.0d0
         Xmax2 = dble(nnx1)*dx_c + dble(buff)*dx_c
         Ymax2 = dble(nny1)*dy_c + dble(buff)*dy_c
-        Zmax2 = 0.0d0
-        do k = 1, nz_c
-            Zmax2 = Zmax2 + dz(k)
-        end do
+        ! Zmax2 = 0.0d0
+        ! do k = 1, nz_c
+        !     Zmax2 = Zmax2 + dz(k)
+        ! end do
+        Zmax2 = sum(dz)
 
         Xmin3 = dble(buff)*dx_c
         Ymin3 = dble(buff)*dy_c
         Zmin3 = 0.0d0
         Xmax3 = dble(nnx1)*dx_c - dble(buff)*dx_c
         Ymax3 = dble(nny1)*dy_c - dble(buff)*dy_c
-        Zmax3 = 0.0d0
-        do k = 1, nz_c
-            Zmax3 = Zmax3 + dz(k)
-        end do
+        ! Zmax3 = 0.0d0
+        ! do k = 1, nz_c
+        !     Zmax3 = Zmax3 + dz(k)
+        ! end do
+        Zmax3 = sum(dz)
 
         Xgmin = Xgmin - dble(ix1)*dx_c
         Ygmin = Ygmin - dble(iy1)*dy_c
         Zgmin = 0.0d0
         Xgmax = Xgmax - dble(ix1)*dx_c
         Ygmax = Ygmax - dble(iy1)*dy_c
-        Zgmax = 0.0d0
-        do k = 1, nz_c
-            Zgmax = Zgmax + dz(k)
-        end do
+        ! Zgmax = 0.0d0
+        ! do k = 1, nz_c
+        !     Zgmax = Zgmax + dz(k)
+        ! end do
+        Zgmax = sum(dz)
 
     end subroutine local_xyz
 
