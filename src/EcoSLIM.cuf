@@ -80,7 +80,6 @@ program EcoSLIM
     IO_time_read = 0.
     h2d_time = 0.
     d2h_time = 0.
-    add_time = 0.
 
     peri_time = 0.
     inte_time = 0.
@@ -320,7 +319,7 @@ program EcoSLIM
     ! gridinfo is to get grid and Zonet_new
     ! if restart, read grid and Zonet_new in
 
-    if (rank <= max_rank) then
+    if (work_comm /= MPI_COMM_NULL) then
         ! if(np_ic /= -1) then
 
         call copy_grid(map_sub) ! doing this on workers
@@ -446,7 +445,7 @@ program EcoSLIM
 
     do kk = outkk, pfnt
 
-    if(rank <= max_rank) then
+    if(work_comm /= MPI_COMM_NULL) then
 
         ! reset ParFlow counter for cycles
         if (mod((kk-1),(pft2-pft1+1)) == 0)  pfkk = pft1 - 1
@@ -641,8 +640,7 @@ program EcoSLIM
                                 #endif
 
                             call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
-                                tPB >>> (iflux_p_res,np_active,pid, &
-                                nnx1,nny1,ix1,iy1,kk)
+                                tPB >>> (iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk)
 
                                 #if _TIMING == 1
                                 istat = cudaEventRecord(stopEvent,0)
@@ -730,12 +728,14 @@ program EcoSLIM
                                                       sum(N_send),sum(N_recv)
                                                       ! here???
 
-        write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active,IO_time_read,h2d_time,scan_time,thrust_time,copy_time, &
-                                            add2_time,reduce_time,sort_time1,sort_time2,sort_time3,sort_time4, &
-                                            sort_time5,sort_time6,sort_time7,sort_time8,sort_time9,sort_time10, &
-                                            peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
-                                            tran_time6,tran_time7,tran_time8,tran_time9,inte_time, &
-                                            tran_time10,C_time,exit_time
+        write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active, &
+        IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
+        ! 1,         2,       3,        4,          5,        6,        7
+        sort_time1,sort_time2,sort_time3,sort_time4,sort_time5, & ! 12
+        sort_time6,sort_time7,sort_time8,sort_time9,sort_time10, & ! 17
+        peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
+        tran_time6,tran_time7,tran_time8,tran_time9,inte_time, &
+        tran_time10,C_time,exit_time
 
         flush(17);flush(20)
     end if
@@ -747,7 +747,7 @@ program EcoSLIM
     end do
     9090 continue
 
-    if(rank <= max_rank) then
+    if(work_comm /= MPI_COMM_NULL) then
         nullify(EvapTrans_T,Saturation_T,Porosity_T)
         nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T,Zone_T)
         nullify(d_isValid_T,d_indices_T)
@@ -794,7 +794,7 @@ program EcoSLIM
     ! 17 is opened on ecoslim_subdomain_bc.cuf
 
     ! call close_hdf5_interface()
-    if(rank <= max_rank) call MPI_COMM_FREE(work_comm, ierr)
+    if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm, ierr)
     call MPI_GROUP_FREE(work_group, ierr)
     call MPI_GROUP_FREE(world_group, ierr)
     call MPI_FINALIZE(ierr)

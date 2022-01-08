@@ -57,7 +57,7 @@ contains
 
         if (max_rank > max_rank_o) then
 
-            if(rank <= max_rank_o) call MPI_COMM_FREE(work_comm,ierr)
+            if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm,ierr)
             call MPI_GROUP_FREE(work_group,ierr)
             call MPI_GROUP_INCL(world_group,max_rank+1,work_ranks(1:max_rank+1),work_group,ierr)
             call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)

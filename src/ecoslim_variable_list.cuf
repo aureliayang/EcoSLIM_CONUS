@@ -123,7 +123,7 @@ module variable_list
     real(8):: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
-    real:: IO_time_read, h2d_time, d2h_time, add_time
+    real:: IO_time_read, h2d_time, d2h_time
     real:: peri_time, inte_time, exit_time, C_time
     real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
     real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
