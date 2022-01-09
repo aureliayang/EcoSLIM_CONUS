@@ -13,8 +13,9 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_exch2.o \
     ecoslim_updatec_sortp.o \
     ecoslim_pfb_read.o \
-	ecoslim_load_balance.o \
-	ecoslim_particle_separ.o \
+    ecoslim_load_balance.o \
+    ecoslim_particle_separ.o \
+    ecoslim_particle_pme.o \
     EcoSLIM.cuf
 
 FFLAGS = -Mpreprocess -D_TIMING=1
@@ -58,30 +59,20 @@ ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_utilities.o ecoslim_sub
 	mpif90 -c $< -o $@
 ecoslim_particle_separ.o: ecoslim_particle_separ.cuf ecoslim_compaction.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
+ecoslim_particle_pme.o: ecoslim_particle_pme.cuf ecoslim_particle_add.o ecoslim_variable_list.o
+	mpif90 -c $< -o $@ $(FFLAGS)
 
 .PHONY: clean
 clean:
 	rm *.o *.mod test \
-	Read_check.* \
 	slurm* \
-	EcoSLIM_Device_Utility.txt \
+	Device_Utility.txt \
 	SLIM*.txt \
-	grid.* \
-	topology.* \
-	Zone_de_before.* \
 	Zone_de_after.* \
 	Load* \
-	Local* \
-	Variable_init* \
-	P_init.* \
-	Neighbor.* \
 	Exited_particles.* \
 	Log_particles.* \
-	P_new.* \
-	P_separa.* \
-	P_peri.* \
-	Send_Recv.* \
 	null \
-	Device_Utility.txt \
-        Debug*
+	Debug* \
+	Timing*.txt
 

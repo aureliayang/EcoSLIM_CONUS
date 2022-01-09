@@ -29,6 +29,7 @@ program EcoSLIM
     use eco_compact_util
     use eco_particle_loop
     use eco_particle_add
+    use eco_particle_pme
     use eco_particle_exch1
     use eco_particle_exch2
     use eco_updateC_sortP
@@ -42,8 +43,8 @@ program EcoSLIM
     real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
     real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
-    integer:: istat, temp
-    logical:: separ_flag
+    integer:: istat
+    logical:: separ_flag, pme_flag
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -415,12 +416,13 @@ program EcoSLIM
 
     open(17,file='Timing_info.'//trim(adjustl(ranknum))//'.txt')
 
-    open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin')
+    open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin', &
+    form='unformatted',access='stream')
 
     open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
     write(20,*) ' **** Transient Simulation Particle Accounting ****'
-    write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass &
-                  PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered &
+    write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass &
+                  Total_Mass PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered &
                   N_peripheric N_interior N_exit sum_send sum_recv'
 
     if(rank == 0) then
@@ -577,108 +579,14 @@ program EcoSLIM
 
         if (clmtrans) then
             if (np_active < np) then
-                if (rank == c_GPU(map_sub+1)) then
-                        #if _TIMING == 1
-                        istat = cudaEventRecord(startEvent,0)
-                        #endif
-
-                    call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> ( &
-                        nnx1,nny1)
-
-                        #if _TIMING == 1
-                        istat = cudaEventRecord(stopEvent,0)
-                        istat = cudaEventSynchronize(stopEvent)
-                        istat = cudaEventElapsedTime(scan_time,startEvent,stopEvent)
-                        #endif
-
-                    ! d_isValid has the length as P or of np which is assigned in input script
-                    ! so nnx1*nny1*nz should be smaller than np
-                    ! we don't care about the buffer zone for add of particles
-                    ! nnx1, nnx2 etc. subdomain info can be put in its own module. Then use module
-                    ! in main program and pass arguments to other subroutines.
-
-                    if (mod(kk,add_f) == 0) then
-                        ! so the frequency to write restart file should be 24*n
-                        ! i am not sure why i used 1752 previously but I feel it is not necessary
-
-                            #if _TIMING == 1
-                            istat = cudaEventRecord(startEvent,0)
-                            #endif
-
-                        ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
-                        call thrustscan(d_isValid,nnx1*nny1,d_indices)
-
-                            #if _TIMING == 1
-                            istat = cudaEventRecord(stopEvent,0)
-                            istat = cudaEventSynchronize(stopEvent)
-                            istat = cudaEventElapsedTime(thrust_time,startEvent,stopEvent)
-                            #endif
-
-                            #if _TIMING == 1
-                            istat = cudaEventRecord(startEvent,0)
-                            #endif
-
-                        temp = d_indices(nnx1*nny1)
-                        i_added_particles = temp * iflux_p_res
-
-                            #if _TIMING == 1
-                            istat = cudaEventRecord(stopEvent,0)
-                            istat = cudaEventSynchronize(stopEvent)
-                            istat = cudaEventElapsedTime(copy_time,startEvent,stopEvent)
-                            #endif
-
-                        if(i_added_particles > 0) then
-
-                            if(np_active + i_added_particles >= np) then
-                                write(11,*) ' **Warning rainfall input but no paricles left'
-                                write(11,*) ' **Exiting code gracefully writing restart'
-                                goto 9090
-                            endif
-
-                                #if _TIMING == 1
-                                istat = cudaEventRecord(startEvent,0)
-                                #endif
-
-                            call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
-                                tPB >>> (iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk)
-
-                                #if _TIMING == 1
-                                istat = cudaEventRecord(stopEvent,0)
-                                istat = cudaEventSynchronize(stopEvent)
-                                istat = cudaEventElapsedTime(add2_time,startEvent,stopEvent)
-                                #endif
-
-                            np_active = np_active + i_added_particles
-                            pid = pid + i_added_particles
-                        end if
-                    end if
-                end if
-
-                    PET_balance = PET_balance_de
-                    call MPI_Barrier(work_comm,ierr)
-
-                        #if _TIMING == 1
-                        ! istat = cudaEventRecord(startEvent,0)
-                        t1 = mpi_wtime()
-                        #endif
-
-                    call MPI_ALLReduce(MPI_IN_PLACE,PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
-                    ! be carefull???
-                    ! no matter if a GPU in the work group working, it will join this reduce,
-                    ! otherwise, we need one more work group which will be extra time.
-
-                        #if _TIMING == 1
-                        !istat = cudaEventRecord(stopEvent,0)
-                        !istat = cudaEventSynchronize(stopEvent)
-                        !istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
-                        t2 = mpi_wtime()
-                        reduce_time = (t2 - t1)*1000
-                        #endif
+                pme_flag = .false.
+                call particle_pme(pme_flag)
+                if(pme_flag) exit
             end if
         end if
 
         !----------------------------------------
-        ! If you don't physically separate the particles, the interior and peripherical particles
+        ! If you don't physically separate the particles, the interior and peripheric particles
         ! are mixed in the array, the thrustscan and movement of interior particles may happen at
         ! the same time, but they are all read-only operations, so it doesn't matter.
         !!!!! ****since add_f is large, after new GPU is added, in the following add_f steps, in fact,
@@ -713,9 +621,19 @@ program EcoSLIM
             istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
             #endif
         !----------------------------------------
-        if(transfer == 1) call particle_exchange1()
-        if(transfer == 2) call particle_exchange2()
-        if(np_active > 0) call Update_Sort()
+        if(transfer > 0) then
+            if(mod(kk,transfer) == 0) then
+                call particle_exchange1()
+            end if
+        end if
+
+        if(transfer < 0) then
+            if(mod(kk,abs(transfer)) == 0) then
+                call particle_exchange2()
+            end if
+        end if
+
+        if(np_active > 0) call UpdateC_SortP()
         !----------------------------------------
         mean_age    = mean_age_de
         mean_comp   = mean_comp_de
@@ -725,35 +643,39 @@ program EcoSLIM
         mean_mass = total_mass/dble(np_active)
         ET_np_cpu   = ET_np_de
         out_np_cpu  = out_np_de
-
-        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk), &
-
-        mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
-        !
-        PET_balance(2),i_added_particles,ET_np_cpu(1),Out_np_cpu(1), &
-        !
-        np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv)
-        !
-
-        write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active, &
-
-        IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
-        ! 4,         5,       6,        7,          8,        9,        10
-        sort_time1,sort_time2,sort_time3,sort_time4,sort_time5, &
-        ! 11,      12,         13,        14,       15
-        sort_time6,sort_time7,sort_time9,sort_time10, &
-        ! 16,      17,         18,       19
-        peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
-        ! 20,     21,        22,        23,        24,        25
-        tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
-        ! 26,      27,        28,        29,        30,       31
-        C_time,exit_time
-        ! 32,  33
-
-        flush(17);flush(20)
     end if
 
-    if(LB > 0 .and. mod(kk,LB) == 0) call load_balance(Porosity_cpu)
+    write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk), &
+
+    mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
+    !
+    PET_balance(2),i_added_particles,ET_np_cpu(1),Out_np_cpu(1), &
+    !
+    np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv)
+    !
+
+    write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active, &
+
+    IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
+    ! 4,         5,       6,        7,          8,        9,        10
+    sort_time1,sort_time2,sort_time3,sort_time4,sort_time5, &
+    ! 11,      12,         13,        14,       15
+    sort_time6,sort_time7,sort_time9,sort_time10, &
+    ! 16,      17,         18,       19
+    peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
+    ! 20,     21,        22,        23,        24,        25
+    tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
+    ! 26,      27,        28,        29,        30,       31
+    C_time,exit_time
+    ! 32,  33
+
+    flush(17);flush(20)
+
+    if(LB > 0) then
+        if(mod(kk,LB) == 0) then
+            call load_balance(Porosity_cpu)
+        end if
+    end if
 
     call MPI_Barrier(MPI_COMM_WORLD,ierr)
 

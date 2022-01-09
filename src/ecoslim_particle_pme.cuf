@@ -1,0 +1,121 @@
+module eco_particle_pme
+    use cudafor
+    use thrust
+    use eco_particle_add
+    use variable_list, only: rank, c_GPU, map_sub, ierr, work_comm
+    use variable_list, only: startEvent, stopEvent
+    use variable_list, only: nnx1, nny1, ix1, iy1, nz_c, tPB
+    use variable_list, only: d_isValid, d_indices
+    use variable_list, only: kk, add_f, i_added_particles
+    use variable_list, only: np_active, np, iflux_p_res, pid
+    use variable_list, only: PET_balance, PET_balance_de
+    use variable_list, only: t1, t2, scan_time, thrust_time
+    use variable_list, only: copy_time, add2_time, reduce_time
+
+contains
+    subroutine particle_pme(pme_flag)
+        use mpi
+        implicit none
+        integer:: istat, temp
+        logical:: pme_flag
+
+        if (rank == c_GPU(map_sub+1)) then
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+
+            call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> ( &
+                nnx1,nny1)
+
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(scan_time,startEvent,stopEvent)
+                #endif
+
+            ! d_isValid has the length as P or of np which is assigned in input script
+            ! so nnx1*nny1*nz_c should be smaller than np
+            ! we don't care about the buffer zone for add of particles
+
+            if (mod(kk,add_f) == 0) then
+                ! so the frequency to write restart file should be 24*n
+                ! i am not sure why i used 1752 previously but I feel it is not necessary
+                ! 1752 because we want to have the results of a complete year so 8760/m
+
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(startEvent,0)
+                    #endif
+
+                ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
+                call thrustscan(d_isValid,nnx1*nny1,d_indices)
+
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(stopEvent,0)
+                    istat = cudaEventSynchronize(stopEvent)
+                    istat = cudaEventElapsedTime(thrust_time,startEvent,stopEvent)
+                    #endif
+
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(startEvent,0)
+                    #endif
+
+                temp = d_indices(nnx1*nny1)
+                i_added_particles = temp * iflux_p_res
+
+                    #if _TIMING == 1
+                    istat = cudaEventRecord(stopEvent,0)
+                    istat = cudaEventSynchronize(stopEvent)
+                    istat = cudaEventElapsedTime(copy_time,startEvent,stopEvent)
+                    #endif
+
+                if(i_added_particles > 0) then
+
+                    if(np_active + i_added_particles >= np) then
+                        write(11,*) ' **Warning rainfall input but no paricles left'
+                        write(11,*) ' **Exiting code gracefully writing restart'
+                        ! goto 9090
+                        pme_flag = .true.
+                        return
+                    endif
+
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(startEvent,0)
+                        #endif
+
+                    call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
+                        tPB >>> (iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk)
+
+                        #if _TIMING == 1
+                        istat = cudaEventRecord(stopEvent,0)
+                        istat = cudaEventSynchronize(stopEvent)
+                        istat = cudaEventElapsedTime(add2_time,startEvent,stopEvent)
+                        #endif
+
+                    np_active = np_active + i_added_particles
+                    pid = pid + i_added_particles
+                end if
+            end if
+        end if
+
+        PET_balance = PET_balance_de
+        call MPI_Barrier(work_comm,ierr)
+
+            #if _TIMING == 1
+            ! istat = cudaEventRecord(startEvent,0)
+            t1 = mpi_wtime()
+            #endif
+
+        call MPI_ALLReduce(MPI_IN_PLACE,PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
+        ! no matter if a GPU in the work group working, it will join this reduce,
+        ! otherwise, we need one more work group which will be extra time.
+
+            #if _TIMING == 1
+            !istat = cudaEventRecord(stopEvent,0)
+            !istat = cudaEventSynchronize(stopEvent)
+            !istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
+            t2 = mpi_wtime()
+            reduce_time = (t2 - t1)*1000
+            #endif
+    end subroutine particle_pme
+end module eco_particle_pme

@@ -6,7 +6,7 @@ module utilities
     use variable_list, only: Zone_T, grid
     use variable_list, only: nx_c, ny_c, buff
     use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
-    use variable_list, only: Zonet_new, ppx, qqy
+    use variable_list, only: Zonet_new, ppx, qqy, ranknum
 
 contains
     subroutine copy_grid(map_sub)
@@ -113,7 +113,7 @@ contains
         grid_c = grid
         Zonet_new_c = Zonet_new
 
-        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
+        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum)),form='unformatted',access='stream')
             write(18) grid_c
             write(18) Zonet_new_c
         close(18)

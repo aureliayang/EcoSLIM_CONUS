@@ -37,8 +37,10 @@ contains
         Zgmax = sum(dz)
 
             #if _TIMING == 1
+        write(11,*)
         write(11,*) 'TIMING defined'
             #else
+        write(11,*)
         write(11,*) 'TIMING not defined'
             #endif
         write(11,*)
