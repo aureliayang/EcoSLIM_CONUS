@@ -8,7 +8,7 @@
 * **nCLMsoil,** Layers coupled between CLM and ParFlow
 * **ppx,** Split in x direction
 * **qqy,** Split in y direction
-* **transfer,** Transfer scheme; options are 0, 1, 2; 0 is no transfer, 1 is packed transfer, 2 is one by one transfer
+* **transfer,** Transfer scheme; options are 0, >0, <0; 0 is no transfer, >0 is packed transfer, <0 is one by one transfer, abs(transfer) is frequency
 * **separate,** Separate or not
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **(hdf5),** hdf5 I/O, coming soon, modules ready in ***test*** folder
