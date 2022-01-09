@@ -196,7 +196,7 @@ module variable_list
 
     real(8),texture,pointer:: EvapTrans_T(:,:,:),Saturation_T(:,:,:),Porosity_T(:,:,:)
     real(8),texture,pointer:: Vx_T(:,:,:),Vy_T(:,:,:),Vz_T(:,:,:),Ind_T(:,:,:),dz_T(:)
-    real(8),texture,pointer:: EvapTrans_da_T(:,:,:)
+    real(8),texture,pointer:: EvapTrans_da_T(:,:,:),CLMvars_T(:,:)
 
     real(8),allocatable,device:: PET_balance_de(:),PET_balance_da_de(:)
     ! initialization of PET_balance
@@ -372,6 +372,7 @@ contains
             EvapTrans_da_T  => EvapTrans_da_de
             Saturation_T => Saturation_de
             Porosity_T   => Porosity_de
+            CLMvars_T   => CLMvars_de
             Vx_T  => Vx_de
             Vy_T  => Vy_de
             Vz_T  => Vz_de

@@ -7,12 +7,11 @@ module eco_particle_add
     use curand_device
     use mrand, only: h   ! curand states saved in global memory
     use variable_list, only: Saturation_T, Porosity_T, P_T
-    use variable_list, only: EvapTrans_T, CLMvars_de, Ind_T
+    use variable_list, only: EvapTrans_T, CLMvars_T, Ind_T
     use variable_list, only: EvapTrans_da_T, dz_T, d_indices_T
     use variable_list, only: dx, dy, pfdt, denh2o, nind, nz
     use variable_list, only: PET_balance_de, P_de, C_de
     use variable_list, only: d_isValid
-
 
 contains
 
@@ -175,13 +174,14 @@ attributes(global) subroutine scan_new_particles(nnx1,nny1)
                 temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
             endif
 
+            tempi = ii - nnx1*nny1*(nz-1)
             if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 1
+                if(k == nz) d_isValid(tempi) = 1
                 ! only the top layer (k = nz) will introduce new particles
                 ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
                 ! it must be in the top layer.
             else
-                if(k == nz) d_isValid(ii - nnx1*nny1*(nz-1)) = 0
+                if(k == nz) d_isValid(tempi) = 0
             endif
             ! pass add_f and kk in, use if condition.
             ! but I feel too much extra work. Probably just let it calculate and we never use it,
@@ -201,10 +201,12 @@ attributes(global) subroutine add_new_particles( &
     integer,value:: iflux_p_res, np_active, pid
     integer,value:: nnx1, nny1, ix1, iy1, kk
     ! real(8),value:: denh2o
-    integer:: i, j, k, index, ij, ii, itemp, temp, Ploc(2)
-    ! real(8):: Z
+    integer:: i, j, k, ij, ii, ii_l
+    integer:: index, itemp, temp, Ploc(2)
+    real(8),shared:: P_s(256,2)
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+    ii_l = threadIdx%x
 
     if(ii <= nnx1*nny1) then
         ! get i, j from ii
@@ -223,13 +225,14 @@ attributes(global) subroutine add_new_particles( &
 
                 index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
 
-                ! P_s(ii_l,1) = P_de(index,1)
+                P_s(ii_l,1) = P_de(index,1)
+                P_s(ii_l,2) = P_de(index,2)
 
-                P_de(index,1) = dble(i-1)*dx + curand_uniform(h(index))*dx
-                P_de(index,2) = dble(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
-                P_de(index,13+2*nind) = dble(pid + d_indices_T(ii)*iflux_p_res - (ij - 1))
-                P_de(index,14+2*nind) = P_T(index,1)
-                P_de(index,15+2*nind) = P_T(index,2)
+                P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(h(index))*dx
+                P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
+                P_de(index,13+2*nind) = dble(pid + index - np_active)
+                P_de(index,14+2*nind) = P_s(ii_l,1)
+                P_de(index,15+2*nind) = P_s(ii_l,2)
 
                 !Z = 0.0d0
                 !do ik = 1, nz
@@ -241,8 +244,8 @@ attributes(global) subroutine add_new_particles( &
                 P_de(index,4) = 0.0d0 + curand_uniform(h(index))*pfdt
 
                 if (nind > 0) then
-                    Ploc(1) = floor(P_T(index,1) / dx)
-                    Ploc(2) = floor(P_T(index,2) / dy)
+                    Ploc(1) = floor(P_s(ii_l,1) / dx)
+                    Ploc(2) = floor(P_s(ii_l,2) / dy)
                     ! Ploc(3) = nz-1
 
                     itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,nz))
@@ -256,7 +259,7 @@ attributes(global) subroutine add_new_particles( &
                 P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
                             EvapTrans_da_T(i,j,k)*dx*dy*dz_T(k)*denh2o
 
-                if(CLMvars_de(i,j) > 0.d0) then ! this is snowmelt
+                if(CLMvars_T(i,j) > 0.d0) then ! this is snowmelt
                     P_de(index,7) = 3.d0 ! Snow composition
                 else
                     P_de(index,7) = 2.d0 ! Rainfall composition
@@ -266,8 +269,8 @@ attributes(global) subroutine add_new_particles( &
                 P_de(index,9)  = 1.0d0
                 P_de(index,10) = 0.0d0  ! Particle hasn't exited domain
 
-                P_de(index,1) = P_T(index,1) + dble(ix1)*dx
-                P_de(index,2) = P_T(index,2) + dble(iy1)*dy
+                P_de(index,1) = P_s(ii_l,1) + dble(ix1)*dx
+                P_de(index,2) = P_s(ii_l,2) + dble(iy1)*dy
             enddo
         endif
     endif
