@@ -2,10 +2,11 @@ module eco_updateC_sortP
     use thrust
     use cudafor
     use eco_compact_util
-    use variable_list, only: N_exit, holes, P, P_exit
-    use variable_list, only: P_de, d_isValid, d_indices, P_T, C_de
-    use variable_list, only: ix1, iy1, nind_c, tPB
-    use variable_list, only: np_active, ranknum, filenum
+    use variable_list, only: N_exit, holes, P_exit
+    use variable_list, only: P_de, P_T, C_de
+    use variable_list, only: d_isValid, d_indices
+    use variable_list, only: ix1, iy1, nattri_c, tPB
+    use variable_list, only: np_active
     use variable_list, only: exit_time, C_time
     use variable_list, only: startEvent, stopEvent
     use variable_list, only: mean_age_de,mean_comp_de,total_mass_de
@@ -44,11 +45,13 @@ contains
             N_exit = np_active - temp
 
             if(N_exit > 0) then
-                allocate(holes(N_exit),P_exit(N_exit,17+2*nind_c))
+                allocate(holes(N_exit),P_exit(N_exit,nattri_c))
                 ! P_exit has to be deallocated after the use in main
                 call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,np_active)
                 call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(holes,P_exit,N_exit)
+                ! add output to binary file here. P_exit is managed.
+
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,0,np_active)
                 ! update the slots after np_active
@@ -67,8 +70,6 @@ contains
     attributes(global) subroutine Update_C_Array(ix1_m,iy1_m,np_active_m)
 
         implicit none
-        ! real(8),intent(inout):: P(:,:)
-        ! real(8),intent(inout):: mean_age(:),total_mass(:),mean_comp(:)
         integer,parameter:: tPB = 256
         integer,value:: ix1_m,iy1_m,np_active_m
         integer:: Ploc(3), ii, k, ii_s !5

@@ -4,13 +4,10 @@ module eco_particle_exch2
     use eco_compact_util
     use eco_particle_loop
     use variable_list, only: N_recv, N_send, N_peri, N_inte, N_exit
-    use variable_list, only: neigh_list
-    ! neigh_list is allocated after getting the number of total GPUs.
-    ! It is 1 if neighbor exists while 0 if neighbor doesn't exist.
-    ! N_send has the same length of neigh_list and was built one by one.
-    ! N_recv is allocated or deallocated after initialization/update of grid.
-    ! N_recv has the length of its neighbors and has been initialized as 0.
-    use variable_list, only: holes, P_send, P_recv, P, P_exit
+    use variable_list, only: neigh_list, nattri_c
+    ! neigh_list is 1 if neighbor exists while 0 if neighbor doesn't exist.
+
+    use variable_list, only: holes, P_send, P_recv
     use variable_list, only: P_de, d_isValid, d_indices
     use variable_list, only: ix1, iy1, nnx1, nny1, reflect
     use variable_list, only: rank, t_rank, nind_c, tPB
@@ -31,7 +28,7 @@ contains
         integer:: i, j, ierr, status(MPI_STATUS_SIZE,tPB)
         integer:: nc1, nc2, nc3, nc4, nc5, nc6, rq1(tPB), &
                   rq2(tPB), rq3(tPB), rq4(tPB)
-        integer:: left, right, nattri_c, sum_recv, sum_send
+        integer:: left, right, sum_recv, sum_send
         integer:: istat, temp
         real:: tran_t1, tran_t2, tran_t3, tran_t4, tran_t5
         real:: tran_t6, tran_t7, tran_t8, tran_t9, tran_t10
@@ -57,8 +54,6 @@ contains
         tran_time6=0.; tran_time7=0.; tran_time8=0.; tran_time9=0.; tran_time10=0.
             #endif
 
-        nattri_c = 17 + 2*nind_c
-        nattri = nattri_c
         sum_send = sum(N_send)
 
         nc1 = 0; nc3 = 0

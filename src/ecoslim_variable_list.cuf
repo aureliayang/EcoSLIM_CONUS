@@ -67,7 +67,7 @@ module variable_list
     real(8):: dx_c, dy_c, pfdt_c, dtfrac_c, denh2o_c, moldiff_c
 
     integer,constant:: nattri, nind, nx, ny, nz
-    integer:: nind_c
+    integer:: nattri_c, nind_c
 
     integer:: pft1, pft2, tout1, pfnt, n_cycle
     ! parflow start and stop file numbers number of ParFlow timesteps
@@ -205,7 +205,8 @@ module variable_list
     real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
     real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),total_mass_de(:)
 
-    real(8),allocatable,device:: P_exit(:,:),P_send(:),P_recv(:)
+    real(8),allocatable,device:: P_send(:),P_recv(:)
+    real(8),allocatable,managed:: P_exit(:,:)
 
     integer,allocatable,device,target:: d_isValid(:),d_indices(:),holes(:)
     integer,texture,pointer:: d_isValid_T(:),d_indices_T(:)
@@ -246,7 +247,10 @@ contains
         allocate(grid(ppx*qqy,4),neigh_list(ppx*qqy))
         allocate(work_ranks(t_rank),nump(t_rank),rq1(t_rank))
         allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,t_rank),c_GPU(ppx*qqy))
-        allocate(N_send(ppx*qqy),N_recv(t_rank)) ! not sure, double-check
+        allocate(N_send(ppx*qqy),N_recv(t_rank))
+        ! N_send means, on each rank, it only sends particles to the initial GPUs
+        ! N_recv means, on each rank, it receives particles from all rank.
+        ! However, N_recv has no use on secondary ranks/GPUs.
         allocate(d_isValid(np),d_indices(np),h(np))
 
         allocate(out_np_cpu(1),ET_np_cpu(1))
@@ -278,7 +282,10 @@ contains
         PET_balance = 0.0d0
         PET_balance_da = 0.0d0
 
-        allocate(P(np,17+nind_c*2),P_de(np,17+nind_c*2))
+        nattri_c = 17 + 2*nind_c
+        nattri = nattri_c
+
+        allocate(P(np,nattri_c),P_de(np,nattri_c))
         P = 0.d0    ! clear out all particle attributes
         P(1:np,7:9) = 1.d0
         ! make all particles active to start with and original from 1 = GW/IC
@@ -291,7 +298,8 @@ contains
         d_isValid_T => d_isValid
         d_indices_T => d_indices
 
-        allocate(P_send(tPB*(17+nind_c*2)),P_recv(tPB*(17+nind_c*2)))
+        allocate(P_send(tPB*nattri_c),P_recv(tPB*nattri_c))
+        ! if send and recv larger than 256??? add some if condition
 
         allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
         allocate(p_num(nx_c,ny_c),c_sum(max(nx_c,ny_c)))
