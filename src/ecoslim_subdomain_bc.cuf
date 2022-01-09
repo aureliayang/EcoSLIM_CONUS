@@ -36,18 +36,17 @@ contains
         ! end do
         Zgmax = sum(dz)
 
-        open(17,file='Load_info.'//trim(adjustl(ranknum))//'.txt')
             #if _TIMING == 1
-        write(17,*) 'TIMING defined'
+        write(11,*) 'TIMING defined'
             #else
-        write(17,*) 'TIMING not defined'
+        write(11,*) 'TIMING not defined'
             #endif
-        write(17,*)
-        write(17,*) '## Domain Info'
-        write(17,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
-        write(17,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
-        write(17,'("Zmin:",e12.5," Zmax:",e12.5)') Zgmin, Zgmax
-        write(17,*)
+        write(11,*)
+        write(11,*) '## Domain Info'
+        write(11,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
+        write(11,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
+        write(11,'("Zmin:",e12.5," Zmax:",e12.5)') Zgmin, Zgmax
+        write(11,*)
 
     end subroutine global_xyz
 

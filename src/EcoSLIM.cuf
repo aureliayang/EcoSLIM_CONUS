@@ -113,22 +113,20 @@ program EcoSLIM
     ! read DEM file name
     read(10,*) DEMname
 
-    if(rank == 0) then
-        ! open/create/write the output log.txt file. If doesn't exist, it's created.
-        open(11,file=trim(runname)//'_log.txt')
-        write(11,*) '### EcoSLIM Log File'
-        write(11,*)
-        write(11,*) 'run name:',trim(runname)
-        write(11,*)
-        write(11,*) 'ParFlow run name:',trim(pname)
-        write(11,*)
-        if (DEMname /= '') then
-            write(11,*) 'ParFlow DEM name:',trim(DEMname)
-        else
-            write(11,*) 'Not reading ParFlow DEM'
-        end if
-        write(11,*)
-    endif ! rank = 0, write logfile through channel 11
+    ! open/create/write the output log.txt file. If doesn't exist, it's created.
+    open(11,file=trim(runname)//'_log.'//trim(adjustl(ranknum))//'.txt')
+    write(11,*) '### EcoSLIM Log File'
+    write(11,*)
+    write(11,*) 'run name:',trim(runname)
+    write(11,*)
+    write(11,*) 'ParFlow run name:',trim(pname)
+    write(11,*)
+    if (DEMname /= '') then
+        write(11,*) 'ParFlow DEM name:',trim(DEMname)
+    else
+        write(11,*) 'Not reading ParFlow DEM'
+    end if
+    write(11,*)
 
     ! read domain number of cells and number of particles to be injected
     read(10,*) nx_c
@@ -150,25 +148,23 @@ program EcoSLIM
     ! read in the number of particles total
     read(10,*) np
 
-    if(rank == 0) then
-        ! check to make sure we don't assign more particles for IC than we have allocated
-        ! in total
-        if (np_ic > np) then
-            write(11,*) 'warning NP_IC greater than IC'
-            np = np_ic
-        end if
-        ! write nx, ny, nz, and np in the log file
-        write(11,*) 'Grid information'
-        write(11,*) 'nx:',nx_c
-        write(11,*) 'ny:',ny_c
-        write(11,*) 'nz:',nz_c
-        write(11,*)
-        write(11,*) 'Particle IC Information'
-        write(11,*) 'np IC:',np_ic
-        if (np_ic == -1) &
-        write(11,*) 'Reading particle restart file:',trim(runname)//'_particle_restart.bin'
-        write(11,*) 'np:',np
-    endif ! rank=0
+    ! check to make sure we don't assign more particles for IC than we have allocated
+    ! in total
+    if (np_ic > np) then
+        write(11,*) 'warning NP_IC greater than IC'
+        np = np_ic
+    end if
+    ! write nx, ny, nz, and np in the log file
+    write(11,*) 'Grid information'
+    write(11,*) 'nx:',nx_c
+    write(11,*) 'ny:',ny_c
+    write(11,*) 'nz:',nz_c
+    write(11,*)
+    write(11,*) 'Particle IC Information'
+    write(11,*) 'np IC:',np_ic
+    if (np_ic == -1) &
+    write(11,*) 'Reading particle restart file:',trim(runname)//'_particle_restart.bin'
+    write(11,*) 'np:',np
 
     ! nCLMsoil = 10 ! number of CLM soil layers over the root zone !this doesn't matter
     nzclm = 13 + nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables not domain NZ,
@@ -234,46 +230,40 @@ program EcoSLIM
     read(10,*) dtfrac_c
     dtfrac = dtfrac_c
 
-    if(rank == 0) then
-        ! wite out log file
-        write(11,*)
-        write(11,*) 'Grid Dimensions'
-        write(11,'(" dx:",e12.5)') dx_c
-        write(11,'(" dy:",e12.5)') dy_c
-        write(11,'(" dz:",*(e12.5,", "))') dz(1:nz_c)
-        write(11,*)
-        write(11,*) 'Timestepping Information'
-        write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt_c
-        write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
-        write(11,'(" ParFlow start step, pft1:",i12)') pft1
-        write(11,'(" ParFlow end step, pft2:",i12)') pft2
-        write(11,'(" Output step start:",i12)') outkk
-        write(11,'(" Time loops, cycles, n_cycle:",i12)') n_cycle
-        write(11,'(" Total time steps:",i12)') pfnt
+    ! wite out log file
+    write(11,*)
+    write(11,*) 'Grid Dimensions'
+    write(11,'(" dx:",e12.5)') dx_c
+    write(11,'(" dy:",e12.5)') dy_c
+    write(11,'(" dz:",*(e12.5,", "))') dz(1:nz_c)
+    write(11,*)
+    write(11,*) 'Timestepping Information'
+    write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt_c
+    write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
+    write(11,'(" ParFlow start step, pft1:",i12)') pft1
+    write(11,'(" ParFlow end step, pft2:",i12)') pft2
+    write(11,'(" Output step start:",i12)') outkk
+    write(11,'(" Time loops, cycles, n_cycle:",i12)') n_cycle
+    write(11,'(" Total time steps:",i12)') pfnt
 
-        write(11,*)
-        write(11,*) 'V mult: ',V_mult,' for forward/backward particle tracking'
-        write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
-        write(11,*)
-        write(11,*) 'Physical Constants'
-        write(11,*) 'denh2o: ',denh2o_c,' M/L^3'
-        write(11,*) 'Molecular Diffusivity: ',moldiff_c,' '
-        !write(11,*) 'Fractionation: ',Efract,' '
-        write(11,*)
-        write(11,*) 'Numerical Stability Information'
-        write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac_c
-    endif
+    write(11,*)
+    write(11,*) 'V mult: ',V_mult,' for forward/backward particle tracking'
+    write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
+    write(11,*)
+    write(11,*) 'Physical Constants'
+    write(11,*) 'denh2o: ',denh2o_c,' M/L^3'
+    write(11,*) 'Molecular Diffusivity: ',moldiff_c,' '
+    !write(11,*) 'Fractionation: ',Efract,' '
+    write(11,*)
+    write(11,*) 'Numerical Stability Information'
+    write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac_c
 
     read(10,*) nind_c
     nind = nind_c
     read(10,*) Indname
-    if(rank == 0) then
-        write(11,*)
-        write(11,*) 'Indicator File'
-        write(11,*) nind_c, 'Indicators'
-        flush(11)
-        close(11)
-    endif
+    write(11,*)
+    write(11,*) 'Indicator File'
+    write(11,*) nind_c, 'Indicators'
 
     ! end of SLIM input
     close(10)
@@ -292,6 +282,7 @@ program EcoSLIM
 
 !--------------------------------------------------------------------
     ! define the dynamic working group
+    ! restart ???
     do i = 1, t_rank
         work_ranks(i) = i - 1
     end do
@@ -379,6 +370,7 @@ program EcoSLIM
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
             Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
             Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+
             Saturation_de = Saturation
                 ! allocate(h_cpu(np))
                 ! h_cpu = h
@@ -404,8 +396,8 @@ program EcoSLIM
             pid = np_active
 
             if (np_active >= np) then
-                write(17,*) ' **Warning IC input but no paricles left'
-                write(17,*) ' **Exiting code gracefully writing restart'
+                write(11,*) ' **Warning IC input but no paricles left'
+                write(11,*) ' **Exiting code gracefully writing restart'
                 goto 9090
             endif
 
@@ -421,13 +413,15 @@ program EcoSLIM
     end if
     ! if the initial number of GPUs equals the total number, this will be skipped.
 
+    open(17,file='Timing_info.'//trim(adjustl(ranknum))//'.txt')
+
+    open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin')
+
     open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
     write(20,*) ' **** Transient Simulation Particle Accounting ****'
     write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass &
                   PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered &
-                  N_peri N_inte N_exit sum(N_send) sum(N_recv)'
-
-    open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin')
+                  N_peripheric N_interior N_exit sum_send sum_recv'
 
     if(rank == 0) then
 
@@ -636,8 +630,8 @@ program EcoSLIM
                         if(i_added_particles > 0) then
 
                             if(np_active + i_added_particles >= np) then
-                                write(17,*) ' **Warning rainfall input but no paricles left'
-                                write(17,*) ' **Exiting code gracefully writing restart'
+                                write(11,*) ' **Warning rainfall input but no paricles left'
+                                write(11,*) ' **Exiting code gracefully writing restart'
                                 goto 9090
                             endif
 
@@ -778,39 +772,38 @@ program EcoSLIM
     istat = cudaEventDestroy(startEvent)
     istat = cudaEventDestroy(stopEvent)
 
-    write(17,*)
-    write(17,*) '###  Execution Finished'
-    write(17,*)
-    write(17,*) 'Simulation Timing and Profiling:'
-    write(17,'("Total Execution Time (s):",e12.5)') Total_time2 - Total_time1
-    !write(17,'("File IO Time Read (s):",e12.5)') IO_time_read
-    !write(17,'("Host to device data transfer (s):",e12.5)') h2d_time
-    !write(17,'("Add new particles (s):",e12.5)') add_time
-    !write(17,'("Peripheric particles (s):",e12.5)') peri_time/1000.
-    !write(17,'("Interior particles (s):",e12.5)') inte_time/1000.
-    !write(17,'("Update C array (s):",e12.5)') C_time/1000.
-    !write(17,'("Exit particles (s):",e12.5)') exit_time/1000.
-    !write(17,'("Particles separation (s):",e12.5)') sort_time
-    !write(17,'("Transfer particles (s):",e12.5)') transfer_time/1000.
-    !write(17,'("scan (s):",e12.5)') scan_time/1000.
-    !write(17,'("thrust (s):",e12.5)') thrust_time/1000.
-    !write(17,'("copy (s):",e12.5)') copy_time/1000.
-    !write(17,'("add (s):",e12.5)') add2_time/1000.
-    !Write(17,'("File IO Time Write (s):",e12.5)') float(IO_time_write)/1000.
-    !Write(17,'("Parallel Particle Time (s):",e12.5)') float(parallel_time)/1000.
-    !write(17,*)
+    write(11,*)
+    write(11,*) '###  Execution Finished'
+    write(11,*)
+    write(11,*) 'Simulation Timing and Profiling:'
+    write(11,'("Total Execution Time (s):",e12.5)') Total_time2 - Total_time1
+    !write(11,'("File IO Time Read (s):",e12.5)') IO_time_read
+    !write(11,'("Host to device data transfer (s):",e12.5)') h2d_time
+    !write(11,'("Add new particles (s):",e12.5)') add_time
+    !write(11,'("Peripheric particles (s):",e12.5)') peri_time/1000.
+    !write(11,'("Interior particles (s):",e12.5)') inte_time/1000.
+    !write(11,'("Update C array (s):",e12.5)') C_time/1000.
+    !write(11,'("Exit particles (s):",e12.5)') exit_time/1000.
+    !write(11,'("Particles separation (s):",e12.5)') sort_time
+    !write(11,'("Transfer particles (s):",e12.5)') transfer_time/1000.
+    !write(11,'("scan (s):",e12.5)') scan_time/1000.
+    !write(11,'("thrust (s):",e12.5)') thrust_time/1000.
+    !write(11,'("copy (s):",e12.5)') copy_time/1000.
+    !write(11,'("add (s):",e12.5)') add2_time/1000.
+    !Write(11,'("File IO Time Write (s):",e12.5)') float(IO_time_write)/1000.
+    !Write(11,'("Parallel Particle Time (s):",e12.5)') float(parallel_time)/1000.
+    !write(11,*)
 
     if(rank == 0) then
         flush(13);close(13)
         flush(15);close(15)
         flush(16);close(16)
     end if
+    flush(11);close(11)
     flush(17);close(17)
     flush(19);close(19)
     flush(20);close(20)
     flush(30);close(30)
-    ! be careful here? some ranks might not have these files
-    ! 17 is opened on ecoslim_subdomain_bc.cuf
 
     ! call close_hdf5_interface()
     if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm, ierr)
