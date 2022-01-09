@@ -11,6 +11,7 @@
 * **transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is one by one transfer, abs(transfer) is frequency
 * **separate,** Separate or not
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
+* **th_value,** the threshold to start a new GPU
 * **(hdf5),** hdf5 I/O, coming soon, modules ready in ***test*** folder
 * **np_ic,** Number of particles per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
