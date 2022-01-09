@@ -5,17 +5,19 @@ module eco_updateC_sortP
     use variable_list, only: N_exit, holes, P_exit
     use variable_list, only: P_de, P_T, C_de
     use variable_list, only: d_isValid, d_indices
-    use variable_list, only: ix1, iy1, nattri_c, tPB
-    use variable_list, only: np_active
+    use variable_list, only: ix1, iy1, tPB
+    use variable_list, only: np_active, nattri_c, nind_c
     use variable_list, only: exit_time, C_time
     use variable_list, only: startEvent, stopEvent
     use variable_list, only: mean_age_de,mean_comp_de,total_mass_de
     use variable_list, only: dx, dy, nz, dz_T
+    use variable_list, only: Time_Next, kk
 
 contains
     subroutine Update_Sort()
         implicit none
         integer:: istat, temp
+        integer:: i, j
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
@@ -50,7 +52,11 @@ contains
                 call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,np_active)
                 call select2exit<<<ceiling(dble(N_exit)/tPB),tPB>>>(holes,P_exit,N_exit)
+
                 ! add output to binary file here. P_exit is managed.
+                ! not easy to write two parts of the attributes, so output all
+                P_exit(:,13+2*nind_c) = Time_Next(kk)
+                write(19) ((P_exit(i,j),j=1,nattri_c),i=1,N_exit)
 
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,0,np_active)

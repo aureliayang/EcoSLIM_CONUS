@@ -157,16 +157,4 @@ contains
         end if
     end subroutine read_restarts
 
-    subroutine read_Zone_de()
-        implicit none
-
-        if (rank /= ppx*qqy) then
-            write(ranknum,'(i5.5)') rank
-            open(18,file='Zone_de_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
-                ! read(18) Zone_de
-            close(18)  ! Zone_de
-        endif
-
-    end subroutine read_Zone_de
-
 end module subdomain_bound

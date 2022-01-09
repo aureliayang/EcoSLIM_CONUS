@@ -6,6 +6,7 @@ module utilities
     use variable_list, only: Zone_T, grid
     use variable_list, only: nx_c, ny_c, buff
     use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
+    use variable_list, only: Zonet_new, ppx, qqy
 
 contains
     subroutine copy_grid(map_sub)
@@ -86,5 +87,42 @@ contains
 
         if(ii <= t_rank_m .and. neigh_list_m(ii) > 0) neigh_list_m(ii) = 1
     end subroutine scan_zone
+
+    subroutine read_grid_Zone()
+        implicit none
+
+        integer:: Zonet_new_c(-buff+1:nx_c+buff,-buff+1:ny_c+buff)
+        integer:: grid_c(ppx*qqy,4)
+
+        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
+            read(18) grid_c
+            read(18) Zonet_new_c
+        close(18)
+
+        grid = grid_c
+        Zonet_new = Zonet_new_c
+
+    end subroutine read_grid_Zone
+
+    subroutine write_grid_Zone()
+        implicit none
+
+        integer:: Zonet_new_c(-buff+1:nx_c+buff,-buff+1:ny_c+buff)
+        integer:: grid_c(ppx*qqy,4)
+
+        grid_c = grid
+        Zonet_new_c = Zonet_new
+
+        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
+            write(18) grid_c
+            write(18) Zonet_new_c
+        close(18)
+
+    end subroutine write_grid_Zone
+
+    ! write/read P
+    ! max_rank
+    ! GPUs three arrays
+    ! map_sub
 
 end module utilities

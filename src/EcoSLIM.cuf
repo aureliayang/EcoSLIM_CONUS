@@ -315,9 +315,11 @@ program EcoSLIM
     end if
 !--------------------------------------------------------------------
     if(np_ic /= -1) call gridinfo()
+    if(np_ic == -1) call read_grid_Zone()
     ! if not restart, we do decompostion and build topology
     ! gridinfo is to get grid and Zonet_new
     ! if restart, read grid and Zonet_new in
+    ! we want to restart at n*add_f, and also 8760/m since we want results of a year
 
     if (work_comm /= MPI_COMM_NULL) then
         ! if(np_ic /= -1) then
@@ -411,6 +413,9 @@ program EcoSLIM
             (np_ic,tout1,nnx1,nny1,ix1,iy1)
 
         end if
+
+        if(np_ic == -1) then
+        end if
     else !if(rank >= max_rank+1 .and. rank < t_rank) then
         call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
     end if
@@ -419,7 +424,8 @@ program EcoSLIM
     open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
     write(20,*) ' **** Transient Simulation Particle Accounting ****'
     write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass Total_Mass &
-                PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered'
+                  PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered &
+                  N_peri N_inte N_exit sum(N_send) sum(N_recv)'
 
     open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin')
 
