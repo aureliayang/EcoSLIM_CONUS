@@ -29,9 +29,11 @@ program EcoSLIM
     use eco_compact_util
     use eco_updateC_sortP
     use eco_read_input
+    use eco_working_comm
     use eco_particle_loop
     use eco_particle_add
     use eco_particle_pme
+    use eco_particle_init
     use eco_particle_exch1
     use eco_particle_exch2
     use eco_particle_lb
@@ -45,7 +47,7 @@ program EcoSLIM
     real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
     integer:: istat
-    logical:: separ_flag, pme_flag
+    logical:: separ_flag, pme_flag, fore_flag
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -69,29 +71,7 @@ program EcoSLIM
     call MPI_FILE_CLOSE(fh0, ierr)
 
 !--------------------------------------------------------------------
-    ! How to do timing is also a new question when we do asyn later.
-    ! Set up timing
-    Total_time1 = 0.d0
-    Total_time2 = 0.d0
-    t1 = 0.d0
-    t2 = 0.d0
-
-    IO_time_write = 0.d0
-    parallel_time = 0.d0
-
-    IO_time_read = 0.
-    h2d_time = 0.
-    d2h_time = 0.
-
-    peri_time = 0.
-    inte_time = 0.
-    exit_time = 0.
-    C_time    = 0.
-
-    scan_time   = 0.
-    copy_time   = 0.
-    add2_time   = 0.
-    thrust_time = 0.
+    call initialize_time()
 
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
@@ -115,30 +95,7 @@ program EcoSLIM
     call global_xyz()
     ! restart file info inside, so have to call it before restart.
 
-!--------------------------------------------------------------------
-    ! define the dynamic working group
-    ! restart ???
-    do i = 1, t_rank
-        work_ranks(i) = i - 1
-    end do
-    max_rank = ppx*qqy - 1  ! the maximum rank number of current work group
-    call MPI_COMM_GROUP(MPI_COMM_WORLD,world_group,ierr)
-    call MPI_GROUP_INCL(world_group,max_rank+1,work_ranks(1:max_rank+1),work_group,ierr)
-    call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)
-
-    do i = 1, ppx*qqy
-        t_GPUs(i) = 1
-        l_GPUs(i,t_GPUs(i)) = i-1
-        c_GPU(i) = l_GPUs(i,t_GPUs(i))
-    end do
-    ! all GPUs have this information
-
-    if(rank < ppx*qqy) then
-        map_sub = rank
-    else
-        map_sub = -1
-        ! to make sure the new GPU started correctly
-    end if
+    call working_comm()
 !--------------------------------------------------------------------
     if(np_ic /= -1) call gridinfo()
     if(np_ic == -1) call read_grid_Zone()
@@ -151,52 +108,14 @@ program EcoSLIM
         ! if(np_ic /= -1) then
 
         call copy_grid(map_sub) ! doing this on workers
-            ! open(10,file='topology.'//trim(adjustl(ranknum)))
-            !     write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
-            !     write(10,'(8(i3,1x))') ix2-ix1+1,ix2-ix1+nnx2,iy2-iy1+1,iy2-iy1+nny2
-            ! close(10)
 
         call alloc_arrays_temp(Porosity_cpu) ! doing this on workers
-            ! open(10,file='Zone_de_before.'//trim(adjustl(ranknum)))
-            !     write(10,'(8(12(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            ! close(10)
-
-            open(10,file='Zone_de_after.'//trim(adjustl(ranknum))//'.txt')
-                !if(rank == 0) &
-                !    write(10,'(462(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                !if(rank == 1) &
-                !    write(10,'(463(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                !if(rank == 2) &
-                !    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                !if(rank == 3) &
-                !    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 0) &
-                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 1) &
-                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 2) &
-                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-                if(rank == 3) &
-                write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            close(10)
 
         ! end if
         call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
             tPB >>> (nnx1,nny1,buff,neigh_list,rank,ppx*qqy)
 
-                ! open(10,file='Neighbor.'//trim(adjustl(ranknum)))
-                !     write(10,*) neigh_list
-                !     write(10,*) N_recv
-                ! close(10)
-        !--------------------------------------------------------------------
         call local_xyz()
-            ! open(10,file='Local_range.'//trim(adjustl(ranknum))//'.txt')
-            !     write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-            !     write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-            !     write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-            !     write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
-            ! close(10)
-
         !--------------------------------------------------------------------
         if(np_ic /= -1) then
             ! Saturation = 0.8d0
@@ -218,59 +137,23 @@ program EcoSLIM
 
         ! Define initial particles' locations and mass
         if (np_ic > 0)  then
-            np_active = 0
-            pid = 0
-
-            call scan_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB), &
-            tPB >>> (nnx1,nny1)
-
-            call thrustscan(d_isValid,nnx1*nny1*nz_c,d_indices)
-
-            np_active = d_indices(nnx1*nny1*nz_c)
-            np_active = np_ic*np_active
-            pid = np_active
-
-            if (np_active >= np) then
-                write(11,*) ' **Warning IC input but no paricles left'
-                write(11,*) ' **Exiting code gracefully writing restart'
-                goto 9090
-            endif
-
-            call add_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> &
-            (np_ic,tout1,nnx1,nny1,ix1,iy1)
-
+            fore_flag = .false.
+            call initial_forward(fore_flag)
+            if(fore_flag) goto 9090
         end if
 
         if(np_ic == -1) then
         end if
+
+        if(np_ic < -1) then
+        end if
+
     else !if(rank >= max_rank+1 .and. rank < t_rank) then
         call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
     end if
     ! if the initial number of GPUs equals the total number, this will be skipped.
 
-    open(17,file='Timing_info.'//trim(adjustl(ranknum))//'.txt')
-
-    open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin', &
-    form='unformatted',access='stream')
-
-    open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
-    write(20,*) ' **** Transient Simulation Particle Accounting ****'
-    write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass &
-                  Total_Mass PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered &
-                  N_peripheric N_interior N_exit sum_send sum_recv'
-
-    if(rank == 0) then
-
-        open(13,file=trim(runname)//'_ET_output.txt')
-        write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
-
-        open(15,file=trim(runname)//'_flow_output.txt')
-        write(15,*) 'TIME Out_age Out_comp1 outcomp2 outcomp3 Out_mass Out_NP'
-
-        open(16,file=trim(runname)//'_PET_balance.txt')
-        write(16,*) 'TIME P[kg] ET[kg]'
-
-    endif
+    call file_open()
 
     ! Intialize cuRand device API and this part need to check through again.
     call createRand_loop<<< ceiling(dble(np)/tPB),tPB >>> (np, rank, pfnt)
@@ -281,246 +164,242 @@ program EcoSLIM
 
     do kk = outkk, pfnt
 
-    if(work_comm /= MPI_COMM_NULL) then
+        if(work_comm /= MPI_COMM_NULL) then
 
-        ! reset ParFlow counter for cycles
-        if (mod((kk-1),(pft2-pft1+1)) == 0)  pfkk = pft1 - 1
+            ! reset ParFlow counter for cycles
+            if (mod((kk-1),(pft2-pft1+1)) == 0)  pfkk = pft1 - 1
 
-        ! adjust the file counters
-        pfkk = pfkk + 1
+            ! adjust the file counters
+            pfkk = pfkk + 1
 
-            #if _TIMING == 1
-            istat = cudaEventRecord(startEvent,0)
-            #endif
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
 
-        ! Read the velocities computed by ParFlow
-        write(filenum,'(i5.5)') pfkk
+            ! Read the velocities computed by ParFlow
+            write(filenum,'(i5.5)') pfkk
 
-        !fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
-        !call read_h5_file(Vx,1)
-        !Vx = 240.d0
-        fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
-        Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c) = &
-        Vx_cpu(ix2+1:ix2+nnx2+1,iy2+1:iy2+nny2,1:nz_c)
+            !fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
+            !call read_h5_file(Vx,1)
+            !Vx = 240.d0
+            fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
+            call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
+            Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c) = &
+            Vx_cpu(ix2+1:ix2+nnx2+1,iy2+1:iy2+nny2,1:nz_c)
 
-        !fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
-        !call read_h5_file(Vy,2)
-        !Vy = 240.d0
-        fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
-        Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c) = &
-        Vy_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2+1,1:nz_c)
+            !fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
+            !call read_h5_file(Vy,2)
+            !Vy = 240.d0
+            fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
+            call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
+            Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c) = &
+            Vy_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2+1,1:nz_c)
 
-        !fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
-        !call read_h5_file(Vz,3)
-        !Vz = 0.d0
-        fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
-        Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1) = &
-        Vz_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,1:nz_c+1)
+            !fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
+            !call read_h5_file(Vz,3)
+            !Vz = 0.d0
+            fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
+            call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
+            Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1) = &
+            Vz_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,1:nz_c+1)
 
-        !fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
-        !call read_h5_file(Saturation,0)
-        !Saturation = 0.8d0
-        fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
-        call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
-        Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-        Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+            !fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
+            !call read_h5_file(Saturation,0)
+            !Saturation = 0.8d0
+            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
+            call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
+            Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
+            Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
-        if (clmtrans) then
-            ! Read in the Evap_Trans
-            ! fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
-            ! call read_h5_file(EvapTrans,0)
-            ! EvapTrans = 0.d0
-            ! EvapTrans(2,:,1) = 1.d-8
-            fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
-            call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
-            EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-            EvapTrans_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+            if (clmtrans) then
+                ! Read in the Evap_Trans
+                ! fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
+                ! call read_h5_file(EvapTrans,0)
+                ! EvapTrans = 0.d0
+                ! EvapTrans(2,:,1) = 1.d-8
+                fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
+                call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
+                EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
+                EvapTrans_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
-            if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
-            where (EvapTrans > 0.d0) EvapTrans_da = EvapTrans_da + EvapTrans
-            ! LB has to be n*add_f??? yes!
+                if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
+                where (EvapTrans > 0.d0) EvapTrans_da = EvapTrans_da + EvapTrans
+                ! LB has to be n*add_f??? yes!
 
-            if (clmfile) then
-                ! Read in CLM output file @RMM to do make this input
-                ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
-                ! call read_h5_file(CLMvars,5)
-                CLMvars = 0.d0
-                ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
-                ! call pfb_read(CLMvars_cpu,fname,nx,ny,nzclm)
-                ! CLMvars(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-                ! CLMvars_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+                if (clmfile) then
+                    ! Read in CLM output file @RMM to do make this input
+                    ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
+                    ! call read_h5_file(CLMvars,5)
+                    CLMvars = 0.d0
+                    ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
+                    ! call pfb_read(CLMvars_cpu,fname,nx,ny,nzclm)
+                    ! CLMvars(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
+                    ! CLMvars_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
 
+                end if
             end if
-        end if
 
-            #if _TIMING == 1
-            istat = cudaEventRecord(stopEvent,0)
-            istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(IO_time_read,startEvent,stopEvent)
-            #endif
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(IO_time_read,startEvent,stopEvent)
+                #endif
 
-        ! Determine whether to perform forward or backward patricle tracking
-        Vx = Vx * V_mult
-        Vy = Vy * V_mult
-        Vz = Vz * V_mult
+            ! Determine whether to perform forward or backward patricle tracking
+            Vx = Vx * V_mult
+            Vy = Vy * V_mult
+            Vz = Vz * V_mult
 
-            #if _TIMING == 1
-            istat = cudaEventRecord(startEvent,0)
-            #endif
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
 
-        Vx_de = Vx
-        Vy_de = Vy
-        Vz_de = Vz
-        Saturation_de = Saturation
-        EvapTrans_de  = EvapTrans
-        if (mod(kk,add_f) == 0) EvapTrans_da_de = EvapTrans_da
-        CLMvars_de    = CLMvars(:,:,11)
-        ! probably this can be deallocated after adding of particles
-        ! Now just think about the hourly add of particles.
+            Vx_de = Vx
+            Vy_de = Vy
+            Vz_de = Vz
+            Saturation_de = Saturation
+            EvapTrans_de  = EvapTrans
+            if (mod(kk,add_f) == 0) EvapTrans_da_de = EvapTrans_da
+            CLMvars_de    = CLMvars(:,:,11)
+            ! probably this can be deallocated after adding of particles
+            ! Now just think about the hourly add of particles.
 
-        out_age_de  = 0.d0
-        out_mass_de = 0.d0
-        out_comp_de = 0.d0
-        out_np_de   = 0
+            out_age_de  = 0.d0
+            out_mass_de = 0.d0
+            out_comp_de = 0.d0
+            out_np_de   = 0
 
-        et_age_de  = 0.d0
-        et_mass_de = 0.d0
-        et_comp_de = 0.d0
-        et_np_de   = 0
+            et_age_de  = 0.d0
+            et_mass_de = 0.d0
+            et_comp_de = 0.d0
+            et_np_de   = 0
 
-        mean_age_de    = 0.d0
-        mean_comp_de   = 0.d0
-        total_mass_de  = 0.d0
-        PET_balance_de = 0.d0
+            mean_age_de    = 0.d0
+            mean_comp_de   = 0.d0
+            total_mass_de  = 0.d0
+            PET_balance_de = 0.d0
 
-        C_de = 0.d0
-        ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
-        ! the following adding of particles.
+            C_de = 0.d0
+            ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
+            ! the following adding of particles.
 
-        N_send = 0
-        N_recv = 0
+            N_send = 0
+            N_recv = 0
 
-            #if _TIMING == 1
-            istat = cudaEventRecord(stopEvent,0)
-            istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
-            #endif
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
+                #endif
 
-        !----------------------------------------
+            !----------------------------------------
 
-        if (clmtrans) then
-            if (np_active < np) then
-                pme_flag = .false.
-                call particle_pme(pme_flag)
-                if(pme_flag) exit
+            if (clmtrans) then
+                if (np_active < np) then
+                    pme_flag = .false.
+                    call particle_pme(pme_flag)
+                    if(pme_flag) exit
+                end if
             end if
-        end if
 
-        !----------------------------------------
-        ! If you don't physically separate the particles, the interior and peripheric particles
-        ! are mixed in the array, the thrustscan and movement of interior particles may happen at
-        ! the same time, but they are all read-only operations, so it doesn't matter.
-        !!!!! ****since add_f is large, after new GPU is added, in the following add_f steps, in fact,
-        !!!!! ****there are no particles on this new GPU, so we need if condition for the following work.
+            !----------------------------------------
+            ! If you don't physically separate the particles, the interior and peripheric particles
+            ! are mixed in the array, the thrustscan and movement of interior particles may happen at
+            ! the same time, but they are all read-only operations, so it doesn't matter.
+            !!!!! ****since add_f is large, after new GPU is added, in the following add_f steps, in fact,
+            !!!!! ****there are no particles on this new GPU, so we need if condition for the following work.
 
-        if(separate) then
-            if(np_active > 0) then
-                separ_flag = .false.
-                call separ_particles(separ_flag)
-                if (separ_flag) exit
+            if(separate) then
+                if(np_active > 0) then
+                    separ_flag = .false.
+                    call separ_particles(separ_flag)
+                    if (separ_flag) exit
+                else
+                    N_peri = np_active
+                    N_inte = 0
+                end if
             else
                 N_peri = np_active
                 N_inte = 0
-            end if
-        else
-            N_peri = np_active
-            N_inte = 0
-        endif
-        !----------------------------------------
-            #if _TIMING == 1
-            istat = cudaEventRecord(startEvent,0)
-            #endif
-        ! peripheric particles
-        call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
-            xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-            xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-            N_inte,N_peri,ix1,iy1,reflect,map_sub)
+            endif
+            !----------------------------------------
+                #if _TIMING == 1
+                istat = cudaEventRecord(startEvent,0)
+                #endif
+            ! peripheric particles
+            call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
+                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
+                xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
+                N_inte,N_peri,ix1,iy1,reflect,map_sub)
 
-            #if _TIMING == 1
-            istat = cudaEventRecord(stopEvent,0)
-            istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
-            #endif
-        !----------------------------------------
-        if(transfer > 0) then
-            if(mod(kk,transfer) == 0) then
-                call particle_exchange1()
+                #if _TIMING == 1
+                istat = cudaEventRecord(stopEvent,0)
+                istat = cudaEventSynchronize(stopEvent)
+                istat = cudaEventElapsedTime(peri_time,startEvent,stopEvent)
+                #endif
+            !----------------------------------------
+            if(transfer > 0) then
+                if(mod(kk,transfer) == 0) then
+                    call particle_exchange1()
+                end if
+            end if
+
+            if(transfer < 0) then
+                if(mod(kk,abs(transfer)) == 0) then
+                    call particle_exchange2()
+                end if
+            end if
+
+            if(np_active > 0) call UpdateC_SortP()
+            !----------------------------------------
+            mean_age    = mean_age_de
+            mean_comp   = mean_comp_de
+            total_mass  = total_mass_de
+            if(total_mass(1) > 0.d0) mean_age(1)  = mean_age(1)/total_mass(1)
+            if(total_mass(1) > 0.d0) mean_comp(1) = mean_comp(1)/total_mass(1)
+            mean_mass = total_mass/dble(np_active)
+            ET_np_cpu   = ET_np_de
+            out_np_cpu  = out_np_de
+        end if
+
+        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk), &
+
+        mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
+        !
+        PET_balance(2),i_added_particles,ET_np_cpu(1),Out_np_cpu(1), &
+        !
+        np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv)
+        !
+
+        write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active, &
+
+        IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
+        ! 4,         5,       6,        7,          8,        9,        10
+        sort_time1,sort_time2,sort_time3,sort_time4,sort_time5, &
+        ! 11,      12,         13,        14,       15
+        sort_time6,sort_time7,sort_time9,sort_time10, &
+        ! 16,      17,         18,       19
+        peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
+        ! 20,     21,        22,        23,        24,        25
+        tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
+        ! 26,      27,        28,        29,        30,       31
+        C_time,exit_time
+        ! 32,  33
+
+        flush(17);flush(20)
+
+        if(LB > 0) then
+            if(mod(kk,LB) == 0) then
+                call load_balance(Porosity_cpu)
             end if
         end if
 
-        if(transfer < 0) then
-            if(mod(kk,abs(transfer)) == 0) then
-                call particle_exchange2()
-            end if
-        end if
-
-        if(np_active > 0) call UpdateC_SortP()
-        !----------------------------------------
-        mean_age    = mean_age_de
-        mean_comp   = mean_comp_de
-        total_mass  = total_mass_de
-        if(total_mass(1) > 0.d0) mean_age(1)  = mean_age(1)/total_mass(1)
-        if(total_mass(1) > 0.d0) mean_comp(1) = mean_comp(1)/total_mass(1)
-        mean_mass = total_mass/dble(np_active)
-        ET_np_cpu   = ET_np_de
-        out_np_cpu  = out_np_de
-    end if
-
-    write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk), &
-
-    mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
-    !
-    PET_balance(2),i_added_particles,ET_np_cpu(1),Out_np_cpu(1), &
-    !
-    np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv)
-    !
-
-    write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active, &
-
-    IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
-    ! 4,         5,       6,        7,          8,        9,        10
-    sort_time1,sort_time2,sort_time3,sort_time4,sort_time5, &
-    ! 11,      12,         13,        14,       15
-    sort_time6,sort_time7,sort_time9,sort_time10, &
-    ! 16,      17,         18,       19
-    peri_time,tran_time1,tran_time2,tran_time3,tran_time4,tran_time5, &
-    ! 20,     21,        22,        23,        24,        25
-    tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
-    ! 26,      27,        28,        29,        30,       31
-    C_time,exit_time
-    ! 32,  33
-
-    flush(17);flush(20)
-
-    if(LB > 0) then
-        if(mod(kk,LB) == 0) then
-            call load_balance(Porosity_cpu)
-        end if
-    end if
-
-    call MPI_Barrier(MPI_COMM_WORLD,ierr)
+        call MPI_Barrier(MPI_COMM_WORLD,ierr)
 
     end do
     9090 continue
 
-    if(work_comm /= MPI_COMM_NULL) then
-        nullify(EvapTrans_T,Saturation_T,Porosity_T)
-        nullify(Vx_T,Vy_T,Vz_T,Ind_T,dz_T,P_T,Zone_T)
-        nullify(d_isValid_T,d_indices_T)
-    end if
+    call null_texture()
 
     #if _TIMING == 1
     Total_time2 = mpi_wtime()
@@ -533,6 +412,36 @@ program EcoSLIM
     write(11,*)
     write(11,*) 'Simulation Timing and Profiling:'
     write(11,'("Total Execution Time (s):",e12.5)') Total_time2 - Total_time1
+
+    call file_close()
+
+    ! call close_hdf5_interface()
+    if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm, ierr)
+    call MPI_GROUP_FREE(work_group, ierr)
+    call MPI_GROUP_FREE(world_group, ierr)
+    call MPI_FINALIZE(ierr)
+
+end program EcoSLIM
+
+    ! open(10,file='Zone_de_after.'//trim(adjustl(ranknum))//'.txt')
+    ! !if(rank == 0) &
+    ! !    write(10,'(462(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! !if(rank == 1) &
+    ! !    write(10,'(463(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! !if(rank == 2) &
+    ! !    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! !if(rank == 3) &
+    ! !    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! if(rank == 0) &
+    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! if(rank == 1) &
+    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! if(rank == 2) &
+    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! if(rank == 3) &
+    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+    ! close(10)
+
     !write(11,'("File IO Time Read (s):",e12.5)') IO_time_read
     !write(11,'("Host to device data transfer (s):",e12.5)') h2d_time
     !write(11,'("Add new particles (s):",e12.5)') add_time
@@ -550,43 +459,23 @@ program EcoSLIM
     !Write(11,'("Parallel Particle Time (s):",e12.5)') float(parallel_time)/1000.
     !write(11,*)
 
-    if(rank == 0) then
-        flush(13);close(13)
-        flush(15);close(15)
-        flush(16);close(16)
-    end if
-    flush(11);close(11)
-    flush(17);close(17)
-    flush(19);close(19)
-    flush(20);close(20)
-    flush(30);close(30)
+            ! open(10,file='Local_range.'//trim(adjustl(ranknum))//'.txt')
+            !     write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+            !     write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
+            !     write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
+            !     write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+            ! close(10)
 
-    ! call close_hdf5_interface()
-    if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm, ierr)
-    call MPI_GROUP_FREE(work_group, ierr)
-    call MPI_GROUP_FREE(world_group, ierr)
-    call MPI_FINALIZE(ierr)
+            ! open(10,file='Zone_de_before.'//trim(adjustl(ranknum)))
+            !     write(10,'(8(12(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
+            ! close(10)
 
-end program EcoSLIM
+            ! open(10,file='topology.'//trim(adjustl(ranknum)))
+            !     write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
+            !     write(10,'(8(i3,1x))') ix2-ix1+1,ix2-ix1+nnx2,iy2-iy1+1,iy2-iy1+nny2
+            ! close(10)
 
-!open(10,file='P_new.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-!    write(10,*) np_active
-!    write(10,*) pid
-!    P = P_de
-!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind_c),i=1,np_active)
-!close(10)
-
-!open(10,file='P_separa.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-!    write(10,*) 'rank',rank,N_peri,N_inte
-!    write(10,*) np_active
-!    write(10,*) pid
-!    P = P_de
-!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind_c),i=1,np_active)
-!close(10)
-
-!open(10,file='P_peri.'//trim(adjustl(ranknum))//'.'//trim(adjustl(filenum))//'.txt')
-!    write(10,*) np_active
-!    write(10,*) pid
-!    P = P_de
-!    write(10,'(2000(19(f20.5,1x),/))') ((P(i,j),j=1,17+2*nind_c),i=1,np_active)
-!close(10)
+                ! open(10,file='Neighbor.'//trim(adjustl(ranknum)))
+                !     write(10,*) neigh_list
+                !     write(10,*) N_recv
+                ! close(10)

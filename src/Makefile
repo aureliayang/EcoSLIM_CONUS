@@ -17,6 +17,8 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_separ.o \
     ecoslim_particle_pme.o \
 	ecoslim_read_input.o \
+	ecoslim_working_comm.o \
+	ecoslim_particle_init.o \
     EcoSLIM.cuf
 
 FFLAGS = -Mpreprocess -D_TIMING=1
@@ -63,6 +65,10 @@ ecoslim_particle_separ.o: ecoslim_particle_separ.cuf ecoslim_compaction.o ecosli
 ecoslim_particle_pme.o: ecoslim_particle_pme.cuf ecoslim_particle_add.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_read_input.o: ecoslim_read_input.cuf ecoslim_variable_list.o
+	mpif90 -c $< -o $@
+ecoslim_working_comm.o: ecoslim_working_comm.cuf ecoslim_variable_list.o
+	mpif90 -c $< -o $@
+ecoslim_particle_init.o: ecoslim_particle_init.cuf ecoslim_particle_add.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 
 .PHONY: clean

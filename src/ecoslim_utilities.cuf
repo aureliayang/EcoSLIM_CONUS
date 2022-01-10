@@ -4,7 +4,7 @@ module utilities
 
     use cudafor
     use variable_list, only: Zone_T, grid
-    use variable_list, only: nx_c, ny_c, buff
+    use variable_list, only: nx_c, ny_c, buff, rank, runname
     use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
     use variable_list, only: Zonet_new, ppx, qqy, ranknum
 
@@ -87,6 +87,49 @@ contains
 
         if(ii <= t_rank_m .and. neigh_list_m(ii) > 0) neigh_list_m(ii) = 1
     end subroutine scan_zone
+
+    subroutine file_open()
+        use mpi
+        implicit none
+
+        open(17,file='Timing_info.'//trim(adjustl(ranknum))//'.txt')
+
+        open(19,file='Exited_particles.'//trim(adjustl(ranknum))//'.bin', &
+        form='unformatted',access='stream')
+
+        open(20,file='Log_particles.'//trim(adjustl(ranknum))//'.txt')
+        write(20,*) ' **** Transient Simulation Particle Accounting ****'
+        write(20,*) ' Timestep PFTimestep OutStep Time Mean_Age Mean_Comp Mean_Mass &
+                      Total_Mass PrecipIn ETOut NP_PrecipIn NP_ETOut NP_QOut NP_filtered &
+                      N_peripheric N_interior N_exit sum_send sum_recv'
+
+        if(rank == 0) then
+
+            open(13,file=trim(runname)//'_ET_output.txt')
+            write(13,*) 'TIME ET_age ET_comp1 ET_comp2 ET_comp3 ET_mass ET_Np'
+
+            open(15,file=trim(runname)//'_flow_output.txt')
+            write(15,*) 'TIME Out_age Out_comp1 outcomp2 outcomp3 Out_mass Out_NP'
+
+            open(16,file=trim(runname)//'_PET_balance.txt')
+            write(16,*) 'TIME P[kg] ET[kg]'
+
+        endif
+    end subroutine file_open
+
+    subroutine file_close()
+        implicit none
+        if(rank == 0) then
+            flush(13);close(13)
+            flush(15);close(15)
+            flush(16);close(16)
+        end if
+        flush(11);close(11)
+        flush(17);close(17)
+        flush(19);close(19)
+        flush(20);close(20)
+        flush(30);close(30)
+    end subroutine file_close
 
     subroutine read_grid_Zone()
         implicit none
