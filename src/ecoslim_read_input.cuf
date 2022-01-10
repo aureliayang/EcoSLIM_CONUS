@@ -1,0 +1,192 @@
+module eco_read_input
+    use cudafor
+    use variable_list,only: runname, pname, DEMname, ranknum
+    use variable_list,only: nx,nx_c,ny,ny_c,nz,nz_c
+    use variable_list,only: nCLMsoil,ppx,qqy,transfer,separate
+    use variable_list,only: LB,th_value,np_ic,np,nzclm,n_constituents
+    use variable_list,only: dz,dz_de,dx,dx_c,dy,dy_c
+    use variable_list,only: pfdt,pfdt_c,pft1,pft2,tout1,n_cycle,add_f
+    use variable_list,only: ipwrite,ibinpntswrite,etwrite,icwrite
+    use variable_list,only: kk,pfnt,Time_Next,Time_first,outkk
+    use variable_list,only: V_mult,clmtrans,clmfile,iflux_p_res
+    use variable_list,only: denh2o,denh2o_c,moldiff,moldiff_c,dtfrac,dtfrac_c
+    use variable_list,only: nind,nind_c,Indname
+
+
+contains
+    subroutine read_input()
+
+        implicit none
+
+    !--------------------------------------------------------------------
+        ! Read inputs, set up domain, write the log file
+        ! open SLIM input .txt file
+        open (10,file='slimin.txt')
+
+        ! read SLIM run name
+        read(10,*) runname
+
+        ! read ParFlow run name
+        read(10,*) pname
+
+        ! read DEM file name
+        read(10,*) DEMname
+    !--------------------------------------------------------------------
+        ! open/create/write the output log.txt file. If doesn't exist, it's created.
+        open(11,file=trim(runname)//'_log.'//trim(adjustl(ranknum))//'.txt')
+        write(11,*) '### EcoSLIM Log File'
+        write(11,*)
+        write(11,*) 'run name:',trim(runname)
+        write(11,*)
+        write(11,*) 'ParFlow run name:',trim(pname)
+        write(11,*)
+        if (DEMname /= '') then
+            write(11,*) 'ParFlow DEM name:',trim(DEMname)
+        else
+            write(11,*) 'Not reading ParFlow DEM'
+        end if
+        write(11,*)
+    !--------------------------------------------------------------------
+        ! read domain number of cells and number of particles to be injected
+        read(10,*) nx_c
+        nx = nx_c
+        read(10,*) ny_c
+        ny = ny_c
+        read(10,*) nz_c
+        nz = nz_c
+        read(10,*) nCLMsoil
+        read(10,*) ppx
+        read(10,*) qqy
+        read(10,*) transfer
+        read(10,*) separate
+        read(10,*) LB
+        read(10,*) th_value
+        ! read in number of particles for IC (if np_ic = -1 then restart from a file)
+        read(10,*) np_ic
+
+        ! read in the number of particles total
+        read(10,*) np
+    !--------------------------------------------------------------------
+        ! check to make sure we don't assign more particles for IC than we have allocated
+        ! in total
+        if (np_ic > np) then
+            write(11,*) 'warning NP_IC greater than IC'
+            np = np_ic
+        end if
+        ! write nx, ny, nz, and np in the log file
+        write(11,*) 'Grid information'
+        write(11,*) 'nx:',nx_c
+        write(11,*) 'ny:',ny_c
+        write(11,*) 'nz:',nz_c
+        write(11,*)
+        write(11,*) 'Particle IC Information'
+        write(11,*) 'np IC:',np_ic
+        if (np_ic == -1) &
+        write(11,*) 'Reading particle restart file:',trim(runname)//'_particle_restart.bin'
+        write(11,*) 'np:',np
+    !--------------------------------------------------------------------
+        ! nCLMsoil = 10 ! number of CLM soil layers over the root zone !this doesn't matter
+        nzclm = 13 + nCLMsoil ! CLM output is 13+nCLMsoil layers for different variables not domain NZ,
+                            ! e.g. 23 for 10 soil layers (default) and 17 for 4 soil layers (Noah soil
+                            ! layer setup)
+        n_constituents = 9
+
+        allocate(dz(nz_c),dz_de(nz_c))
+        ! have to do this here since the following read of dz
+
+        ! read dx, dy as scalars
+        read(10,*) dx_c
+        dx = dx_c
+        read(10,*) dy_c
+        dy = dy_c
+        ! read dz as an array
+        read(10,*) dz(1:nz_c)
+        ! read in (constant for now) ParFlow dt
+        read(10,*) pfdt_c
+        pfdt = pfdt_c
+        ! read in parflow start and stop times
+        read(10,*) pft1
+        read(10,*) pft2
+        read(10,*) tout1
+        read(10,*) n_cycle
+        read(10,*) add_f
+    !--------------------------------------------------------------------
+        pfnt = n_cycle*(pft2-pft1+1)
+        outkk = tout1 + 1
+
+        ! IO control, each value is a timestep interval, e.g. 1= every timestep, 2=every other, 0 = no writing
+        read(10,*) ipwrite        ! controls an ASCII, .3D particle file not recommended due to poor performance
+        read(10,*) ibinpntswrite  !  controls VTK, binary output of particle locations and attributes
+        read(10,*) etwrite        !  controls ASCII ET output
+        read(10,*) icwrite        ! controls VTK, binary grid based output where particle masses, concentrations,
+                                ! ages are mapped to a grid and written every N timesteps
+
+        ! allocate and assign timesteps
+        ! this can be a scalar and update every timestep
+        allocate(Time_Next(pfnt-tout1))
+        Time_Next = 0.d0
+        do kk = 1, pfnt-tout1
+            Time_Next(kk) = dble(kk+tout1)*pfdt
+        end do
+        Time_first = dble(outkk-1)*pfdt
+    !--------------------------------------------------------------------
+        ! read in velocity multiplier
+        read(10,*) V_mult
+        ! do we read in clm evap trans?
+        read(10,*) clmtrans
+        ! do we read in clm output file?
+        read(10,*) clmfile
+        ! read in IC number of particles for flux
+        read(10,*) iflux_p_res
+        ! read in density h2o
+        read(10,*) denh2o_c
+        denh2o = denh2o_c
+        ! read in diffusivity
+        ! moldiff = (1.15e-9)*3600.d0
+        read(10,*) moldiff_c
+        moldiff = moldiff_c
+        ! fraction of dx/Vx
+        read(10,*) dtfrac_c
+        dtfrac = dtfrac_c
+    !--------------------------------------------------------------------
+        ! wite out log file
+        write(11,*)
+        write(11,*) 'Grid Dimensions'
+        write(11,'(" dx:",e12.5)') dx_c
+        write(11,'(" dy:",e12.5)') dy_c
+        write(11,'(" dz:",*(e12.5,", "))') dz(1:nz_c)
+        write(11,*)
+        write(11,*) 'Timestepping Information'
+        write(11,'(" ParFlow delta-T, pfdt:",e12.5)') pfdt_c
+        write(11,'(" ParFlow timesteps, pfnt:",i12)') pfnt
+        write(11,'(" ParFlow start step, pft1:",i12)') pft1
+        write(11,'(" ParFlow end step, pft2:",i12)') pft2
+        write(11,'(" Output step start:",i12)') outkk
+        write(11,'(" Time loops, cycles, n_cycle:",i12)') n_cycle
+        write(11,'(" Total time steps:",i12)') pfnt
+
+        write(11,*)
+        write(11,*) 'V mult: ',V_mult,' for forward/backward particle tracking'
+        write(11,*) 'CLM Trans: ',clmtrans,' adds / removes particles based on LSM fluxes'
+        write(11,*)
+        write(11,*) 'Physical Constants'
+        write(11,*) 'denh2o: ',denh2o_c,' M/L^3'
+        write(11,*) 'Molecular Diffusivity: ',moldiff_c,' '
+        !write(11,*) 'Fractionation: ',Efract,' '
+        write(11,*)
+        write(11,*) 'Numerical Stability Information'
+        write(11,'(" dtfrac: ",e12.5," fraction of dx/Vx")') dtfrac_c
+    !--------------------------------------------------------------------
+        read(10,*) nind_c
+        nind = nind_c
+        read(10,*) Indname
+        write(11,*)
+        write(11,*) 'Indicator File'
+        write(11,*) nind_c, 'Indicators'
+
+        ! end of SLIM input
+        close(10)
+        ! Read all input data on all ranks.
+    end subroutine read_input
+
+end module eco_read_input

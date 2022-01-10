@@ -204,6 +204,7 @@ attributes(global) subroutine add_new_particles( &
     integer:: i, j, k, ij, ii, ii_l
     integer:: index, itemp, temp, Ploc(2)
     real(8),shared:: P_s(256,2)
+    type(curandStateXORWOW):: hh
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
     ii_l = threadIdx%x
@@ -225,32 +226,29 @@ attributes(global) subroutine add_new_particles( &
 
                 index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
 
+                hh = h(index)
+
                 P_s(ii_l,1) = P_de(index,1)
                 P_s(ii_l,2) = P_de(index,2)
 
-                P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(h(index))*dx
-                P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(h(index))*dy ! update that for random number
+                P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
+                P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                 P_de(index,13+2*nind) = dble(pid + index - np_active)
                 P_de(index,14+2*nind) = P_s(ii_l,1)
                 P_de(index,15+2*nind) = P_s(ii_l,2)
 
-                !Z = 0.0d0
-                !do ik = 1, nz
-                !    Z = Z + dz(ik)
-                !end do
                 P_de(index,3) = sum(dz_T) - dz_T(nz)*0.5d0
                 P_de(index,16+2*nind) = P_T(index,3)
 
-                P_de(index,4) = 0.0d0 + curand_uniform(h(index))*pfdt
+                P_de(index,4) = 0.0d0 + curand_uniform(hh)*pfdt
 
                 if (nind > 0) then
                     Ploc(1) = floor(P_s(ii_l,1) / dx)
                     Ploc(2) = floor(P_s(ii_l,2) / dy)
-                    ! Ploc(3) = nz-1
 
                     itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,nz))
                     if(itemp > 0 .and. itemp <= nind) then
-                    P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_T(index,4)
+                    P_de(index,(12+itemp)) = P_T(index,(12+itemp)) + P_T(index,4)
                     end if
                 end if
 
@@ -271,6 +269,7 @@ attributes(global) subroutine add_new_particles( &
 
                 P_de(index,1) = P_s(ii_l,1) + dble(ix1)*dx
                 P_de(index,2) = P_s(ii_l,2) + dble(iy1)*dy
+                h(index) = hh
             enddo
         endif
     endif
@@ -278,3 +277,9 @@ attributes(global) subroutine add_new_particles( &
 end subroutine add_new_particles
 
 end module eco_particle_add
+
+!!! pme_add
+! use texture EvapTrans_da_T, CLMvars_T, P_T
+! use register to save ii - nnx1*nny1*(nz-1)
+! use shared memory for x and y coordinates
+! random number state saved in register ! most significant improvement
