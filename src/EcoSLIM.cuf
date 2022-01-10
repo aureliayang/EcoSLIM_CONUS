@@ -76,9 +76,8 @@ program EcoSLIM
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
 
-        #if _TIMING == 1
+
     Total_time1 = mpi_wtime()
-        #endif
 
     open(30,file='Debug.'//trim(adjustl(ranknum))//'.txt')
 
@@ -361,9 +360,8 @@ program EcoSLIM
 
     call null_texture()
 
-    #if _TIMING == 1
     Total_time2 = mpi_wtime()
-    #endif
+
     istat = cudaEventDestroy(startEvent)
     istat = cudaEventDestroy(stopEvent)
 

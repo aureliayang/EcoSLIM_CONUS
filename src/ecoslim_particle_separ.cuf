@@ -137,17 +137,14 @@ contains
         integer,parameter:: tPB = 256
         real(8),value:: xmin3_m,ymin3_m,xmax3_m,ymax3_m
         integer,value:: np_active_m,ix1_m,iy1_m
-        integer:: ii,ii_g
-        ! real(8),shared:: P_s(tPB,2)
+        integer:: ii
         real(8):: P_s(2)
-        ! integer,shared:: d_isValid_s(tPB)
 
-        ii_g = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        ! ii = threadIdx%x
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-        if (ii_g <= np_active_m) then
+        if (ii <= np_active_m) then
 
-            P_s(1:2) = P_de(ii_g,1:2)
+            P_s(1:2) = P_de(ii,1:2)
 
             ! Transfer global to local
             P_s(1) = P_s(1) - dble(ix1_m)*dx
@@ -155,14 +152,12 @@ contains
 
             if(P_s(1) <  xmin3_m .or. P_s(2) <  ymin3_m .or. &
             P_s(1) >= xmax3_m .or. P_s(2) >= ymax3_m) then
-                d_isValid(ii_g) = 0
+                d_isValid(ii) = 0
                 ! perip
             else
-                d_isValid(ii_g) = 1
+                d_isValid(ii) = 1
                 ! inter
             end if
-
-            ! d_isValid(ii_g) = d_isValid_s(ii)
 
         end if
     end subroutine particles_separation
