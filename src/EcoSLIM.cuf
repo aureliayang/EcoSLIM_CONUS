@@ -250,47 +250,7 @@ program EcoSLIM
             Vy = Vy * V_mult
             Vz = Vz * V_mult
 
-                #if _TIMING == 1
-                istat = cudaEventRecord(startEvent,0)
-                #endif
-
-            Vx_de = Vx
-            Vy_de = Vy
-            Vz_de = Vz
-            Saturation_de = Saturation
-            EvapTrans_de  = EvapTrans
-            if (mod(kk,add_f) == 0) EvapTrans_da_de = EvapTrans_da
-            CLMvars_de    = CLMvars(:,:,11)
-            ! probably this can be deallocated after adding of particles
-            ! Now just think about the hourly add of particles.
-
-            out_age_de  = 0.d0
-            out_mass_de = 0.d0
-            out_comp_de = 0.d0
-            out_np_de   = 0
-
-            et_age_de  = 0.d0
-            et_mass_de = 0.d0
-            et_comp_de = 0.d0
-            et_np_de   = 0
-
-            mean_age_de    = 0.d0
-            mean_comp_de   = 0.d0
-            total_mass_de  = 0.d0
-            PET_balance_de = 0.d0
-
-            C_de = 0.d0
-            ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
-            ! the following adding of particles.
-
-            N_send = 0
-            N_recv = 0
-
-                #if _TIMING == 1
-                istat = cudaEventRecord(stopEvent,0)
-                istat = cudaEventSynchronize(stopEvent)
-                istat = cudaEventElapsedTime(h2d_time,startEvent,stopEvent)
-                #endif
+            call host2device()
 
             !----------------------------------------
 
