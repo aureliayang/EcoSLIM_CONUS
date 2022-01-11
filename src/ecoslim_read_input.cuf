@@ -2,7 +2,7 @@ module eco_read_input
     use cudafor
     use variable_list,only: runname, pname, DEMname, ranknum
     use variable_list,only: nx,nx_c,ny,ny_c,nz,nz_c
-    use variable_list,only: nCLMsoil,ppx,qqy,transfer,separate
+    use variable_list,only: nCLMsoil,ppx,qqy,transfer,separate,spinup
     use variable_list,only: LB,th_value,np_ic,np,nzclm,n_constituents
     use variable_list,only: dz,dz_de,dx,dx_c,dy,dy_c
     use variable_list,only: pfdt,pfdt_c,pft1,pft2,tout1,n_cycle,add_f
@@ -61,6 +61,7 @@ contains
         read(10,*) separate
         read(10,*) LB
         read(10,*) th_value
+        read(10,*) spinup
         ! read in number of particles for IC (if np_ic = -1 then restart from a file)
         read(10,*) np_ic
 

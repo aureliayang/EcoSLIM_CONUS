@@ -11,7 +11,7 @@ module eco_updateC_sortP
     use variable_list, only: startEvent, stopEvent
     use variable_list, only: mean_age_de,mean_comp_de,total_mass_de
     use variable_list, only: dx, dy, nz, dz_T
-    use variable_list, only: Time_Next, kk
+    use variable_list, only: Time_Next, kk, spinup
 
 contains
     subroutine UpdateC_SortP()
@@ -23,6 +23,7 @@ contains
                 istat = cudaEventRecord(startEvent,0)
                 #endif
 
+            if(.not. spinup) &
             call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
                 ix1,iy1,np_active)
 

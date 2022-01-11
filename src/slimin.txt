@@ -11,6 +11,7 @@ SLIM_LW      ! SLIM run name, path to PF-CLM next, followed by DEM
 True              !separate or not
 20                !LB frequency, must be n*add_f
 1e5               !th_value
+True              !spinup
 1                 !particles per cell at start of simulation
 20000000          !np Total
 1000.             !dx
