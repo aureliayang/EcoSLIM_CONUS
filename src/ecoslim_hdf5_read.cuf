@@ -1,6 +1,5 @@
 module hdf5_file_read
     use HDF5
-    ! use cudafor
     use variable_list, only: fname, dsetname
     use variable_list, only: ix2, iy2
 contains
@@ -44,12 +43,10 @@ contains
 
         call h5screate_simple_f(rank_hdf5, chunk_dims, memspace, error)
         ! memspace doesn't have the location information.
-        write(30,*) 'ok1'
-        flush(30)
+
         call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, &
         data, chunk_dims, error, memspace, dataspace)
-        write(30,*) 'ok2'
-        flush(30)
+
         ! Close everything opened.
         call h5sclose_f(dataspace, error)
         call h5sclose_f(memspace, error)
