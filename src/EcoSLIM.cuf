@@ -48,10 +48,6 @@ program EcoSLIM
     real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
     real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
-    real(8),allocatable:: Saturation_h5(:,:,:),Porosity_h5(:,:,:)
-    real(8),allocatable:: EvapTrans_h5(:,:,:),CLMvars_h5(:,:,:)
-    real(8),allocatable:: Vx_h5(:,:,:),Vy_h5(:,:,:),Vz_h5(:,:,:)
-
     integer:: istat
     logical:: separ_flag, pme_flag, fore_flag
 !--------------------------------------------------------------------
@@ -119,10 +115,6 @@ program EcoSLIM
         call copy_grid(map_sub) ! doing this on workers
 
         call alloc_arrays_temp(Porosity_cpu) ! doing this on workers
-
-        allocate(Saturation_h5(nnx2,nny2,nz_c),Porosity_h5(nnx2,nny2,nz_c))
-        allocate(EvapTrans_h5(nnx2,nny2,nz_c),CLMvars_h5(nnx2,nny2,nzclm))
-        allocate(Vx_h5(nnx2+1,nny2,nz_c),Vy_h5(nnx2,nny2+1,nz_c),Vz_h5(nnx2,nny2,nz_c+1))
 
         ! end if
         call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &

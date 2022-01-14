@@ -175,6 +175,10 @@ module variable_list
     integer:: transfer, map_sub, LB, th_value
     integer,allocatable:: l_GPUs(:,:), t_GPUs(:), c_GPU(:)
 
+    real(8),allocatable:: Saturation_h5(:,:,:),Porosity_h5(:,:,:)
+    real(8),allocatable:: EvapTrans_h5(:,:,:),CLMvars_h5(:,:,:)
+    real(8),allocatable:: Vx_h5(:,:,:),Vy_h5(:,:,:),Vz_h5(:,:,:)
+
 !-------------------------------------
     ! GPU variables
     real(8),allocatable,device,target:: P_de(:,:)
@@ -381,6 +385,10 @@ contains
 
             Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
             Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
+
+            allocate(Saturation_h5(nnx2,nny2,nz_c),Porosity_h5(nnx2,nny2,nz_c))
+            allocate(EvapTrans_h5(nnx2,nny2,nz_c),CLMvars_h5(nnx2,nny2,nzclm))
+            allocate(Vx_h5(nnx2+1,nny2,nz_c),Vy_h5(nnx2,nny2+1,nz_c),Vz_h5(nnx2,nny2,nz_c+1))
 
     end subroutine alloc_arrays_temp
 
