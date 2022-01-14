@@ -12,7 +12,7 @@
 * **separate,** Separate or not
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **th_value,** the threshold to start a new GPU
-* **spinup,** if true, it will not do the calculation of C array.
+* **spinup,** if true, it will not do the calculation of C array. This aims to speedup th spinup.
 * **np_ic,** Number of particles per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
 * **dx,** grid-cell size in x direction
