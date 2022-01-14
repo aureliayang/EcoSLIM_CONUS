@@ -39,7 +39,11 @@
 * **Indname,**
 # Build (for users)
 * An example of environment on Della GPU cluster at Princeton University:  
+* if hdf5 is disabled:
   **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
+* Build: **make HDF5=0** in the src folder
+* * if hdf5 is enabled:
+  **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1, hdf5/nvhpc-21.5/1.10.6**
 * Build: **make** in the src folder
 # Transfer schemes (for dev)
 * **neigh_list** uses *managed memory* and has the length of total number of GPUs. This is because the do loop using it can skip the non-neighbor quickly. However, if we compact it with pure neighbors, there should be extra work. We can think carefully about this to choose the best way.  
@@ -60,7 +64,7 @@
 * If we do separation?
 * If we rearrange the array or just label the array?  
 # Load Balancing (LB)
-* The idea of LB in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the own characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***).  
+* The idea of LB in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***).  
 * Code is started with a number of GPUs (subdomains) fewer than the total number of GPUs used. Manager rank periodically checks the number of particles on each GPU. If the number of particles on a GPU is larger than a given number, one more GPU will be started to help that GPU/subdomain.  
 * For a subdomain with more than one GPU, source particles from positive PME will be added into the GPU with the fewest number of particles. 
 
