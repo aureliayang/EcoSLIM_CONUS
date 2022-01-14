@@ -44,10 +44,6 @@ program EcoSLIM
     implicit none
     ! integer(8),allocatable,pinned:: p_num_cpu(:,:)
     ! type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
-    real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
-    real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
-    real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
-
     integer:: istat
     logical:: separ_flag, pme_flag, fore_flag
 !--------------------------------------------------------------------
@@ -80,7 +76,6 @@ program EcoSLIM
     istat = cudaEventCreate(startEvent)
     istat = cudaEventCreate(stopEvent)
 
-
     Total_time1 = mpi_wtime()
 
     open(30,file='Debug.'//trim(adjustl(ranknum))//'.txt')
@@ -89,12 +84,6 @@ program EcoSLIM
 !--------------------------------------------------------------------
     call alloc_arrays_const()
     ! now we know the total dimension
-
-    allocate(Saturation_cpu(nx_c,ny_c,nz_c),Porosity_cpu(nx_c,ny_c,nz_c))
-    allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
-    allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
-
-    ! This will be moved after hdf5 added.
 
     call global_xyz()
     ! restart file info inside, so have to call it before restart.
@@ -187,7 +176,6 @@ program EcoSLIM
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
             call read_h5_file(Vx_h5,nnx2+1,nny2,nz_c)
             Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c)=Vx_h5
-            ! Vx = 240.d0
                 #else
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
@@ -199,7 +187,6 @@ program EcoSLIM
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
             call read_h5_file(Vy_h5,nnx2,nny2+1,nz_c)
             Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c)=Vy_h5
-            ! Vy = 240.d0
                 #else
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
@@ -211,7 +198,6 @@ program EcoSLIM
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
             call read_h5_file(Vz_h5,nnx2,nny2,nz_c+1)
             Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1)=Vz_h5
-            ! Vz = 0.d0
                 #else
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
@@ -223,7 +209,6 @@ program EcoSLIM
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
             call read_h5_file(Saturation_h5,nnx2,nny2,nz_c)
             Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:)=Saturation_h5
-            ! Saturation = 0.8d0
                 #else
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
@@ -237,8 +222,6 @@ program EcoSLIM
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
                 call read_h5_file(EvapTrans_h5,nnx2,nny2,nz_c)
                 EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:)=EvapTrans_h5
-                ! EvapTrans = 0.d0
-                ! EvapTrans(2,:,1) = 1.d-8
                     #else
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
                 call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)

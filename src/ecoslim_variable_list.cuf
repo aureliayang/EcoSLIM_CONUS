@@ -179,6 +179,10 @@ module variable_list
     real(8),allocatable:: EvapTrans_h5(:,:,:),CLMvars_h5(:,:,:)
     real(8),allocatable:: Vx_h5(:,:,:),Vy_h5(:,:,:),Vz_h5(:,:,:)
 
+    real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
+    real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
+    real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
+
 !-------------------------------------
     ! GPU variables
     real(8),allocatable,device,target:: P_de(:,:)
@@ -312,6 +316,10 @@ contains
         Zonet_new = -1
         Zonet_new(1:nx_c,1:ny_c) = 0
         p_num = 1
+
+        allocate(Saturation_cpu(nx_c,ny_c,nz_c),Porosity_cpu(nx_c,ny_c,nz_c))
+        allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
+        allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
 
     end subroutine alloc_arrays_const
 
