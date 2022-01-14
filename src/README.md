@@ -39,11 +39,9 @@
 * **Indname,**
 # Build (for users)
 * An example of environment on Della GPU cluster at Princeton University:  
-* if hdf5 is disabled:
-  **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
+* if hdf5 is disabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
 * Build: **make HDF5=0** in the src folder
-* if hdf5 is enabled:  
-  **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1, hdf5/nvhpc-21.5/1.10.6**
+* if hdf5 is enabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1, hdf5/nvhpc-21.5/1.10.6**
 * Build: **make** in the src folder
 # Transfer schemes (for dev)
 * **neigh_list** uses *managed memory* and has the length of total number of GPUs. This is because the do loop using it can skip the non-neighbor quickly. However, if we compact it with pure neighbors, there should be extra work. We can think carefully about this to choose the best way.  
