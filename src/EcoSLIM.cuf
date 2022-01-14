@@ -19,7 +19,9 @@ program EcoSLIM
     ! use cudafor
     ! use thrust
     ! use variable_list
-    ! use hdf5_file_read
+        #if _HDF5 == 1
+    use hdf5_file_read
+        #endif
     ! use hdf5_file_write
     use mrand
     use utilities
@@ -46,6 +48,10 @@ program EcoSLIM
     real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
     real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
+    real(8),allocatable:: Saturation_h5(:,:,:),Porosity_h5(:,:,:)
+    real(8),allocatable:: EvapTrans_h5(:,:,:),CLMvars_h5(:,:,:)
+    real(8),allocatable:: Vx_h5(:,:,:),Vy_h5(:,:,:),Vz_h5(:,:,:)
+
     integer:: istat
     logical:: separ_flag, pme_flag, fore_flag
 !--------------------------------------------------------------------
@@ -54,7 +60,9 @@ program EcoSLIM
     call MPI_COMM_SIZE(MPI_COMM_WORLD, t_rank, ierr)
     write(ranknum,'(i5.5)') rank
 
-    ! call open_hdf5_interface()
+        #if _HDF5 == 1
+    call open_hdf5_interface()
+        #endif
 !--------------------------------------------------------------------
     ! Get and set unique device
     call assignDevice(deviceID)
@@ -89,6 +97,8 @@ program EcoSLIM
     allocate(Saturation_cpu(nx_c,ny_c,nz_c),Porosity_cpu(nx_c,ny_c,nz_c))
     allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
     allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
+
+
     ! This will be moved after hdf5 added.
 
     call global_xyz()
@@ -109,6 +119,10 @@ program EcoSLIM
         call copy_grid(map_sub) ! doing this on workers
 
         call alloc_arrays_temp(Porosity_cpu) ! doing this on workers
+
+        allocate(Saturation_h5(nnx2,nny2,nz_c),Porosity_h5(nnx2,nny2,nz_c))
+        allocate(EvapTrans_h5(nnx2,nny2,nz_c),CLMvars_h5(nnx2,nny2,nzclm))
+        allocate(Vx_h5(nnx2+1,nny2,nz_c),Vy_h5(nnx2,nny2+1,nz_c),Vz_h5(nnx2,nny2,nz_c+1))
 
         ! end if
         call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
@@ -178,48 +192,68 @@ program EcoSLIM
             ! Read the velocities computed by ParFlow
             write(filenum,'(i5.5)') pfkk
 
-            !fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
-            !call read_h5_file(Vx,1)
+                #if _HDF5 == 1
+            fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vx_h5,nnx2+1,nny2,nz_c)
+            Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c)=Vx_h5
             !Vx = 240.d0
+                #else
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
             Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c) = &
             Vx_cpu(ix2+1:ix2+nnx2+1,iy2+1:iy2+nny2,1:nz_c)
+                #endif
 
-            !fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
-            !call read_h5_file(Vy,2)
+                #if _HDF5 == 1
+            fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vy_h5,nnx2,nny2+1,nz_c)
+            Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c)=Vy_h5
             !Vy = 240.d0
+                #else
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
             Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c) = &
             Vy_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2+1,1:nz_c)
+                #endif
 
-            !fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
-            !call read_h5_file(Vz,3)
+                #if _HDF5 == 1
+            fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Vz_h5,nnx2,nny2,nz_c+1)
+            Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1)=Vz_h5
             !Vz = 0.d0
+                #else
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
             Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1) = &
             Vz_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,1:nz_c+1)
+                #endif
 
-            !fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
-            !call read_h5_file(Saturation,0)
+                #if _HDF5 == 1
+            fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
+            call read_h5_file(Saturation_h5,nnx2,nny2,nz_c)
+            Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:)=Saturation_h5
             !Saturation = 0.8d0
+                #else
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
             Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
             Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+                #endif
 
             if (clmtrans) then
                 ! Read in the Evap_Trans
-                ! fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
-                ! call read_h5_file(EvapTrans,0)
+                    #if _HDF5 == 1
+                fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
+                call read_h5_file(EvapTrans_h5,nnx2,nny2,nz_c)
+                EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:)=EvapTrans_h5
                 ! EvapTrans = 0.d0
                 ! EvapTrans(2,:,1) = 1.d-8
+                    #else
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
                 call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
                 EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
                 EvapTrans_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+                    #endif
 
                 if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
                 where (EvapTrans > 0.d0) EvapTrans_da = EvapTrans_da + EvapTrans
@@ -373,7 +407,9 @@ program EcoSLIM
 
     call file_close()
 
-    ! call close_hdf5_interface()
+        #if _HDF5 == 1
+    call close_hdf5_interface()
+        #endif
     if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm, ierr)
     call MPI_GROUP_FREE(work_group, ierr)
     call MPI_GROUP_FREE(world_group, ierr)

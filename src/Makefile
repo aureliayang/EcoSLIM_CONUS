@@ -1,4 +1,4 @@
-# Last Change:  2021-07-20 22:29:28
+# Last Change:  2022-01-12 12:19:19
 CUF=ecoslim_thrustscan.o \
     ecoslim_device_rand.o \
     ecoslim_variable_list.o \
@@ -16,17 +16,27 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_load_balance.o \
     ecoslim_particle_separ.o \
     ecoslim_particle_pme.o \
-	ecoslim_read_input.o \
-	ecoslim_working_comm.o \
-	ecoslim_particle_init.o \
+    ecoslim_read_input.o \
+    ecoslim_working_comm.o \
+    ecoslim_particle_init.o \
     EcoSLIM.cuf
 
-FFLAGS = -Mpreprocess -D_TIMING=1
+HDF5 = 1
+
+FFLAGS = -Mpreprocess -D_TIMING=1 -D_HDF5=$(HDF5)
+
+HDF5FLAGS = -I$(HDF5DIR)/include -L$(HDF5DIR)/lib64 -rpath $(HDF5DIR)/lib64 -lhdf5_fortran -lhdf5
+
+ifneq ($(HDF5),1)
+    HDF5FLAGS = ''
+else
+    CUF += ecoslim_hdf5_read.o
+endif
 
 all: test
 
 test: ecoslim_thrustscanc.o ${CUF}
-	mpif90 -o $@ $^ $(FFLAGS) -lstdc++
+	mpif90 -o $@ $^ $(FFLAGS) $(HDF5FLAGS) -lstdc++
 
 ecoslim_thrustscanc.o: ecoslim_thrustscanc.cu
 	nvcc -c $^ -o $@ -std=c++14
@@ -70,6 +80,10 @@ ecoslim_working_comm.o: ecoslim_working_comm.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 ecoslim_particle_init.o: ecoslim_particle_init.cuf ecoslim_particle_add.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
+ifeq ($(HDF5),1)
+    ecoslim_hdf5_read.o: ecoslim_hdf5_read.cuf ecoslim_variable_list.o
+		mpif90 -c $< -o $@ $(HDF5FLAGS)
+endif
 
 .PHONY: clean
 clean:
