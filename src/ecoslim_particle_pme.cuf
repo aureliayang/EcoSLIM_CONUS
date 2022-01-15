@@ -17,7 +17,7 @@ contains
         use mpi
         implicit none
         integer:: istat, temp
-        logical:: pme_flag
+        logical,intent(out):: pme_flag
 
         if (rank == c_GPU(map_sub+1)) then
 

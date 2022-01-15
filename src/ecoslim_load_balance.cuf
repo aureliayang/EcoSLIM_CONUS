@@ -13,7 +13,7 @@ contains
         implicit none
         integer:: max_rank_o, temp
         logical:: flag
-        real(8):: Porosity_cpu(:,:,:)
+        real(8),intent(out):: Porosity_cpu(:,:,:)
 
         ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
         ! setting LB > 0 also works, but extra time will be consumed.

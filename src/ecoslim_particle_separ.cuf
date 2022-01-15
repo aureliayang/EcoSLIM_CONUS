@@ -19,7 +19,7 @@ contains
         implicit none
 
         integer:: istat
-        logical:: flag
+        logical,intent(out):: flag
 
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)

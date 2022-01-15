@@ -16,7 +16,7 @@ contains
         integer(hsize_t):: block(3)  ! Hyperslab block size
         integer(hsize_t):: chunk_dims(3)
 
-        real(8):: data(:,:,:) ! attention, pinned???
+        real(8),intent(out):: data(:,:,:) ! attention, pinned???
         integer:: error, rank_hdf5 = 3
 
         count  = [nx, ny, nz]

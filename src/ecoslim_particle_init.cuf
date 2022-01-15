@@ -9,7 +9,7 @@ module eco_particle_init
 contains
     subroutine initial_forward (fore_flag)
         implicit none
-        logical:: fore_flag
+        logical,intent(out):: fore_flag
 
         np_active = 0
         pid = 0

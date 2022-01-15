@@ -325,7 +325,7 @@ contains
 
     subroutine alloc_arrays_temp(Porosity_cpu)
         implicit none
-        real(8):: Porosity_cpu(:,:,:)
+        real(8),intent(out):: Porosity_cpu(:,:,:)
         !--------------------------------------------------------------------
         ! allocate arrays
             allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
