@@ -14,10 +14,9 @@ t=1:3600;
 ll=plot(t,gpu1(t,14)+gpu2(t,14)+gpu3(t,14)+gpu4(t,14),t,cpu(:,15),'--',...
     t,gpu1(t,14),t,gpu2(t,14),t,gpu3(t,14),t,gpu4(t,14));
 set(ll,'linewidth',2);
-<<<<<<< HEAD
+
 set(gca,'FontSize',18,'FontName','Times New Roman','FontWeight','Bold','Linewidth',1);
 ylabel('Active Particle Number','FontSize',20,'FontName','Times New Roman','FontWeight','Bold');
 xlabel('Timestep','FontSize',20,'FontName','Times New Roman','FontWeight','Bold');
 legend('4gpus total','cpu','gpu0','gpu1','gpu2','gpu3')
-=======
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
+

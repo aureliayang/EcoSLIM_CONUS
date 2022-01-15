@@ -13,7 +13,6 @@ set(ll,'linewidth',2);
 set(gca,'FontSize',18,'FontName','Times New Roman','FontWeight','Bold','Linewidth',1);
 ylabel('Active Particle Number','FontSize',20,'FontName','Times New Roman','FontWeight','Bold');
 xlabel('Timestep','FontSize',20,'FontName','Times New Roman','FontWeight','Bold');
-<<<<<<< HEAD
+
 legend('2gpus total','cpu','gpu0','gpu1','1gpu')
-=======
->>>>>>> 951d44b4e1694d6e51014ee948d6b2db57e4b12e
+
