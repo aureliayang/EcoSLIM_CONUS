@@ -1,6 +1,6 @@
 clear;
-gpu1=load('Log_particles.00000.txt');
-gpu2=load('Log_particles.00001.txt');
+gpu1=load('./test_01152021/Log_particles.00000.txt');
+gpu2=load('./test_01152021/Log_particles.00001.txt');
 gpu=load('../1gpu_hill/Log_particles.00000.txt');
 h1=load('../half1.txt');
 h2=load('../half2.txt');
