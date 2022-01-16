@@ -1,6 +1,6 @@
 module eco_compact_util
     use cudafor
-    use variable_list, only: P_de
+    use variable_list, only: P_de, ix1, iy1, dx, dy
     use variable_list, only: d_indices_T, d_isValid_T, P_T
     use variable_list, only: nattri, d_isValid
 
@@ -217,5 +217,35 @@ contains
             P_de(numElements+ii,:) = P_de(numElements+N_recv+ii,:)
         end if
     end subroutine connect_recv
+
+    attributes(global) subroutine local2global(N_inte,N_peri)
+
+        implicit none
+        integer,value:: N_inte,N_peri
+        integer:: ii
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= N_peri) then
+            P_de(N_inte+ii,1) = P_de(N_inte+ii,1) + dble(ix1)*dx
+            P_de(N_inte+ii,2) = P_de(N_inte+ii,2) + dble(iy1)*dy
+        end if
+
+    end subroutine local2global
+
+    attributes(global) subroutine global2local(N_inte,N_peri)
+
+    implicit none
+    integer,value:: N_inte,N_peri
+    integer:: ii
+
+    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+    if(ii <= N_peri) then
+        P_de(N_inte+ii,1) = P_de(N_inte+ii,1) - dble(ix1)*dx
+        P_de(N_inte+ii,2) = P_de(N_inte+ii,2) - dble(iy1)*dy
+    end if
+
+end subroutine global2local
 
 end module eco_compact_util

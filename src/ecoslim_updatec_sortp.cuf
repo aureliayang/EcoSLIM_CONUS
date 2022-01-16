@@ -5,7 +5,7 @@ module eco_updateC_sortP
     use variable_list, only: N_exit, holes, P_exit
     use variable_list, only: P_de, P_T, C_de
     use variable_list, only: d_isValid, d_indices
-    use variable_list, only: ix1, iy1, tPB
+    use variable_list, only: ix1_c, iy1_c, tPB
     use variable_list, only: np_active, nattri_c, nind_c
     use variable_list, only: exit_time, C_time
     use variable_list, only: startEvent, stopEvent
@@ -25,7 +25,7 @@ contains
 
             if(.not. spinup) &
             call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
-                ix1,iy1,np_active)
+                ix1_c,iy1_c,np_active)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)

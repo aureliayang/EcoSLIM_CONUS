@@ -14,18 +14,17 @@ module eco_particle_separ
 
 contains
 
-    subroutine separ_particles (flag)
+    subroutine separ_particles (separ_flag)
 
         implicit none
 
         integer:: istat
-        logical,intent(out):: flag
+        logical,intent(out):: separ_flag
 
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif
-        call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-            xmin3,ymin3,xmax3,ymax3,np_active,ix1,iy1)
+        call particles_separation<<<ceiling(dble(np_active)/tPB),tPB>>>(np_active)
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
@@ -57,7 +56,7 @@ contains
             if(np_active + N_peri >= np) then
                 write(17,*) ' **Warning particles separation out of bound'
                 write(17,*) ' **Exiting code gracefully writing restart'
-                flag = .true.
+                separ_flag = .true.
                 return
             endif
 
@@ -130,13 +129,11 @@ contains
         end if
     end subroutine separ_particles
 
-    attributes(global) subroutine particles_separation( &
-        xmin3_m,ymin3_m,xmax3_m,ymax3_m,np_active_m,ix1_m,iy1_m)
+    attributes(global) subroutine particles_separation(np_active_m)
         implicit none
 
         integer,parameter:: tPB = 256
-        real(8),value:: xmin3_m,ymin3_m,xmax3_m,ymax3_m
-        integer,value:: np_active_m,ix1_m,iy1_m
+        integer,value:: np_active_m
         integer:: ii
         real(8):: P_s(2)
 
@@ -147,11 +144,11 @@ contains
             P_s(1:2) = P_de(ii,1:2)
 
             ! Transfer global to local
-            P_s(1) = P_s(1) - dble(ix1_m)*dx
-            P_s(2) = P_s(2) - dble(iy1_m)*dy
+            P_s(1) = P_s(1) - dble(ix1)*dx
+            P_s(2) = P_s(2) - dble(iy1)*dy
 
-            if(P_s(1) <  xmin3_m .or. P_s(2) <  ymin3_m .or. &
-            P_s(1) >= xmax3_m .or. P_s(2) >= ymax3_m) then
+            if(P_s(1) <  xmin3 .or. P_s(2) <  ymin3 .or. &
+            P_s(1) >= xmax3 .or. P_s(2) >= ymax3) then
                 d_isValid(ii) = 0
                 ! perip
             else

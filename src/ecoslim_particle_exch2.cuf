@@ -9,12 +9,11 @@ module eco_particle_exch2
 
     use variable_list, only: holes, P_send, P_recv
     use variable_list, only: P_de, d_isValid, d_indices
-    use variable_list, only: ix1, iy1, nnx1, nny1, reflect
+    use variable_list, only: ix1_c, iy1_c, nnx1_c, nny1_c, reflect
     use variable_list, only: rank, t_rank, nind_c, tPB
     use variable_list, only: np_active !, ranknum, filenum
 
-    use variable_list, only: xgmin,ygmin,zgmin,xgmax,ygmax,zgmax
-    use variable_list, only: xmin1,ymin1,zmin1,xmax1,ymax1,zmax1
+    use variable_list, only: xmin1_c,ymin1_c,zmin1_c,xmax1_c,ymax1_c,zmax1_c
     use variable_list, only: inte_time
 
     use variable_list, only: tran_time1, tran_time2, tran_time3, tran_time4, tran_time5
@@ -53,6 +52,8 @@ contains
         tran_time1=0.; tran_time2=0.; tran_time3=0.; tran_time4=0.; tran_time5=0.
         tran_time6=0.; tran_time7=0.; tran_time8=0.; tran_time9=0.; tran_time10=0.
             #endif
+
+        ! call local2global<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
 
         sum_send = sum(N_send)
 
@@ -124,9 +125,8 @@ contains
 
         !interior particles
         call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
-            xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-            xmin1,ymin1,zmin1,xmax1,ymax1,zmax1, &
-            0,N_inte,ix1,iy1,reflect,rank)
+            xmin1_c,ymin1_c,zmin1_c,xmax1_c,ymax1_c,zmax1_c, &
+            0,N_inte,reflect,rank)
 
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
@@ -152,6 +152,8 @@ contains
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(tran_time10,startEvent,stopEvent)
             #endif
+
+        ! call global2local<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
 
     end subroutine particle_exchange2
 

@@ -41,11 +41,13 @@ program EcoSLIM
     use eco_particle_lb
     use eco_particle_separ
 
+!--------------------------------------------------------------------
     implicit none
     ! integer(8),allocatable,pinned:: p_num_cpu(:,:)
     ! type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
     integer:: istat
     logical:: separ_flag, pme_flag, fore_flag
+
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
     call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -55,6 +57,7 @@ program EcoSLIM
         #if _HDF5 == 1
     call open_hdf5_interface()
         #endif
+
 !--------------------------------------------------------------------
     ! Get and set unique device
     call assignDevice(deviceID)
@@ -81,12 +84,12 @@ program EcoSLIM
     open(30,file='Debug.'//trim(adjustl(ranknum))//'.txt')
 
     call read_input()
+
 !--------------------------------------------------------------------
     call alloc_arrays_const()
     ! now we know the total dimension
 
     call global_xyz()
-    ! restart file info inside, so have to call it before restart.
 
     call working_comm()
 !--------------------------------------------------------------------
@@ -95,18 +98,16 @@ program EcoSLIM
     ! if not restart, we do decompostion and build topology
     ! gridinfo is to get grid and Zonet_new
     ! if restart, read grid and Zonet_new in
-    ! we want to restart at n*add_f, and also 8760/m since we want results of a year
+    ! we want to restart at n*add_f, and also 8760/m since we need results of a complete year
 
     if (work_comm /= MPI_COMM_NULL) then
-        ! if(np_ic /= -1) then
 
         call copy_grid(map_sub) ! doing this on workers
 
         call alloc_arrays_temp(Porosity_cpu) ! doing this on workers
 
-        ! end if
-        call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-            tPB >>> (nnx1,nny1,buff,neigh_list,rank,ppx*qqy)
+        call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
+            tPB >>> (buff,neigh_list,rank,ppx*qqy)
 
         call local_xyz()
         !--------------------------------------------------------------------
@@ -115,15 +116,15 @@ program EcoSLIM
             write(filenum,'(i5.5)') pft1-1
             fname = trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
-            Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-            Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+            Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
+            Saturation_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
 
             Saturation_de = Saturation
                 ! allocate(h_cpu(np))
                 ! h_cpu = h
                 ! write(*,*) rank,'h_before',h_cpu(1)
-            call createRand_init<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> (nx_c,ny_c,nz_c, &
-                rank,np_ic,nnx1,nny1)
+            call createRand_init<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> (nx_c,ny_c,nz_c, &
+                rank,np_ic,nnx1_c,nny1_c)
                 ! h_cpu = h
                 ! write(*,*) rank,'h_after',h_cpu(1)
         endif
@@ -141,7 +142,7 @@ program EcoSLIM
         if(np_ic < -1) then
         end if
 
-    else !if(rank >= max_rank+1 .and. rank < t_rank) then
+    else
         call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
     end if
     ! if the initial number of GPUs equals the total number, this will be skipped.
@@ -174,59 +175,59 @@ program EcoSLIM
 
                 #if _HDF5 == 1
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
-            call read_h5_file(Vx_h5,nnx2+1,nny2,nz_c)
-            Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c)=Vx_h5
+            call read_h5_file(Vx_h5,nnx2_c+1,nny2_c,nz_c)
+            Vx(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c+1,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c)=Vx_h5
                 #else
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
-            Vx(ix2-ix1+1:ix2-ix1+nnx2+1,iy2-iy1+1:iy2-iy1+nny2,1:nz_c) = &
-            Vx_cpu(ix2+1:ix2+nnx2+1,iy2+1:iy2+nny2,1:nz_c)
+            Vx(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c+1,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c) = &
+            Vx_cpu(ix2_c+1:ix2_c+nnx2_c+1,iy2_c+1:iy2_c+nny2_c,1:nz_c)
                 #endif
 
                 #if _HDF5 == 1
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.h5'
-            call read_h5_file(Vy_h5,nnx2,nny2+1,nz_c)
-            Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c)=Vy_h5
+            call read_h5_file(Vy_h5,nnx2_c,nny2_c+1,nz_c)
+            Vy(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c+1,1:nz_c)=Vy_h5
                 #else
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
-            Vy(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2+1,1:nz_c) = &
-            Vy_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2+1,1:nz_c)
+            Vy(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c+1,1:nz_c) = &
+            Vy_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c+1,1:nz_c)
                 #endif
 
                 #if _HDF5 == 1
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.h5'
-            call read_h5_file(Vz_h5,nnx2,nny2,nz_c+1)
-            Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1)=Vz_h5
+            call read_h5_file(Vz_h5,nnx2_c,nny2_c,nz_c+1)
+            Vz(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c+1)=Vz_h5
                 #else
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
-            Vz(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,1:nz_c+1) = &
-            Vz_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,1:nz_c+1)
+            Vz(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c+1) = &
+            Vz_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,1:nz_c+1)
                 #endif
 
                 #if _HDF5 == 1
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.h5'
-            call read_h5_file(Saturation_h5,nnx2,nny2,nz_c)
-            Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:)=Saturation_h5
+            call read_h5_file(Saturation_h5,nnx2_c,nny2_c,nz_c)
+            Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=Saturation_h5
                 #else
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
-            Saturation(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-            Saturation_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+            Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
+            Saturation_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
                 #endif
 
             if (clmtrans) then
                 ! Read in the Evap_Trans
                     #if _HDF5 == 1
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.h5'
-                call read_h5_file(EvapTrans_h5,nnx2,nny2,nz_c)
-                EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:)=EvapTrans_h5
+                call read_h5_file(EvapTrans_h5,nnx2_c,nny2_c,nz_c)
+                EvapTrans(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=EvapTrans_h5
                     #else
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
                 call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
-                EvapTrans(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-                EvapTrans_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+                EvapTrans(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
+                EvapTrans_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
                     #endif
 
                 if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
@@ -240,8 +241,8 @@ program EcoSLIM
                     CLMvars = 0.d0
                     ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
                     ! call pfb_read(CLMvars_cpu,fname,nx,ny,nzclm)
-                    ! CLMvars(ix2-ix1+1:ix2-ix1+nnx2,iy2-iy1+1:iy2-iy1+nny2,:) = &
-                    ! CLMvars_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+                    ! CLMvars(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
+                    ! CLMvars_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
 
                 end if
             end if
@@ -295,9 +296,8 @@ program EcoSLIM
                 #endif
             ! peripheric particles
             call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
-                xgmin,ygmin,zgmin,xgmax,ygmax,zgmax, &
-                xmin2,ymin2,zmin2,xmax2,ymax2,zmax2, &
-                N_inte,N_peri,ix1,iy1,reflect,map_sub)
+                xmin2_c,ymin2_c,zmin2_c,xmax2_c,ymax2_c,zmax2_c, &
+                N_inte,N_peri,reflect,map_sub)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -390,60 +390,3 @@ program EcoSLIM
     call MPI_FINALIZE(ierr)
 
 end program EcoSLIM
-
-    ! open(10,file='Zone_de_after.'//trim(adjustl(ranknum))//'.txt')
-    ! !if(rank == 0) &
-    ! !    write(10,'(462(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! !if(rank == 1) &
-    ! !    write(10,'(463(256(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! !if(rank == 2) &
-    ! !    write(10,'(462(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! !if(rank == 3) &
-    ! !    write(10,'(463(257(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! if(rank == 0) &
-    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! if(rank == 1) &
-    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! if(rank == 2) &
-    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! if(rank == 3) &
-    ! write(10,'(18(34(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-    ! close(10)
-
-    !write(11,'("File IO Time Read (s):",e12.5)') IO_time_read
-    !write(11,'("Host to device data transfer (s):",e12.5)') h2d_time
-    !write(11,'("Add new particles (s):",e12.5)') add_time
-    !write(11,'("Peripheric particles (s):",e12.5)') peri_time/1000.
-    !write(11,'("Interior particles (s):",e12.5)') inte_time/1000.
-    !write(11,'("Update C array (s):",e12.5)') C_time/1000.
-    !write(11,'("Exit particles (s):",e12.5)') exit_time/1000.
-    !write(11,'("Particles separation (s):",e12.5)') sort_time
-    !write(11,'("Transfer particles (s):",e12.5)') transfer_time/1000.
-    !write(11,'("scan (s):",e12.5)') scan_time/1000.
-    !write(11,'("thrust (s):",e12.5)') thrust_time/1000.
-    !write(11,'("copy (s):",e12.5)') copy_time/1000.
-    !write(11,'("add (s):",e12.5)') add2_time/1000.
-    !Write(11,'("File IO Time Write (s):",e12.5)') float(IO_time_write)/1000.
-    !Write(11,'("Parallel Particle Time (s):",e12.5)') float(parallel_time)/1000.
-    !write(11,*)
-
-            ! open(10,file='Local_range.'//trim(adjustl(ranknum))//'.txt')
-            !     write(10,'(6(f15.2,1x))') Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-            !     write(10,'(6(f15.2,1x))') Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-            !     write(10,'(6(f15.2,1x))') Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-            !     write(10,'(6(f15.2,1x))') Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
-            ! close(10)
-
-            ! open(10,file='Zone_de_before.'//trim(adjustl(ranknum)))
-            !     write(10,'(8(12(i3,1x),/))') ((Zone_de(i,j),i=-buff+1,nnx1+buff),j=-buff+1,nny1+buff)
-            ! close(10)
-
-            ! open(10,file='topology.'//trim(adjustl(ranknum)))
-            !     write(10,'(8(i3,1x))') ix1,iy1,nnx1,nny1,ix2,iy2,nnx2,nny2
-            !     write(10,'(8(i3,1x))') ix2-ix1+1,ix2-ix1+nnx2,iy2-iy1+1,iy2-iy1+nny2
-            ! close(10)
-
-                ! open(10,file='Neighbor.'//trim(adjustl(ranknum)))
-                !     write(10,*) neigh_list
-                !     write(10,*) N_recv
-                ! close(10)

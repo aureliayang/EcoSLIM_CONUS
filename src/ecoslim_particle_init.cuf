@@ -3,7 +3,7 @@ module eco_particle_init
     use thrust
     use eco_particle_add
     use variable_list,only: np_active, pid, np, np_ic
-    use variable_list,only: nnx1, nny1, ix1, iy1
+    use variable_list,only: nnx1_c, nny1_c, ix1_c, iy1_c
     use variable_list,only: tout1, nz_c, tPB
     use variable_list,only: d_isValid, d_indices
 contains
@@ -14,12 +14,12 @@ contains
         np_active = 0
         pid = 0
 
-        call scan_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB), &
-        tPB >>> (nnx1,nny1)
+        call scan_init_particles<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB), &
+        tPB >>> ()
 
-        call thrustscan(d_isValid,nnx1*nny1*nz_c,d_indices)
+        call thrustscan(d_isValid,nnx1_c*nny1_c*nz_c,d_indices)
 
-        np_active = d_indices(nnx1*nny1*nz_c)
+        np_active = d_indices(nnx1_c*nny1_c*nz_c)
         np_active = np_ic*np_active
         pid = np_active
 
@@ -30,8 +30,8 @@ contains
             return
         endif
 
-        call add_init_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> &
-        (np_ic,tout1,nnx1,nny1,ix1,iy1)
+        call add_init_particles<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> &
+        (np_ic,tout1)
 
     end subroutine initial_forward
 end module eco_particle_init

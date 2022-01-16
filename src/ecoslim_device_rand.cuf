@@ -1,6 +1,6 @@
 module mrand
     use curand_device
-    type(curandStateXORWOW),allocatable,device:: h(:)
+    type(curandStateXORWOW),allocatable,device:: handle(:)
 contains
 
     attributes(global) subroutine createRand_init(nx,ny,nz,rank, &
@@ -15,7 +15,7 @@ contains
             seed = 123_8 ! this can be any number you want
             seq = 0_8 ! use this sequence
             offset = 3_8*abs(np_ic)*(ii-1) + 3_8*abs(np_ic)*nx*ny*nz*rank
-            call curand_init(seed, seq, offset, h(ii))
+            call curand_init(seed, seq, offset, handle(ii))
         endif
 
         ! 3_8*abs(np_ic) slots are reserved for each grid cell
@@ -34,7 +34,7 @@ contains
             seed = 12345_8
             seq = 0_8
             offset = 40_8*(ii-1)*pfnt + 40_8*pfnt*np*rank
-            call curand_init(seed, seq, offset, h(ii))
+            call curand_init(seed, seq, offset, handle(ii))
         endif
 
         ! 40 slots are reserved for each (particle+grid-cell) per timestep

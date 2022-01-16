@@ -7,13 +7,17 @@ module subdomain_bound
     use variable_list, only: ppx, qqy, rank, buff
     use variable_list, only: nx_c, ny_c, nz_c
     use variable_list, only: dx_c, dy_c, dz
-    use variable_list, only: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
-    use variable_list, only: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-    use variable_list, only: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-    use variable_list, only: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
+    use variable_list, only: xgmin_c, xgmax_c, ygmin_c, ygmax_c, zgmin_c, zgmax_c
+    use variable_list, only: xmin1_c, xmax1_c, ymin1_c, ymax1_c, zmin1_c, zmax1_c
+    use variable_list, only: xmin2_c, xmax2_c, ymin2_c, ymax2_c, zmin2_c, zmax2_c
+    use variable_list, only: xmin3_c, xmax3_c, ymin3_c, ymax3_c, zmin3_c, zmax3_c
+    use variable_list, only: xgmin, xgmax, ygmin, ygmax, zgmin, zgmax
+    use variable_list, only: xmin1, xmax1, ymin1, ymax1, zmin1, zmax1
+    use variable_list, only: xmin2, xmax2, ymin2, ymax2, zmin2, zmax2
+    use variable_list, only: xmin3, xmax3, ymin3, ymax3, zmin3, zmax3
     use variable_list, only: restartf, ranknum
     use variable_list, only: fh1, fh2
-    use variable_list, only: ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
+    use variable_list, only: ix1_c, iy1_c, nnx1_c, nny1_c, ix2_c, iy2_c, nnx2_c, nny2_c
     use variable_list, only: DEM, DEMname, fname, Pnts
     use variable_list, only: np, nind_c, np_active, pid
     use variable_list, only: P, grid, Zone_de, Zonet_new
@@ -21,20 +25,18 @@ module subdomain_bound
 contains
     subroutine global_xyz()
         ! get the boundary of the whole domain.
+        ! Only effective here for output purpose, after the call of local_xyz
+        ! this group of data are updated to local data
+        ! for extra GPU, this group of data will be updated when it is activated
 
         implicit none
 
-        ! set up domain boundaries
-        Xgmin = 0.0d0
-        Ygmin = 0.0d0
-        Zgmin = 0.0d0
-        Xgmax = dble(nx_c)*dx_c
-        Ygmax = dble(ny_c)*dy_c
-        ! Zgmax = 0.0d0
-        ! do k = 1, nz_c
-        !     Zgmax = Zgmax + dz(k)
-        ! end do
-        Zgmax = sum(dz)
+        xgmin_c = 0.0d0
+        ygmin_c = 0.0d0
+        zgmin_c = 0.0d0
+        xgmax_c = dble(nx_c)*dx_c
+        ygmax_c = dble(ny_c)*dy_c
+        zgmax_c = sum(dz)
 
             #if _TIMING == 1
         write(11,*)
@@ -45,9 +47,9 @@ contains
             #endif
         write(11,*)
         write(11,*) '## Domain Info'
-        write(11,'("Xmin:",e12.5," Xmax:",e12.5)') Xgmin, Xgmax
-        write(11,'("Ymin:",e12.5," Ymax:",e12.5)') Ygmin, Ygmax
-        write(11,'("Zmin:",e12.5," Zmax:",e12.5)') Zgmin, Zgmax
+        write(11,'("xmin:",e12.5," xmax:",e12.5)') xgmin_c, xgmax_c
+        write(11,'("ymin:",e12.5," ymax:",e12.5)') ygmin_c, ygmax_c
+        write(11,'("zmin:",e12.5," zmax:",e12.5)') zgmin_c, zgmax_c
         write(11,*)
 
     end subroutine global_xyz
@@ -55,52 +57,44 @@ contains
     subroutine local_xyz()
 
         implicit none
-        integer:: k
 
         ! set up subdomain boundaries
-        Xmin1 = 0.0d0
-        Ymin1 = 0.0d0
-        Zmin1 = 0.0d0
-        Xmax1 = dble(nnx1)*dx_c
-        Ymax1 = dble(nny1)*dy_c
-        ! Zmax1 = 0.0d0
-        ! do k = 1, nz_c
-        !     Zmax1 = Zmax1 + dz(k)
-        ! end do
-        Zmax1 = sum(dz)
+        xmin1_c = 0.0d0
+        ymin1_c = 0.0d0
+        zmin1_c = 0.0d0
+        xmax1_c = dble(nnx1_c)*dx_c
+        ymax1_c = dble(nny1_c)*dy_c
+        zmax1_c = sum(dz)
 
-        Xmin2 = -dble(buff)*dx_c
-        Ymin2 = -dble(buff)*dy_c
-        Zmin2 = 0.0d0
-        Xmax2 = dble(nnx1)*dx_c + dble(buff)*dx_c
-        Ymax2 = dble(nny1)*dy_c + dble(buff)*dy_c
-        ! Zmax2 = 0.0d0
-        ! do k = 1, nz_c
-        !     Zmax2 = Zmax2 + dz(k)
-        ! end do
-        Zmax2 = sum(dz)
+        xmin2_c = -dble(buff)*dx_c
+        ymin2_c = -dble(buff)*dy_c
+        zmin2_c = 0.0d0
+        xmax2_c = dble(nnx1_c)*dx_c + dble(buff)*dx_c
+        ymax2_c = dble(nny1_c)*dy_c + dble(buff)*dy_c
+        zmax2_c = sum(dz)
 
-        Xmin3 = dble(buff)*dx_c
-        Ymin3 = dble(buff)*dy_c
-        Zmin3 = 0.0d0
-        Xmax3 = dble(nnx1)*dx_c - dble(buff)*dx_c
-        Ymax3 = dble(nny1)*dy_c - dble(buff)*dy_c
-        ! Zmax3 = 0.0d0
-        ! do k = 1, nz_c
-        !     Zmax3 = Zmax3 + dz(k)
-        ! end do
-        Zmax3 = sum(dz)
+        xmin3_c = dble(buff)*dx_c
+        ymin3_c = dble(buff)*dy_c
+        zmin3_c = 0.0d0
+        xmax3_c = dble(nnx1_c)*dx_c - dble(buff)*dx_c
+        ymax3_c = dble(nny1_c)*dy_c - dble(buff)*dy_c
+        zmax3_c = sum(dz)
 
-        Xgmin = Xgmin - dble(ix1)*dx_c
-        Ygmin = Ygmin - dble(iy1)*dy_c
-        Zgmin = 0.0d0
-        Xgmax = Xgmax - dble(ix1)*dx_c
-        Ygmax = Ygmax - dble(iy1)*dy_c
-        ! Zgmax = 0.0d0
-        ! do k = 1, nz_c
-        !     Zgmax = Zgmax + dz(k)
-        ! end do
-        Zgmax = sum(dz)
+        xgmin_c = xgmin_c - dble(ix1_c)*dx_c
+        ygmin_c = ygmin_c - dble(iy1_c)*dy_c
+        zgmin_c = 0.0d0
+        xgmax_c = xgmax_c - dble(ix1_c)*dx_c
+        ygmax_c = ygmax_c - dble(iy1_c)*dy_c
+        zgmax_c = sum(dz)
+
+        xgmin = xgmin_c; xgmax = xgmax_c; ygmin = ygmin_c
+        ygmax = ygmax_c; zgmin = zgmin_c; zgmax = zgmax_c
+        xmin1 = xmin1_c; xmax1 = xmax1_c; ymin1 = ymin1_c
+        ymax1 = ymax1_c; zmin1 = zmin1_c; zmax1 = zmax1_c
+        xmin2 = xmin2_c; xmax2 = xmax2_c; ymin2 = ymin2_c
+        ymax2 = ymax2_c; zmin2 = zmin2_c; zmax2 = zmax2_c
+        xmin3 = xmin3_c; xmax3 = xmax3_c; ymin3 = ymin3_c
+        ymax3 = ymax3_c; zmin3 = zmin3_c; zmax3 = zmax3_c
 
     end subroutine local_xyz
 
@@ -148,7 +142,7 @@ contains
 
             ! read topology
             open(17,file='topology_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
-                read(17) ix1, iy1, nnx1, nny1, ix2, iy2, nnx2, nny2
+                read(17) ix1_c, iy1_c, nnx1_c, nny1_c, ix2_c, iy2_c, nnx2_c, nny2_c
             close(17)  ! Topology
         else
             !open(19,file='manager_grid_zonet_new', FORM='unformatted',access='stream')

@@ -11,6 +11,7 @@ module create_subdomain
     use thrust
 
     use variable_list, only: p_num, c_sum
+    ! p_num and c_sum are device attribute
     use variable_list, only: d_indices
     use variable_list, only: nx_c, ny_c, ppx, qqy, tPB ! , rank, t_rank !,ierr, buff
     use variable_list, only: grid

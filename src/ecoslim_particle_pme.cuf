@@ -4,7 +4,7 @@ module eco_particle_pme
     use eco_particle_add
     use variable_list, only: rank, c_GPU, map_sub, ierr, work_comm
     use variable_list, only: startEvent, stopEvent
-    use variable_list, only: nnx1, nny1, ix1, iy1, nz_c, tPB
+    use variable_list, only: nnx1_c, nny1_c, ix1_c, iy1_c, nz_c, tPB
     use variable_list, only: d_isValid, d_indices
     use variable_list, only: kk, add_f, i_added_particles
     use variable_list, only: np_active, np, iflux_p_res, pid
@@ -25,8 +25,7 @@ contains
                 istat = cudaEventRecord(startEvent,0)
                 #endif
 
-            call scan_new_particles<<< ceiling(dble(nnx1*nny1*nz_c)/tPB),tPB >>> ( &
-                nnx1,nny1)
+            call scan_new_particles<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> ()
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -35,7 +34,7 @@ contains
                 #endif
 
             ! d_isValid has the length as P or of np which is assigned in input script
-            ! so nnx1*nny1*nz_c should be smaller than np
+            ! so nnx1_c*nny1_c*nz_c should be smaller than np
             ! we don't care about the buffer zone for add of particles
 
             if (mod(kk,add_f) == 0) then
@@ -48,7 +47,7 @@ contains
                     #endif
 
                 ! after call the kernel ‘scan_new_particles’, using d_isValid to scan
-                call thrustscan(d_isValid,nnx1*nny1,d_indices)
+                call thrustscan(d_isValid,nnx1_c*nny1_c,d_indices)
 
                     #if _TIMING == 1
                     istat = cudaEventRecord(stopEvent,0)
@@ -60,7 +59,7 @@ contains
                     istat = cudaEventRecord(startEvent,0)
                     #endif
 
-                temp = d_indices(nnx1*nny1)
+                temp = d_indices(nnx1_c*nny1_c)
                 i_added_particles = temp * iflux_p_res
 
                     #if _TIMING == 1
@@ -83,8 +82,8 @@ contains
                         istat = cudaEventRecord(startEvent,0)
                         #endif
 
-                    call add_new_particles<<< ceiling(dble(nnx1*nny1)/tPB), &
-                        tPB >>> (iflux_p_res,np_active,pid,nnx1,nny1,ix1,iy1,kk)
+                    call add_new_particles<<< ceiling(dble(nnx1_c*nny1_c)/tPB), &
+                        tPB >>> (iflux_p_res,np_active,pid,kk)
 
                         #if _TIMING == 1
                         istat = cudaEventRecord(stopEvent,0)

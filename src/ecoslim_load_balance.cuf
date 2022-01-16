@@ -73,30 +73,10 @@ contains
 
                     call alloc_arrays_temp(Porosity_cpu)
 
-                    ! Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
-                    ! Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
-
                     call local_xyz()
 
-                    ! Porosity = 0.3d0
-                    ! fname = trim(adjustl(pname))//'.out.porosity.pfb'
-                    ! call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
-                    ! Porosity(1+ix2-ix1:nnx2+ix2-ix1,1+iy2-iy1:nny2+iy2-iy1,:) = &
-                    ! Porosity_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
-!
-                    ! Ind_de = Ind
-                    ! Porosity_de   = Porosity
-                    ! EvapTrans_T  => EvapTrans_de
-                    ! Saturation_T => Saturation_de
-                    ! Porosity_T   => Porosity_de
-                    ! Vx_T  => Vx_de
-                    ! Vy_T  => Vy_de
-                    ! Vz_T  => Vz_de
-                    ! Ind_T => Ind_de
-                    ! Zone_T => Zone_de
-
-                    call scan_zone<<< ceiling(dble((nnx1+2*buff)*(nny1+2*buff))/tPB), &
-                    tPB >>> (nnx1,nny1,buff,neigh_list,map_sub,ppx*qqy)
+                    call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
+                    tPB >>> (buff,neigh_list,map_sub,ppx*qqy)
 
                 end if
             end if

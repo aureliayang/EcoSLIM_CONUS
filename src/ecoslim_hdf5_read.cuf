@@ -1,7 +1,7 @@
 module hdf5_file_read
     use HDF5
     use variable_list, only: fname, dsetname
-    use variable_list, only: ix2, iy2
+    use variable_list, only: ix2_c, iy2_c
 contains
     subroutine read_h5_file(data,nx,ny,nz)
         implicit none
@@ -22,7 +22,7 @@ contains
         count  = [nx, ny, nz]
         chunk_dims = [nx, ny, nz]
 
-        offset = [ix2, iy2, 0]
+        offset = [ix2_c, iy2_c, 0]
         stride = [1, 1, 1]
         block  = [1, 1, 1]
 

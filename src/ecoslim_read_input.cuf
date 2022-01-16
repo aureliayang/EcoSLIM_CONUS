@@ -7,7 +7,7 @@ module eco_read_input
     use variable_list,only: dz,dz_de,dx,dx_c,dy,dy_c
     use variable_list,only: pfdt,pfdt_c,pft1,pft2,tout1,n_cycle,add_f
     use variable_list,only: ipwrite,ibinpntswrite,etwrite,icwrite
-    use variable_list,only: kk,pfnt,Time_Next,Time_first,outkk
+    use variable_list,only: pfnt,Time_Next,Time_first,outkk
     use variable_list,only: V_mult,clmtrans,clmfile,iflux_p_res
     use variable_list,only: denh2o,denh2o_c,moldiff,moldiff_c,dtfrac,dtfrac_c
     use variable_list,only: nind,nind_c,Indname
@@ -17,6 +17,7 @@ contains
     subroutine read_input()
 
         implicit none
+        integer:: kk
 
     !--------------------------------------------------------------------
         ! Read inputs, set up domain, write the log file
@@ -184,7 +185,7 @@ contains
         write(11,*)
         write(11,*) 'Indicator File'
         write(11,*) nind_c, 'Indicators'
-
+        flush(11)
         ! end of SLIM input
         close(10)
         ! Read all input data on all ranks.

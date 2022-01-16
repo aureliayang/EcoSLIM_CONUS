@@ -31,7 +31,7 @@ module variable_list
 !--------------------------------------------------------------------
     use mpi
     use cudafor
-    use mrand, only: h
+    use mrand, only: handle
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
 
@@ -117,10 +117,15 @@ module variable_list
     ! will remove particles if ET > 0
     ! clmfile governs reading of the full CLM output, not just evaptrans
 
-    real(8):: Xmin1, Xmax1, Ymin1, Ymax1, Zmin1, Zmax1
-    real(8):: Xmin2, Xmax2, Ymin2, Ymax2, Zmin2, Zmax2
-    real(8):: Xmin3, Xmax3, Ymin3, Ymax3, Zmin3, Zmax3
-    real(8):: Xgmin, Xgmax, Ygmin, Ygmax, Zgmin, Zgmax
+    real(8):: xmin1_c, xmax1_c, ymin1_c, ymax1_c, zmin1_c, zmax1_c
+    real(8):: xmin2_c, xmax2_c, ymin2_c, ymax2_c, zmin2_c, zmax2_c
+    real(8):: xmin3_c, xmax3_c, ymin3_c, ymax3_c, zmin3_c, zmax3_c
+    real(8):: xgmin_c, xgmax_c, ygmin_c, ygmax_c, zgmin_c, zgmax_c
+
+    real(8),constant:: xmin1, xmax1, ymin1, ymax1, zmin1, zmax1
+    real(8),constant:: xmin2, xmax2, ymin2, ymax2, zmin2, zmax2
+    real(8),constant:: xmin3, xmax3, ymin3, ymax3, zmin3, zmax3
+    real(8),constant:: xgmin, xgmax, ygmin, ygmax, zgmin, zgmax
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time
@@ -170,7 +175,8 @@ module variable_list
     real(8),allocatable,pinned:: dz(:)
 
     integer,parameter:: buff = 1  ! Buffer can be specified by user, for GW 1km or 2km is enough
-    integer:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
+    integer:: nnx1_c,nny1_c,nnx2_c,nny2_c,ix1_c,iy1_c,ix2_c,iy2_c
+    integer,constant:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
     integer,allocatable:: nump(:) ! gather active particles to jusdge if LB
     integer:: transfer, map_sub, LB, th_value
     integer,allocatable:: l_GPUs(:,:), t_GPUs(:), c_GPU(:)
@@ -260,7 +266,7 @@ contains
         ! N_send means, on each rank, it only sends particles to the initial GPUs
         ! N_recv means, on each rank, it receives particles from all rank.
         ! However, N_recv has no use on secondary ranks/GPUs.
-        allocate(d_isValid(np),d_indices(np),h(np))
+        allocate(d_isValid(np),d_indices(np),handle(np))
 
         allocate(out_np_cpu(1),ET_np_cpu(1))
         allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
@@ -328,20 +334,20 @@ contains
         real(8),intent(out):: Porosity_cpu(:,:,:)
         !--------------------------------------------------------------------
         ! allocate arrays
-            allocate(DEM(-buff+1:nnx1+buff,-buff+1:nny1+buff))
+            allocate(DEM(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff))
 
-            allocate(Vx(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
-                     Vy(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
-                     Vz(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1))
+            allocate(Vx(-buff+1:nnx1_c+1+buff,-buff+1:nny1_c+buff,nz_c), &
+                     Vy(-buff+1:nnx1_c+buff,-buff+1:nny1_c+1+buff,nz_c), &
+                     Vz(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c+1))
 
-            allocate(Saturation(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                       Porosity(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                      EvapTrans(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                            Ind(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+            allocate(Saturation(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                       Porosity(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                      EvapTrans(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                            Ind(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c))
 
-            allocate(EvapTrans_da(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-            allocate(CLMvars(-buff+1:nnx1+buff,-buff+1:nny1+buff,nzclm))
-            allocate(C(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
+            allocate(EvapTrans_da(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c))
+            allocate(CLMvars(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nzclm))
+            allocate(C(n_constituents,-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c))
 
             ! Intialize everything to Zero
             Vx = 0.0d0
@@ -359,25 +365,23 @@ contains
 
             !-------------------------------------
             ! allocate arrays on GPU
-            allocate(Vx_de(-buff+1:nnx1+1+buff,-buff+1:nny1+buff,nz_c), &
-                     Vy_de(-buff+1:nnx1+buff,-buff+1:nny1+1+buff,nz_c), &
-                     Vz_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c+1), &
-                    Ind_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-            allocate(Saturation_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     Porosity_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     EvapTrans_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     EvapTrans_da_de(-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c), &
-                     CLMvars_de(-buff+1:nnx1+buff,-buff+1:nny1+buff), &
-                     Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff))
-            allocate(C_de(n_constituents,-buff+1:nnx1+buff,-buff+1:nny1+buff,nz_c))
-
-            Zone_de = -1
+            allocate(Vx_de(-buff+1:nnx1_c+1+buff,-buff+1:nny1_c+buff,nz_c), &
+                     Vy_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+1+buff,nz_c), &
+                     Vz_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c+1), &
+                    Ind_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c))
+            allocate(Saturation_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                     Porosity_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                     EvapTrans_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                     EvapTrans_da_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c), &
+                     CLMvars_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff), &
+                     Zone_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff))
+            allocate(C_de(n_constituents,-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c))
 
             ! Porosity = 0.3d0
             fname = trim(adjustl(pname))//'.out.porosity.pfb'
             call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
-            Porosity(1+ix2-ix1:nnx2+ix2-ix1,1+iy2-iy1:nny2+iy2-iy1,:) = &
-            Porosity_cpu(ix2+1:ix2+nnx2,iy2+1:iy2+nny2,:)
+            Porosity(1+ix2_c-ix1_c:nnx2_c+ix2_c-ix1_c,1+iy2_c-iy1_c:nny2_c+iy2_c-iy1_c,:) = &
+            Porosity_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
             Ind_de = Ind
             Porosity_de   = Porosity
             EvapTrans_T  => EvapTrans_de
@@ -391,18 +395,19 @@ contains
             Ind_T => Ind_de
             Zone_T => Zone_de
 
-            Zone_de(-buff+1:nnx1+buff,-buff+1:nny1+buff) = &
-            Zonet_new(-buff+ix1+1:ix1+nnx1+buff,-buff+iy1+1:iy1+nny1+buff)
+            Zone_de = -1
+            Zone_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff) = &
+            Zonet_new(-buff+ix1_c+1:ix1_c+nnx1_c+buff,-buff+iy1_c+1:iy1_c+nny1_c+buff)
 
-            allocate(Saturation_h5(nnx2,nny2,nz_c),Porosity_h5(nnx2,nny2,nz_c))
-            allocate(EvapTrans_h5(nnx2,nny2,nz_c),CLMvars_h5(nnx2,nny2,nzclm))
-            allocate(Vx_h5(nnx2+1,nny2,nz_c),Vy_h5(nnx2,nny2+1,nz_c),Vz_h5(nnx2,nny2,nz_c+1))
+            allocate(Saturation_h5(nnx2_c,nny2_c,nz_c),Porosity_h5(nnx2_c,nny2_c,nz_c))
+            allocate(EvapTrans_h5(nnx2_c,nny2_c,nz_c),CLMvars_h5(nnx2_c,nny2_c,nzclm))
+            allocate(Vx_h5(nnx2_c+1,nny2_c,nz_c),Vy_h5(nnx2_c,nny2_c+1,nz_c),Vz_h5(nnx2_c,nny2_c,nz_c+1))
 
     end subroutine alloc_arrays_temp
 
     subroutine initialize_time()
         implicit none
-        ! How to do timing is also a new question when we do asyn later.
+        ! How to do timing is also a question if we do asyn later.
         ! Set up timing
         Total_time1 = 0.d0
         Total_time2 = 0.d0
