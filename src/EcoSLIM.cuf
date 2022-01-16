@@ -277,7 +277,8 @@ program EcoSLIM
             !!!!! ****since add_f is large, after new GPU is added, in the following add_f steps, in fact,
             !!!!! ****there are no particles on this new GPU, so we need if condition for the following work.
 
-            if(separate) then
+            if(separate .and. mod(kk,abs(transfer)) == 0) then
+            ! do separation when we do transfer. Otherwise, the interior part will not be calculated.
                 if(np_active > 0) then
                     separ_flag = .false.
                     call separ_particles(separ_flag)
@@ -314,6 +315,7 @@ program EcoSLIM
             if(transfer < 0) then
                 if(mod(kk,abs(transfer)) == 0) then
                     call particle_exchange2()
+                    ! currently, LB not supported
                 end if
             end if
 

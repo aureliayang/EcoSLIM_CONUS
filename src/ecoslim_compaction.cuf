@@ -133,10 +133,11 @@ contains
         !dimension is determined by np_active - d_indices(np_active)
         !np_active is numElements
         !holes is a temporary array that just needs dynamic allocation on cpu
-        integer:: ii, ii2, temp1, temp2   !global index in the array
+        integer:: ii, ii2, temp1, temp2, tempi   !global index in the array
         integer,value:: offset, numElements
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        tempi = d_indices_T(numElements)
 
         !if(ii <= numElements) &
         !ii2 = d_indices(numElements) - d_indices(ii) + 1
@@ -144,9 +145,9 @@ contains
         !if(ii == numElements) print *, 'rank',rank,'ii',ii,'ii2',ii2
 
         if(ii <= numElements .and. d_isValid_T(ii) > 0) then
-            ii2 = d_indices_T(numElements) - d_indices_T(ii) + 1
-            if (ii2 <= numElements-d_indices_T(numElements) .and. &
-                holes(ii2) <= d_indices_T(numElements)) then
+            ii2 = tempi - d_indices_T(ii) + 1
+            if (ii2 <= numElements-tempi .and. &
+                holes(ii2) <= tempi) then
                 temp1 = offset+holes(ii2)
                 temp2 = offset+ii
                 P_de(temp1,:) = P_de(temp2,:)
@@ -235,17 +236,17 @@ contains
 
     attributes(global) subroutine global2local(N_inte,N_peri)
 
-    implicit none
-    integer,value:: N_inte,N_peri
-    integer:: ii
+        implicit none
+        integer,value:: N_inte,N_peri
+        integer:: ii
 
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-    if(ii <= N_peri) then
-        P_de(N_inte+ii,1) = P_de(N_inte+ii,1) - dble(ix1)*dx
-        P_de(N_inte+ii,2) = P_de(N_inte+ii,2) - dble(iy1)*dy
-    end if
+        if(ii <= N_peri) then
+            P_de(N_inte+ii,1) = P_de(N_inte+ii,1) - dble(ix1)*dx
+            P_de(N_inte+ii,2) = P_de(N_inte+ii,2) - dble(iy1)*dy
+        end if
 
-end subroutine global2local
+    end subroutine global2local
 
 end module eco_compact_util

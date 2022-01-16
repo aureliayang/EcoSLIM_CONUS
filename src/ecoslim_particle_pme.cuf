@@ -9,7 +9,7 @@ module eco_particle_pme
     use variable_list, only: kk, add_f, i_added_particles
     use variable_list, only: np_active, np, iflux_p_res, pid
     use variable_list, only: PET_balance, PET_balance_de
-    use variable_list, only: t1, t2, scan_time, thrust_time
+    use variable_list, only: scan_time, thrust_time
     use variable_list, only: copy_time, add2_time, reduce_time
 
 contains
@@ -73,7 +73,6 @@ contains
                     if(np_active + i_added_particles >= np) then
                         write(11,*) ' **Warning rainfall input but no paricles left'
                         write(11,*) ' **Exiting code gracefully writing restart'
-                        ! goto 9090
                         pme_flag = .true.
                         return
                     endif
@@ -97,24 +96,22 @@ contains
             end if
         end if
 
-        PET_balance = PET_balance_de
         call MPI_Barrier(work_comm,ierr)
 
             #if _TIMING == 1
-            ! istat = cudaEventRecord(startEvent,0)
-            t1 = mpi_wtime()
+            istat = cudaEventRecord(startEvent,0)
             #endif
 
+        PET_balance = PET_balance_de
+        ! MPI_ALLReduce is faster on CPU
         call MPI_ALLReduce(MPI_IN_PLACE,PET_balance,2,MPI_DOUBLE_PRECISION,MPI_SUM,work_comm,ierr)
         ! no matter if a GPU in the work group working, it will join this reduce,
         ! otherwise, we need one more work group which will be extra time.
 
             #if _TIMING == 1
-            !istat = cudaEventRecord(stopEvent,0)
-            !istat = cudaEventSynchronize(stopEvent)
-            !istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
-            t2 = mpi_wtime()
-            reduce_time = (t2 - t1)*1000
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(reduce_time,startEvent,stopEvent)
             #endif
     end subroutine particle_pme
 end module eco_particle_pme

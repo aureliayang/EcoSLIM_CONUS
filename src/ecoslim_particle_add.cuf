@@ -10,9 +10,9 @@ module eco_particle_add
     use variable_list, only: EvapTrans_T, CLMvars_T, Ind_T
     use variable_list, only: EvapTrans_da_T, dz_T, d_indices_T
     use variable_list, only: dx, dy, pfdt, denh2o, nind, nz
+    use variable_list, only: nnx1, nny1, ix1, iy1
     use variable_list, only: PET_balance_de, P_de, C_de
     use variable_list, only: d_isValid
-    use variable_list, only: nnx1, nny1, ix1, iy1
 
 contains
 
@@ -137,28 +137,28 @@ attributes(global) subroutine scan_new_particles()
 
     implicit none
     ! real(8),intent(out):: PET_balance(:)
-    integer:: i, j, k, ii, tempi
+    integer:: i, j, k, ii, tempmod, tempxy
     real(8):: temp
 
     ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-
+    tempxy = nnx1*nny1
     ! get i, j, k from ii
-    if(ii <= nnx1*nny1*nz) then
+    if(ii <= tempxy*nz) then
 
-        tempi = mod(ii,nnx1*nny1)
+        tempmod = mod(ii,tempxy)
 
-        if(tempi == 0) then
-            k = ii/(nnx1*nny1)
+        if(tempmod == 0) then
+            k = ii/tempxy
             j = nny1
             i = nnx1
         else
-            k = ii/(nnx1*nny1) + 1
-            if(mod(tempi,nnx1) == 0) then
-                j = tempi/nnx1
+            k = ii/tempxy + 1
+            if(mod(tempmod,nnx1) == 0) then
+                j = tempmod/nnx1
                 i = nnx1
             else
-                j = tempi/nnx1 + 1
-                i = mod(tempi,nnx1)
+                j = tempmod/nnx1 + 1
+                i = mod(tempmod,nnx1)
             end if
         end if
 
@@ -170,14 +170,14 @@ attributes(global) subroutine scan_new_particles()
                 temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
             endif
 
-            tempi = ii - nnx1*nny1*(nz-1)
+            tempmod = ii - tempxy*(nz-1)
             if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                if(k == nz) d_isValid(tempi) = 1
+                if(k == nz) d_isValid(tempmod) = 1
                 ! only the top layer (k = nz) will introduce new particles
                 ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
                 ! it must be in the top layer.
             else
-                if(k == nz) d_isValid(tempi) = 0
+                if(k == nz) d_isValid(tempmod) = 0
             endif
             ! pass add_f and kk in, use if condition.
             ! but I feel too much extra work. Probably just let it calculate and we never use it,
@@ -191,12 +191,7 @@ attributes(global) subroutine add_new_particles( &
     ! CLMvars is only CLMvars(i,j,11)
 
     implicit none
-    ! real(8),intent(inout):: P(:,:)
-    ! real(8),intent(in):: dz(:)
-    ! integer,intent(in):: d_indices(:)
-    integer,value:: iflux_p_res, np_active, pid
-    integer,value:: kk
-    ! real(8),value:: denh2o
+    integer,value:: iflux_p_res, np_active, pid, kk
     integer:: i, j, k, ij, ii, ii_l
     integer:: index, itemp, temp, Ploc(2)
     real(8),shared:: P_s(256,2)
@@ -265,6 +260,7 @@ attributes(global) subroutine add_new_particles( &
 
                 P_de(index,1) = P_s(ii_l,1) + dble(ix1)*dx
                 P_de(index,2) = P_s(ii_l,2) + dble(iy1)*dy
+
                 handle(index) = hh
             enddo
         endif

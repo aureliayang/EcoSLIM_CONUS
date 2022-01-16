@@ -24,8 +24,7 @@ contains
         implicit none
 
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
-        integer,value:: np_active
-        integer,value:: offset,rank
+        integer,value:: np_active,offset,rank
         logical,value:: reflect
 
         integer:: ii,k,Ploc(3),ii_l
@@ -99,8 +98,7 @@ contains
                     (P_T(ii,1) >= Xmax).or.(P_T(ii,2) >= Ymax).or.(P_T(ii,3) >= (Zmax-dz_T(nz)))) then
 
                 if ((P_T(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
-                    (gl(ii_l,1) == 1.).and. &
-                    (Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
+                    (gl(ii_l,1) == 1.).and.(Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
 
                     temp = atomicAdd(Out_age_de(1), P_T(ii,4)*P_T(ii,6))
                     temp = atomicAdd(Out_mass_de(1), P_T(ii,6))
@@ -143,16 +141,16 @@ contains
                 ! converting darcy flux to average linear velocity
 
                 Vpx = ((1.-advdt(1))*Vx_T(Ploc(1),Ploc(2),Ploc(3)) &
-                    + Vx_T(Ploc(1)+1,Ploc(2),Ploc(3))*advdt(1))   &
-                    /(gl(ii_l,2)*gl(ii_l,1))
+                        + Vx_T(Ploc(1)+1,Ploc(2),Ploc(3))*advdt(1)) &
+                        /(gl(ii_l,2)*gl(ii_l,1))
 
                 Vpy = ((1.-advdt(2))*Vy_T(Ploc(1),Ploc(2),Ploc(3)) &
                         + Vy_T(Ploc(1),Ploc(2)+1,Ploc(3))*advdt(2)) &
                         /(gl(ii_l,2)*gl(ii_l,1))
 
                 Vpz = ((1.-advdt(3))*Vz_T(Ploc(1),Ploc(2),Ploc(3)) &
-                        + Vz_T(Ploc(1),Ploc(2),Ploc(3)+1)*advdt(3))  &
-                            /(gl(ii_l,2)*gl(ii_l,1))
+                        + Vz_T(Ploc(1),Ploc(2),Ploc(3)+1)*advdt(3)) &
+                        /(gl(ii_l,2)*gl(ii_l,1))
 
                 ! calculate particle dt
                 ! check each direction independently

@@ -132,7 +132,6 @@ contains
     attributes(global) subroutine particles_separation(np_active_m)
         implicit none
 
-        integer,parameter:: tPB = 256
         integer,value:: np_active_m
         integer:: ii
         real(8):: P_s(2)
@@ -141,7 +140,8 @@ contains
 
         if (ii <= np_active_m) then
 
-            P_s(1:2) = P_de(ii,1:2)
+            P_s(1:2) = P_T(ii,1:2)
+            ! P_T is in eco_compact_util
 
             ! Transfer global to local
             P_s(1) = P_s(1) - dble(ix1)*dx
