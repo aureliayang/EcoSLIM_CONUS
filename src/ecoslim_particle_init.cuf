@@ -3,7 +3,7 @@ module eco_particle_init
     use thrust
     use eco_particle_add
     use variable_list,only: np_active, pid, np, np_ic
-    use variable_list,only: nnx1_c, nny1_c, ix1_c, iy1_c
+    use variable_list,only: nnx1_c, nny1_c
     use variable_list,only: tout1, nz_c, tPB
     use variable_list,only: d_isValid, d_indices
 contains

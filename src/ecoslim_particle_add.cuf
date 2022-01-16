@@ -58,11 +58,7 @@ end subroutine scan_init_particles
 attributes(global) subroutine add_init_particles(np_ic,tout1)
 
     implicit none
-    ! real(8),intent(inout):: P(:,:)
-    ! real(8),intent(in):: dz(:)
-    ! integer,intent(in):: d_indices(:)
     integer,value:: np_ic, tout1
-    ! real(8),value:: denh2o
     integer:: i, j, k, index, ij, ik, ii, temp
     real(8):: Z
     type(curandStateXORWOW):: hh

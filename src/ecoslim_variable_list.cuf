@@ -226,7 +226,7 @@ module variable_list
     integer,allocatable,device,target:: d_isValid(:),d_indices(:),holes(:)
     integer,texture,pointer:: d_isValid_T(:),d_indices_T(:)
 
-    integer,allocatable,managed,target:: Zone_de(:,:)
+    integer,allocatable,device,target:: Zone_de(:,:)
     integer,texture,pointer:: Zone_T(:,:)
 
     integer(8),allocatable,device:: p_num(:,:), c_sum(:)
