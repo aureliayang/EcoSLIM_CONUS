@@ -24,19 +24,19 @@
 * **tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep for hot start
 * **n_cycle,** The cycles to use ParFlow files
 * **add_f,** The time interval to add particles
-* **ipwrite,**
-* **ibinpntswrite,**
-* **etwrite,**
-* **icwrite,**
+* **ipwrite,** Not supported now
+* **ibinpntswrite,** Not supported now
+* **etwrite,** Not supported now
+* **icwrite,** Not supported now
 * **V_mult,** Velocity multiplier. Not supported now and only used for transfer test.
 * **clmtrans,** clm evap trans?
 * **clmfile,** clm output file?
-* **iflux_p_res,**
+* **iflux_p_res,** The number o particles added into the domain if PME > 0
 * **denh2o,** density of water
-* **moldiff,**
-* **dtfrac,**
-* **nind,**
-* **Indname,**
+* **moldiff,** Molecular Diffusivity
+* **dtfrac,** Numerical Stability Information
+* **nind,** Number of subsurface indicator
+* **Indname,** pfb file of indicator
 # Build (for users)
 * An example of environment on Della GPU cluster at Princeton University:  
 * if hdf5 is disabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
