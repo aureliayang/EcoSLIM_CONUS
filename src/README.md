@@ -6,13 +6,13 @@
 * **ny,** Dimension in y direction
 * **nz,** Dimension in z direction
 * **nCLMsoil,** Layers coupled between CLM and ParFlow
-* **ppx,** Split in x direction
-* **qqy,** Split in y direction
+* **ppx,** Split in x direction, like P in ParFlow
+* **qqy,** Split in y direction, like Q in ParFlow
 * **transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is one by one transfer, abs(transfer) is frequency
-* **separate,** Separate or not
+* **separate,** If we separate particles into interior an peripheric portions fo transfer
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **th_value,** the threshold to start a new GPU
-* **spinup,** if true, it will not do the calculation of C array. This aims to speedup th spinup.
+* **spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
 * **np_ic,** Number of particles per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
 * **dx,** grid-cell size in x direction
