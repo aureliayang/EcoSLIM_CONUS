@@ -1,4 +1,4 @@
-# Input file (for users)
+# Input file 
 * **runname,** EcoSLIM run name
 * **pname,** Path of ParFlow files
 * **DEMname,** pfb file name of DEM
@@ -37,7 +37,7 @@
 * **dtfrac,** Numerical stability information
 * **nind,** Number of subsurface indicator
 * **Indname,** pfb file of indicator
-# Build (for users)
+# Build 
 **An example of environment on Della GPU cluster at Princeton University:**  
 1. If hdf5 is disabled:  
     <table>  
