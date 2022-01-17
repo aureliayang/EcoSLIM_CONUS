@@ -40,44 +40,44 @@
 # Build (for users)
 **An example of environment on Della GPU cluster at Princeton University:**  
 1. If hdf5 is disabled:  
-  <table>  
-    <tr>
-      <td>Compiler</td>
-      <td>nvhpc/21.5</td>
-    </tr> 
-    <tr>
-      <td>CUDA</td>
-      <td>cudatoolkit/11.3</td>
-    </tr> 
-    <tr>
-      <td>MPI</td>
-      <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>  
-    </tr>  
-  </table>  
+    <table>  
+      <tr>
+        <td>Compiler</td>
+        <td>nvhpc/21.5</td>
+      </tr> 
+      <tr>
+        <td>CUDA</td>
+        <td>cudatoolkit/11.3</td>
+      </tr> 
+      <tr>
+        <td>MPI</td>
+        <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>  
+      </tr>  
+    </table>  
 
 * Build in the src folder:  
   ```
   make
   ```
 2. If hdf5 is enabled:  
-  <table>  
-    <tr>  
-      <td>Compiler</td>
-      <td>nvhpc/21.5</td>
-    </tr>
-    <tr>
-      <td>CUDA</td>
-      <td>cudatoolkit/11.3</td>
-    </tr>
-    <tr>
-      <td>MPI</td>
-      <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>
-    </tr>
-    <tr>
-      <td>HDF5</td>
-      <td>hdf5/nvhpc-21.5/1.10.6</td>
-    </tr>  
-  </table>   
+    <table>  
+      <tr>  
+        <td>Compiler</td>
+        <td>nvhpc/21.5</td>
+      </tr>
+      <tr>
+        <td>CUDA</td>
+        <td>cudatoolkit/11.3</td>
+      </tr>
+      <tr>
+        <td>MPI</td>
+        <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>
+      </tr>
+      <tr>
+        <td>HDF5</td>
+        <td>hdf5/nvhpc-21.5/1.10.6</td>
+      </tr>  
+    </table>   
 
 * Build in the src folder:  
   ```
