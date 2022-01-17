@@ -40,7 +40,7 @@
 # Build (for users)
 * An example of environment on Della GPU cluster at Princeton University:  
 * If hdf5 is disabled:  
-  |nvhpc/21.5|cudatoolkit/11.3|openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
+  |nvhpc/21.5|cudatoolkit/11.3|openmpi/cuda-11.3/nvhpc-21.5/4.1.1|
 * Build in the src folder:  
   ```
   make
