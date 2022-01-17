@@ -128,6 +128,7 @@ module variable_list
     real:: peri_time, inte_time, exit_time, C_time
     real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
     real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
+    real:: tran_time11=0., tran_time12=0., tran_time13=0., tran_time14=0., tran_time15=0.
     real:: scan_time, thrust_time, copy_time, add2_time, reduce_time = 0.
     real:: sort_time1 = 0., sort_time2 = 0.,sort_time3 = 0.,sort_time4 = 0.,sort_time5 = 0.
     real:: sort_time6 = 0., sort_time7 = 0.,sort_time8 = 0.,sort_time9 = 0.,sort_time10 = 0.

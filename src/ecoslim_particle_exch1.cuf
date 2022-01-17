@@ -19,6 +19,7 @@ module eco_particle_exch1
 
     use variable_list, only: tran_time1, tran_time2, tran_time3, tran_time4, tran_time5
     use variable_list, only: tran_time6, tran_time7, tran_time8, tran_time9, tran_time10
+    use variable_list, only: tran_time11, tran_time12, tran_time13, tran_time14, tran_time15
     use variable_list, only: startEvent, stopEvent
 
 contains
@@ -33,10 +34,12 @@ contains
         integer:: istat, temp
         real:: tran_t1, tran_t2, tran_t3, tran_t4, tran_t5
         real:: tran_t6, tran_t7, tran_t8, tran_t9, tran_t10
+        real:: tran_t11, tran_t12, tran_t13, tran_t14, tran_t15
 
                 #if _TIMING == 1
             tran_time1=0.; tran_time2=0.; tran_time3=0.; tran_time4=0.; tran_time5=0.
             tran_time6=0.; tran_time7=0.; tran_time8=0.; tran_time9=0.; tran_time10=0.
+            tran_time11=0.; tran_time12=0.; tran_time13=0.; tran_time14=0.; tran_time15=0.
                 #endif
 
             ! call local2global<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
@@ -73,9 +76,27 @@ contains
                             tran_time1 = tran_time1 + tran_t1
                             #endif
 
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
                         call thrustscan(d_isValid,N_peri,d_indices)
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t11,startEvent,stopEvent)
+                            tran_time11 = tran_time11 + tran_t11
+                            #endif
 
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
                         allocate(holes(N_send(i+1)))
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t12,startEvent,stopEvent)
+                            tran_time12 = tran_time12 + tran_t12
+                            #endif
 
                             #if _TIMING == 1
                             istat = cudaEventRecord(startEvent,0)
@@ -89,7 +110,16 @@ contains
                             tran_time3 = tran_time3 + tran_t3
                             #endif
 
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
                         sum_send = sum(N_send(1:i)) ! have sent before this one
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t13,startEvent,stopEvent)
+                            tran_time13 = tran_time13 + tran_t13
+                            #endif
 
                             #if _TIMING == 1
                             istat = cudaEventRecord(startEvent,0)
@@ -103,8 +133,17 @@ contains
                             tran_time4 = tran_time4 + tran_t4
                             #endif
 
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
                         left  = sum_send*nattri_c + 1
                         right = sum(N_send(1:i+1))*nattri_c
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t14,startEvent,stopEvent)
+                            tran_time14 = tran_time14 + tran_t14
+                            #endif
 
                             #if _TIMING == 1
                             istat = cudaEventRecord(startEvent,0)
@@ -130,7 +169,16 @@ contains
                             tran_time6 = tran_time6 + tran_t6
                             #endif
 
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(startEvent,0)
+                            #endif
                         N_peri = d_indices(N_peri); deallocate(holes)
+                            #if _TIMING == 1
+                            istat = cudaEventRecord(stopEvent,0)
+                            istat = cudaEventSynchronize(stopEvent)
+                            istat = cudaEventElapsedTime(tran_t15,startEvent,stopEvent)
+                            tran_time15 = tran_time15 + tran_t15
+                            #endif
                     end if
                 end if
             end do
