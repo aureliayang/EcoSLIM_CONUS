@@ -62,9 +62,19 @@
 * If hdf5 is enabled:  
   <table>  
     <tr>  
-      <td>nvhpc/21.5</td>  
-      <td>cudatoolkit/11.3</td>  
-      <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>  
+      <td>Compiler</td>
+      <td>nvhpc/21.5</td>
+    </tr>
+    <tr>
+      <td>CUDA</td>
+      <td>cudatoolkit/11.3</td>
+    </tr>
+    <tr>
+      <td>MPI</td>
+      <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>
+    </tr>
+    <tr>
+      <td>HDF5</td>
       <td>hdf5/nvhpc-21.5/1.10.6</td>
     </tr>  
   </table>   
