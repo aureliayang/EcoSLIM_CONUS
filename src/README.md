@@ -38,7 +38,7 @@
 * **nind,** Number of subsurface indicator
 * **Indname,** pfb file of indicator
 # Build (for users)
-* An example of environment on Della GPU cluster at Princeton University:  
+**An example of environment on Della GPU cluster at Princeton University:**  
 * If hdf5 is disabled:  
   <table>  
     <tr>  
