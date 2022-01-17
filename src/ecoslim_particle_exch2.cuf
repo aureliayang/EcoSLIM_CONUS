@@ -9,7 +9,7 @@ module eco_particle_exch2
 
     use variable_list, only: holes, P_send, P_recv
     use variable_list, only: P_de, d_isValid, d_indices
-    use variable_list, only: ix1_c, iy1_c, nnx1_c, nny1_c, reflect
+    use variable_list, only: ix1_c, iy1_c, nnx1_c, nny1_c, reflect, kk, transfer
     use variable_list, only: rank, t_rank, nind_c, tPB
     use variable_list, only: np_active !, ranknum, filenum
 
@@ -126,7 +126,7 @@ contains
         !interior particles
         call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
             xmin1_c,ymin1_c,zmin1_c,xmax1_c,ymax1_c,zmax1_c, &
-            0,N_inte,reflect,rank)
+            0,N_inte,reflect,rank,kk,transfer)
 
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)

@@ -19,12 +19,12 @@ contains
 
     attributes(global) subroutine particles_independent( &
         xmin,ymin,zmin,xmax,ymax,zmax, &
-        offset,np_active,reflect,rank)
+        offset,np_active,reflect,rank,kk,transfer)
 
         implicit none
 
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
-        integer,value:: np_active,offset,rank
+        integer,value:: np_active,offset,rank,kk,transfer
         logical,value:: reflect
 
         integer:: ii,k,Ploc(3),ii_l
@@ -284,35 +284,29 @@ contains
             end do ! end of do-while loop for particle time to next time
             999 continue ! where we go if the particle is out of bounds
 
-            ! concentration routine
-            ! Find the "adjacent" "cell corresponding to the particle's location
-            Ploc(1) = floor(P_T(ii,1) / dx)
-            Ploc(2) = floor(P_T(ii,2) / dy)
+            if(mod(kk,transfer) == 0) then
+                ! concentration routine
+                ! Find the "adjacent" "cell corresponding to the particle's location
+                Ploc(1) = floor(P_T(ii,1) / dx)
+                Ploc(2) = floor(P_T(ii,2) / dy)
 
-            Ploc(1) = Ploc(1) + 1
-            Ploc(2) = Ploc(2) + 1
-            !Z = 0.d0
-            !do k = 1, nz
-            !    Z = Z + dz_T(k)
-            !    if (Z >= P(ii,3)) then
-            !        Ploc(3) = k - 1
-            !        exit
-            !    end if
-            !end do
+                Ploc(1) = Ploc(1) + 1
+                Ploc(2) = Ploc(2) + 1
 
-            ! Zone/neighbor identification for cuda-aware transfer.
-            ! keep an eye for ET particles
-            k = Zone_T(Ploc(1),Ploc(2))
-            P_de(ii,13+2*nind) = -1.
-            if(P_T(ii,10) /= 3.) then ! otherwise, particle is out of domain
-                if(k /= rank) then
-                    if(P_T(ii,8) == 1. .or. (P_T(ii,8) == 0. .and. P_T(ii,10) == 2.)) then
-                        P_de(ii,13+2*nind) = k
-                        temp = atomicAdd(N_send(k+1),idnint(one))
+                ! Zone/neighbor identification for cuda-aware transfer.
+                ! keep an eye for ET particles
+                k = Zone_T(Ploc(1),Ploc(2))
+                P_de(ii,13+2*nind) = -1.
+                if(P_T(ii,10) /= 3.) then ! otherwise, particle is out of domain
+                    if(k /= rank) then
+                        if(P_T(ii,8) == 1. .or. (P_T(ii,8) == 0. .and. P_T(ii,10) == 2.)) then
+                            P_de(ii,13+2*nind) = k
+                            temp = atomicAdd(N_send(k+1),idnint(one))
+                        endif
                     endif
                 endif
-            endif
-            ! Hence, particles which will be sent to neighbors has been labeled
+                ! Hence, particles which will be sent to neighbors has been labeled
+            end if
 
             ! Transfer local coordinates to global
             P_de(ii,1) = P_T(ii,1) + dble(ix1)*dx
