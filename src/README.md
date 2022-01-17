@@ -40,7 +40,8 @@
 # Build (for users)
 * An example of environment on Della GPU cluster at Princeton University:  
 * if hdf5 is disabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
-* Build: **make HDF5=0** in the src folder
+* Build in the src folder:
+> make HDF5=0
 * if hdf5 is enabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1, hdf5/nvhpc-21.5/1.10.6**
 * Build: **make** in the src folder
 # Load Balancing (LB)
