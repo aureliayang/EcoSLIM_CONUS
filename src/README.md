@@ -46,7 +46,8 @@
     <td>cudatoolkit/11.3</td>
     <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>
   </tr>
-</table>
+</table>  
+
 * Build in the src folder:  
   ```
   make
