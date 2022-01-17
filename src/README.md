@@ -42,10 +42,13 @@
 * if hdf5 is disabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1**
 * Build in the src folder:  
   ```
-  make HDF5=0
+  make
   ```
 * if hdf5 is enabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1, hdf5/nvhpc-21.5/1.10.6**
-* Build: **make** in the src folder
+* Build in the src folder:  
+  ```
+  make HDF5=0
+  ```
 # Load Balancing (LB)
 * The idea of LB in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***).  
 * Code is started with a number of GPUs (subdomains) fewer than the total scheduled GPUs. Manager rank periodically checks the number of particles on each GPU. If the number of particles on a GPU is larger than a given number, one more GPU will be started to help that GPU/subdomain.  
