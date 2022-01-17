@@ -57,7 +57,7 @@
 
 * Build in the src folder:  
   ```
-  make HDF5=0
+  make
   ```
 * If hdf5 is enabled:  
   <table>  
@@ -81,7 +81,7 @@
 
 * Build in the src folder:  
   ```
-  make 
+  make  HDF5=1 
   ```
 # Load Balancing (LB)
 * The idea of LB in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***).  
