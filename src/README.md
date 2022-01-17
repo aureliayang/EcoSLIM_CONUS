@@ -39,7 +39,7 @@
 * **Indname,** pfb file of indicator
 # Build (for users)
 **An example of environment on Della GPU cluster at Princeton University:**  
-- [x] If hdf5 is disabled:  
+* If hdf5 is disabled:  
   <table>  
     <tr>
       <td>Compiler</td>
@@ -59,7 +59,7 @@
   ```
   make HDF5=0
   ```
-- [x] If hdf5 is enabled:  
+* If hdf5 is enabled:  
   <table>  
     <tr>  
       <td>Compiler</td>
