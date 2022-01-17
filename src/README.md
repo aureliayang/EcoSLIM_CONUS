@@ -42,7 +42,7 @@
 1. If hdf5 is disabled:  
     <table>  
       <tr>
-        <td>**Compiler**</td>
+        <td>Compiler</td>
         <td>nvhpc/21.5</td>
       </tr> 
       <tr>
