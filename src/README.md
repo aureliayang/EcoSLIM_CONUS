@@ -32,7 +32,7 @@
 * **clmtrans,** clm evap trans?
 * **clmfile,** clm output file?
 * **iflux_p_res,**
-* **denh2o,** density h2o
+* **denh2o,** density of water
 * **moldiff,**
 * **dtfrac,**
 * **nind,**
