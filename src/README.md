@@ -31,10 +31,10 @@
 * **V_mult,** Velocity multiplier. Not supported now and only used for transfer test.
 * **clmtrans,** clm evap trans?
 * **clmfile,** clm output file?
-* **iflux_p_res,** The number o particles added into the domain if PME > 0
+* **iflux_p_res,** The number of particles added into the domain if PME > 0
 * **denh2o,** density of water
-* **moldiff,** Molecular Diffusivity
-* **dtfrac,** Numerical Stability Information
+* **moldiff,** Molecular diffusivity
+* **dtfrac,** Numerical stability information
 * **nind,** Number of subsurface indicator
 * **Indname,** pfb file of indicator
 # Build (for users)
