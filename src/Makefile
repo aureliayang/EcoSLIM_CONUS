@@ -1,4 +1,4 @@
-# Last Change:  2022-01-12 12:19:19
+# Last Change:  2022-01-17 10:27:27
 CUF=ecoslim_thrustscan.o \
     ecoslim_device_rand.o \
     ecoslim_variable_list.o \
@@ -21,7 +21,7 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_init.o \
     EcoSLIM.cuf
 
-HDF5 = 1
+HDF5 = 2
 
 FFLAGS = -Mpreprocess -D_TIMING=1 -D_HDF5=$(HDF5)
 
@@ -81,8 +81,8 @@ ecoslim_working_comm.o: ecoslim_working_comm.cuf ecoslim_variable_list.o
 ecoslim_particle_init.o: ecoslim_particle_init.cuf ecoslim_particle_add.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 ifeq ($(HDF5),1)
-    ecoslim_hdf5_read.o: ecoslim_hdf5_read.cuf ecoslim_variable_list.o
-		mpif90 -c $< -o $@ $(HDF5FLAGS)
+ecoslim_hdf5_read.o: ecoslim_hdf5_read.cuf ecoslim_variable_list.o
+	mpif90 -c $< -o $@ $(HDF5FLAGS)
 endif
 
 .PHONY: clean
