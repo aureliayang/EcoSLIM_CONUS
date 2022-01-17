@@ -9,9 +9,9 @@
 * **ppx,** Split in x direction, like P in ParFlow
 * **qqy,** Split in y direction, like Q in ParFlow
 * **transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is one by one transfer, abs(transfer) is frequency
-* **separate,** If we separate particles into interior an peripheric portions fo transfer
+* **separate,** If we separate particles into interior and peripheric portions for transfer
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
-* **th_value,** the threshold to start a new GPU
+* **th_value,** The threshold to start a new GPU
 * **spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
 * **np_ic,** Number of particles per cell at the start of simulation
 * **np,** Maximum number permitted during run time 
