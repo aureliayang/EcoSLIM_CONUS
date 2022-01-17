@@ -52,7 +52,16 @@
   ```
   make
   ```
-* if hdf5 is enabled: **nvhpc/21.5, cudatoolkit/11.3, openmpi/cuda-11.3/nvhpc-21.5/4.1.1, hdf5/nvhpc-21.5/1.10.6**
+* If hdf5 is enabled:  
+  <table>  
+    <tr>  
+      <td>nvhpc/21.5</td>  
+      <td>cudatoolkit/11.3</td>  
+      <td>openmpi/cuda-11.3/nvhpc-21.5/4.1.1</td>  
+      <td>hdf5/nvhpc-21.5/1.10.6</td>
+    </tr>  
+  </table>   
+
 * Build in the src folder:  
   ```
   make HDF5=1
