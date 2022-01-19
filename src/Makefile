@@ -33,9 +33,9 @@ else
     CUF += ecoslim_hdf5_read.o
 endif
 
-all: test
+all: EcoSLIM
 
-test: ecoslim_thrustscanc.o ${CUF}
+EcoSLIM: ecoslim_thrustscanc.o ${CUF}
 	mpif90 -o $@ $^ $(FFLAGS) $(HDF5FLAGS) -lstdc++
 
 ecoslim_thrustscanc.o: ecoslim_thrustscanc.cu
@@ -87,7 +87,7 @@ endif
 
 .PHONY: clean
 clean:
-	rm *.o *.mod test \
+	rm *.o *.mod EcoSLIM \
 	slurm* \
 	Device_Utility.txt \
 	SLIM*.txt \
