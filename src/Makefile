@@ -21,7 +21,7 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_init.o \
     EcoSLIM.cuf
 
-HDF5 = 2
+HDF5 = 0
 
 FFLAGS = -Mpreprocess -D_TIMING=1 -D_HDF5=$(HDF5)
 
