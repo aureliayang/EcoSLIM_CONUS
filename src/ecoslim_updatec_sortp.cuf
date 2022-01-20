@@ -24,8 +24,7 @@ contains
                 #endif
 
             if(.not. spinup) &
-            call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>( &
-                ix1_c,iy1_c,np_active)
+            call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>(np_active)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -74,11 +73,11 @@ contains
 
     end subroutine UpdateC_SortP
 
-    attributes(global) subroutine Update_C_Array(ix1_m,iy1_m,np_active_m)
+    attributes(global) subroutine Update_C_Array(np_active_m)
 
         implicit none
         integer,parameter:: tPB = 256
-        integer,value:: ix1_m,iy1_m,np_active_m
+        integer,value:: np_active_m
         integer:: Ploc(3), ii, k, ii_s !5
         real(8):: one, Z, temp !6
 
@@ -97,8 +96,8 @@ contains
             P_l(2) = P_de(ii,8)
 
             ! Transfer global to local
-            P_s(ii_s,1) = P_s(ii_s,1) - dble(ix1_m)*dx
-            P_s(ii_s,2) = P_s(ii_s,2) - dble(iy1_m)*dy
+            P_s(ii_s,1) = P_s(ii_s,1) - dble(ix1)*dx
+            P_s(ii_s,2) = P_s(ii_s,2) - dble(iy1)*dy
 
             ! Find the "adjacent" "cell corresponding to the particle's location
             Ploc(1) = floor(P_s(ii_s,1) / dx)

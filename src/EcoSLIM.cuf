@@ -43,8 +43,7 @@ program EcoSLIM
 
 !--------------------------------------------------------------------
     implicit none
-    ! integer(8),allocatable,pinned:: p_num_cpu(:,:)
-    ! type(curandStateXORWOW),allocatable,pinned:: h_cpu(:)
+
     integer:: istat
     logical:: separ_flag, pme_flag, fore_flag
 
@@ -120,13 +119,10 @@ program EcoSLIM
             Saturation_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
 
             Saturation_de = Saturation
-                ! allocate(h_cpu(np))
-                ! h_cpu = h
-                ! write(*,*) rank,'h_before',h_cpu(1)
+
             call createRand_init<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> (nx_c,ny_c,nz_c, &
                 rank,np_ic,nnx1_c,nny1_c)
-                ! h_cpu = h
-                ! write(*,*) rank,'h_after',h_cpu(1)
+
         endif
 
         ! Define initial particles' locations and mass
@@ -278,7 +274,7 @@ program EcoSLIM
             !!!!! ****there are no particles on this new GPU, so we need if condition for the following work.
 
             if(separate .and. mod(kk,transfer) == 0) then
-            ! do separation when we do transfer. Otherwise, the interior part will not be calculated.
+                ! do separation when we do transfer. Otherwise, the interior part will not be calculated.
                 if(np_active > 0) then
                     separ_flag = .false.
                     call separ_particles(separ_flag)
@@ -340,7 +336,7 @@ program EcoSLIM
         np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv)
         !
 
-        write(17,'(3(i8),31(1x,e12.5,1x))') kk,pfkk,np_active, &
+        write(17,'(3(i8),35(1x,e12.5,1x))') kk,pfkk,np_active, &
 
         IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
         ! 4,         5,       6,        7,          8,        9,        10
