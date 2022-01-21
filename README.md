@@ -8,8 +8,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
 * It can be applied to real cases now. Irregular boundaries are supported. HDF5 is supported.    
 * Users please refer to ***README.md*** in ***src*** folder for details.
-* Welcome to download and use. Enjoy!  
-* Optimization continues.
+* Welcome to download and use. Enjoy!   
+* Optimization continues. **Technique will be provided from October 2022.**
 ## Parallel performance
 Currently, optimization continues, so **only the particle loop kernel** got tested on the Della-GPU cluster at Princeton University. Each GPU node is equipped with **2 NVIDIA A100 GPUs** and **2 2.60-GHz AMD EPYC 7H12 sockets**. Each socket has 64 cores without hyperthreading.  
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/test.png)  
