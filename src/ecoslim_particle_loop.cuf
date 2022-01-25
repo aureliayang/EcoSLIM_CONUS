@@ -45,10 +45,6 @@ contains
         if(P_T(ii,8) == 1. .and. ii <= offset + np_active) then
 
             delta_time = 0.d0
-
-            ! Transfer global to local
-            P_de(ii,1) = P_T(ii,1) - dble(ix1)*dx
-            P_de(ii,2) = P_T(ii,2) - dble(iy1)*dy
             ! at this moment, after exchange, overlap zones are empty
             ! pay careful attention to BC
 
@@ -307,10 +303,6 @@ contains
                 endif
                 ! Hence, particles which will be sent to neighbors has been labeled
             end if
-
-            ! Transfer local coordinates to global
-            P_de(ii,1) = P_T(ii,1) + dble(ix1)*dx
-            P_de(ii,2) = P_T(ii,2) + dble(iy1)*dy
 
         end if
         handle(ii) = hh

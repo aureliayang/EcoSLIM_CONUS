@@ -90,8 +90,8 @@ attributes(global) subroutine add_init_particles(np_ic,tout1)
 
                 hh = handle(index)
 
-                P_de(index,1) = dble(i-1+ix1)*dx + curand_uniform(hh)*dx ! should use global
-                P_de(index,2) = dble(j-1+iy1)*dy + curand_uniform(hh)*dy ! update that for random number
+                P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
+                P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                 P_de(index,13+2*nind) = dble(index)
                 P_de(index,14+2*nind) = P_de(index,1)
                 P_de(index,15+2*nind) = P_de(index,2)
@@ -219,9 +219,6 @@ attributes(global) subroutine add_new_particles( &
 
                 hh = handle(index)
 
-                P_s(ii_l,1) = P_de(index,1)
-                P_s(ii_l,2) = P_de(index,2)
-
                 P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
                 P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                 P_de(index,13+2*nind) = dble(pid + index - np_active)
@@ -258,8 +255,8 @@ attributes(global) subroutine add_new_particles( &
                 P_de(index,9)  = 1.0d0
                 P_de(index,10) = 0.0d0  ! Particle hasn't exited domain
 
-                P_de(index,1) = P_s(ii_l,1) + dble(ix1)*dx
-                P_de(index,2) = P_s(ii_l,2) + dble(iy1)*dy
+                P_de(index,1) = P_s(ii_l,1)
+                P_de(index,2) = P_s(ii_l,2)
 
                 handle(index) = hh
             enddo

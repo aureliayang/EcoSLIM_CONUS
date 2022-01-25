@@ -95,10 +95,6 @@ contains
             P_l(1) = P_de(ii,6)
             P_l(2) = P_de(ii,8)
 
-            ! Transfer global to local
-            P_s(ii_s,1) = P_s(ii_s,1) - dble(ix1)*dx
-            P_s(ii_s,2) = P_s(ii_s,2) - dble(iy1)*dy
-
             ! Find the "adjacent" "cell corresponding to the particle's location
             Ploc(1) = floor(P_s(ii_s,1) / dx)
             Ploc(2) = floor(P_s(ii_s,2) / dy)
@@ -134,10 +130,6 @@ contains
             temp = atomicAdd(mean_age_de,   P_l(2)*P_T(ii,4)*P_l(1))
             temp = atomicAdd(mean_comp_de,  P_l(2)*P_T(ii,7)*P_l(1))
             temp = atomicAdd(total_mass_de, P_l(2)*P_l(1))
-
-            !--------------------------------------
-            ! P_de(ii,1) = P_de(ii,1) + dble(ix1)*dx
-            ! P_de(ii,2) = P_de(ii,2) + dble(iy1)*dy
 
         end if
 

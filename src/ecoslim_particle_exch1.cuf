@@ -42,7 +42,7 @@ contains
             tran_time11=0.; tran_time12=0.; tran_time13=0.; tran_time14=0.; tran_time15=0.
                 #endif
 
-            ! call local2global<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
+            call local2global<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
 
             nc1 = 0; nc3 = 0
             do i = 0, ppx*qqy-1 ! go through to send particles
@@ -283,7 +283,7 @@ contains
                     #endif
             end if
 
-            ! call global2local<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
+            call global2local<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
     end subroutine particle_exchange1
 
 end module eco_particle_exch1

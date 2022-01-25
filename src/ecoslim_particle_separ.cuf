@@ -143,10 +143,6 @@ contains
             P_s(1:2) = P_T(ii,1:2)
             ! P_T is in eco_compact_util
 
-            ! Transfer global to local
-            P_s(1) = P_s(1) - dble(ix1)*dx
-            P_s(2) = P_s(2) - dble(iy1)*dy
-
             if(P_s(1) <  xmin3 .or. P_s(2) <  ymin3 .or. &
             P_s(1) >= xmax3 .or. P_s(2) >= ymax3) then
                 d_isValid(ii) = 0
