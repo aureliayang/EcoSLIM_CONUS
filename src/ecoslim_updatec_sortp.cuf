@@ -12,6 +12,7 @@ module eco_updateC_sortP
     use variable_list, only: mean_age_de,mean_comp_de,total_mass_de
     use variable_list, only: dx, dy, nz, dz_T
     use variable_list, only: Time_Next, kk, spinup
+    real(8),allocatable,device:: par_sort(:,:)
 
 contains
     subroutine UpdateC_SortP()
@@ -23,8 +24,14 @@ contains
                 istat = cudaEventRecord(startEvent,0)
                 #endif
 
-            if(.not. spinup) &
-            call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>(np_active)
+            if(.not. spinup) then
+                call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>(np_active)
+                temp = ceiling(dble(np_active)/1024)
+                allocate(par_sort(temp,3))
+                call partial_sum_sort<<< temp,1024 >>>(np_active)
+                call final_sum_sort<<< 1,1024 >>>(temp)
+                deallocate(par_sort)
+            end if
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -127,14 +134,74 @@ contains
             temp = atomicAdd(C_de(3,Ploc(1),Ploc(2),Ploc(3)),P_l(2))
             temp = atomicAdd(C_de(5,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,12))
 
-            !--------------------------------------
-            ! increment mean age, composition and mass
-            temp = atomicAdd(mean_age_de,   P_l(2)*P_l(3))
-            temp = atomicAdd(mean_comp_de,  P_l(2)*P_l(4))
-            temp = atomicAdd(total_mass_de, P_l(2))
-
         end if
 
     end subroutine Update_C_Array
+
+    attributes(global) subroutine partial_sum_sort(np_active_m)
+        implicit none
+        real(8),shared:: p_sum(1024,3)
+        integer,value:: np_active_m
+        integer:: ii, ii_l, inext
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii_l = threadIdx%x
+
+        if(ii <= np_active_m) then
+            p_sum(ii_l,1) = P_de(ii,6)*P_de(ii,8)*P_de(ii,4)
+            p_sum(ii_l,2) = P_de(ii,6)*P_de(ii,8)*P_de(ii,7)
+            p_sum(ii_l,3) = P_de(ii,6)*P_de(ii,8)
+        else
+            p_sum(ii_l,1) = 0.d0
+            p_sum(ii_l,2) = 0.d0
+            p_sum(ii_l,3) = 0.d0
+        endif
+
+        call syncthreads()
+
+        inext = blockDim%x/2
+
+        do while (inext >= 1)
+            if(ii_l <= inext) &
+            p_sum(ii_l,:) = p_sum(ii_l,:) + p_sum(ii_l+inext,:)
+            inext = inext/2
+            call syncthreads()
+        end do
+
+        if(ii_l == 1) par_sort(blockIdx%x,:) = p_sum(1,:)
+
+    end subroutine partial_sum_sort
+
+    attributes(global) subroutine final_sum_sort(size)
+        implicit none
+        integer,value:: size
+        real(8),shared:: p_sum(1024,3)
+        integer:: ii_l, inext
+
+        ii_l = threadIdx%x
+
+        if(ii_l <= size) then
+            p_sum(ii_l,:) = par_sort(ii_l,:)
+        else
+            p_sum(ii_l,:) = 0.d0
+        endif
+        call syncthreads()
+
+        inext = blockDim%x/2
+
+        do while (inext >= 1)
+            if(ii_l <= inext) &
+            p_sum(ii_l,:) = p_sum(ii_l,:) + p_sum(ii_l+inext,:)
+            inext = inext/2
+            call syncthreads()
+        end do
+
+        if(ii_l == 1) then
+            mean_age_de = p_sum(1,1)
+            mean_comp_de = p_sum(1,2)
+            total_mass_de = p_sum(1,3)
+        endif
+
+    end subroutine final_sum_sort
 
 end module eco_updateC_sortP
