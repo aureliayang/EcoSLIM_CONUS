@@ -79,21 +79,22 @@ contains
         integer,parameter:: tPB = 256
         integer,value:: np_active_m
         integer:: Ploc(3), ii, k, ii_s !5
-        real(8):: one, Z, temp !6
+        real(8):: Z, temp !6
 
         real(8),shared:: P_s(tPB,2)
-        real(8):: P_l(2)
+        real(8):: P_l(4)
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         ii_s = threadIdx%x
-        one = 1.d0
 
         if(ii <= np_active_m) then
 
             P_s(ii_s,1:2) = P_de(ii,1:2)
 
             P_l(1) = P_de(ii,6)
-            P_l(2) = P_de(ii,8)
+            P_l(2) = P_l(1)*P_de(ii,8)
+            P_l(3) = P_de(ii,4)
+            P_l(4) = P_de(ii,7)
 
             ! Find the "adjacent" "cell corresponding to the particle's location
             Ploc(1) = floor(P_s(ii_s,1) / dx)
@@ -107,29 +108,30 @@ contains
                     exit
                 end if
             end do
+            Z = 1.0
 
             Ploc(1) = Ploc(1) + 1
             Ploc(2) = Ploc(2) + 1
             Ploc(3) = Ploc(3) + 1
 
             if(P_l(2) == 0. .and. P_de(ii,10) == 2.) then
-                temp = atomicAdd(C_de(6,Ploc(1),Ploc(2),Ploc(3)),one)
+                temp = atomicAdd(C_de(6,Ploc(1),Ploc(2),Ploc(3)),Z)
                 temp = atomicAdd(C_de(7,Ploc(1),Ploc(2),Ploc(3)),P_l(1))  ! particle mass added to ET
-                temp = atomicAdd(C_de(8,Ploc(1),Ploc(2),Ploc(3)),P_de(ii,4)*P_l(1))  ! mass weighted age
-                temp = atomicAdd(C_de(9,Ploc(1),Ploc(2),Ploc(3)),P_de(ii,7)*P_l(1))  ! mass weighted contribution
+                temp = atomicAdd(C_de(8,Ploc(1),Ploc(2),Ploc(3)),P_l(3)*P_l(1))  ! mass weighted age
+                temp = atomicAdd(C_de(9,Ploc(1),Ploc(2),Ploc(3)),P_l(4)*P_l(1))  ! mass weighted contribution
             end if
 
-            temp = atomicAdd(C_de(1,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,11)*P_l(1))
-            temp = atomicAdd(C_de(2,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,4)*P_l(1))
-            temp = atomicAdd(C_de(4,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,5)*P_l(1))
-            temp = atomicAdd(C_de(3,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_l(1))
-            temp = atomicAdd(C_de(5,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,12)*P_l(1))
+            temp = atomicAdd(C_de(1,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,11))
+            temp = atomicAdd(C_de(2,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_l(3))
+            temp = atomicAdd(C_de(4,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,5))
+            temp = atomicAdd(C_de(3,Ploc(1),Ploc(2),Ploc(3)),P_l(2))
+            temp = atomicAdd(C_de(5,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,12))
 
             !--------------------------------------
             ! increment mean age, composition and mass
-            temp = atomicAdd(mean_age_de,   P_l(2)*P_de(ii,4)*P_l(1))
-            temp = atomicAdd(mean_comp_de,  P_l(2)*P_de(ii,7)*P_l(1))
-            temp = atomicAdd(total_mass_de, P_l(2)*P_l(1))
+            temp = atomicAdd(mean_age_de,   P_l(2)*P_l(3))
+            temp = atomicAdd(mean_comp_de,  P_l(2)*P_l(4))
+            temp = atomicAdd(total_mass_de, P_l(2))
 
         end if
 
