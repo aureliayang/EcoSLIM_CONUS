@@ -170,14 +170,16 @@ attributes(global) subroutine scan_new_particles()
                 temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
             endif
 
-            tempmod = ii - tempxy*(nz-1)
-            if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                if(k == nz) d_isValid(tempmod) = 1
-                ! only the top layer (k = nz) will introduce new particles
-                ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
-                ! it must be in the top layer.
-            else
-                if(k == nz) d_isValid(tempmod) = 0
+            if(k == nz) then
+                tempmod = ii - tempxy*(nz-1)
+                if(EvapTrans_da_T(i,j,k) > 0.d0) then
+                    d_isValid(tempmod) = 1
+                    ! only the top layer (k = nz) will introduce new particles
+                    ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
+                    ! it must be in the top layer.
+                else
+                    d_isValid(tempmod) = 0
+                endif
             endif
             ! pass add_f and kk in, use if condition.
             ! but I feel too much extra work. Probably just let it calculate and we never use it,
