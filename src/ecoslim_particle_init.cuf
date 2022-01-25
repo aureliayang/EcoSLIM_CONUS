@@ -30,6 +30,7 @@ contains
             return
         endif
 
+        C_de = 0.d0
         call add_init_particles<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> &
         (np_ic,tout1)
 

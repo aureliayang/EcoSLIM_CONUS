@@ -92,7 +92,7 @@ attributes(global) subroutine add_init_particles(np_ic,tout1)
 
                 P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
                 P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
-                P_de(index,13+2*nind) = dble(index)
+                ! P_de(index,13+2*nind) = dble(index)
                 P_de(index,14+2*nind) = P_de(index,1)
                 P_de(index,15+2*nind) = P_de(index,2)
                 P_de(index,17+2*nind) = tout1
@@ -109,17 +109,17 @@ attributes(global) subroutine add_init_particles(np_ic,tout1)
                 P_de(index,7) = 1.0d0
                 P_de(index,8) = 1.0d0  ! make particle active
 
-                C_de(1,i,j,k) = 0.d0
+                ! C_de(1,i,j,k) = 0.d0
                 C_de(1,i,j,k) = C_de(1,i,j,k) + P_de(index,8)*P_de(index,6) / &
                 (dx*dy*dz_T(k)*(Porosity_T(i,j,k)*Saturation_T(i,j,k)))
 
-                C_de(2,i,j,k) = 0.d0
+                ! C_de(2,i,j,k) = 0.d0
                 C_de(2,i,j,k) = C_de(2,i,j,k) + P_de(index,8)*P_de(index,4)*P_de(index,6)
 
-                C_de(4,i,j,k) = 0.d0
+                ! C_de(4,i,j,k) = 0.d0
                 C_de(4,i,j,k) = C_de(4,i,j,k) + P_de(index,8)*P_de(index,7)*P_de(index,6)
 
-                C_de(3,i,j,k) = 0.d0
+                ! C_de(3,i,j,k) = 0.d0
                 C_de(3,i,j,k) = C_de(3,i,j,k) + P_de(index,8)*P_de(index,6)
 
                 handle(index) = hh
@@ -171,14 +171,14 @@ attributes(global) subroutine scan_new_particles()
             endif
 
             if(k == nz) then
-                tempmod = ii - tempxy*(nz-1)
+                ! tempmod = ii - tempxy*(nz-1)
                 if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                    d_isValid(tempmod) = 1
+                    d_isValid(ii - tempxy*(nz-1)) = 1
                     ! only the top layer (k = nz) will introduce new particles
                     ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
                     ! it must be in the top layer.
                 else
-                    d_isValid(tempmod) = 0
+                    d_isValid(ii - tempxy*(nz-1)) = 0
                 endif
             endif
             ! pass add_f and kk in, use if condition.
@@ -223,7 +223,7 @@ attributes(global) subroutine add_new_particles( &
 
                 P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
                 P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
-                P_de(index,13+2*nind) = dble(pid + index - np_active)
+                ! P_de(index,13+2*nind) = dble(pid + index - np_active)
                 P_de(index,14+2*nind) = P_s(ii_l,1)
                 P_de(index,15+2*nind) = P_s(ii_l,2)
 
