@@ -6,7 +6,7 @@ module eco_particle_add
     use cudafor
     use curand_device
     use mrand, only: handle   ! curand states saved in global memory
-    use variable_list, only: Saturation_T, Porosity_T, P_T
+    use variable_list, only: Saturation_T, Porosity_T
     use variable_list, only: EvapTrans_T, CLMvars_T, Ind_T
     use variable_list, only: EvapTrans_da_T, dz_T, d_indices_T
     use variable_list, only: dx, dy, pfdt, denh2o, nind, nz
@@ -228,7 +228,7 @@ attributes(global) subroutine add_new_particles( &
                 P_de(index,15+2*nind) = P_s(ii_l,2)
 
                 P_de(index,3) = sum(dz_T) - dz_T(nz)*0.5d0
-                P_de(index,16+2*nind) = P_T(index,3)
+                P_de(index,16+2*nind) = P_de(index,3)
 
                 P_de(index,4) = 0.0d0 + curand_uniform(hh)*pfdt
 
@@ -238,12 +238,12 @@ attributes(global) subroutine add_new_particles( &
 
                     itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,nz))
                     if(itemp > 0 .and. itemp <= nind) then
-                    P_de(index,(12+itemp)) = P_T(index,(12+itemp)) + P_T(index,4)
+                    P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_de(index,4)
                     end if
                 end if
 
                 P_de(index,5) = 0.0d0
-                P_de(index,17+2*nind) = dble(kk-1)*pfdt + P_T(index,4)
+                P_de(index,17+2*nind) = dble(kk-1)*pfdt + P_de(index,4)
                 P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
                             EvapTrans_da_T(i,j,k)*dx*dy*dz_T(k)*denh2o
 
@@ -270,7 +270,7 @@ end subroutine add_new_particles
 end module eco_particle_add
 
 !!! pme_add
-! use texture EvapTrans_da_T, CLMvars_T, P_T
+! use texture EvapTrans_da_T, CLMvars_T
 ! use register to save ii - nnx1*nny1*(nz-1)
 ! use shared memory for x and y coordinates
 ! random number state saved in register ! most significant improvement

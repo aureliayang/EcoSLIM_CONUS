@@ -3,7 +3,7 @@ module eco_updateC_sortP
     use cudafor
     use eco_compact_util
     use variable_list, only: N_exit, holes, P_exit
-    use variable_list, only: P_de, P_T, C_de
+    use variable_list, only: P_de, C_de
     use variable_list, only: d_isValid, d_indices
     use variable_list, only: ix1_c, iy1_c, tPB
     use variable_list, only: np_active, nattri_c, nind_c
@@ -102,7 +102,7 @@ contains
             Z = 0.d0
             do k = 1, nz
                 Z = Z + dz_T(k)
-                if (Z >= P_T(ii,3)) then
+                if (Z >= P_de(ii,3)) then
                     Ploc(3) = k - 1
                     exit
                 end if
@@ -112,23 +112,23 @@ contains
             Ploc(2) = Ploc(2) + 1
             Ploc(3) = Ploc(3) + 1
 
-            if(P_l(2) == 0. .and. P_T(ii,10) == 2.) then
+            if(P_l(2) == 0. .and. P_de(ii,10) == 2.) then
                 temp = atomicAdd(C_de(6,Ploc(1),Ploc(2),Ploc(3)),one)
                 temp = atomicAdd(C_de(7,Ploc(1),Ploc(2),Ploc(3)),P_l(1))  ! particle mass added to ET
-                temp = atomicAdd(C_de(8,Ploc(1),Ploc(2),Ploc(3)),P_T(ii,4)*P_l(1))  ! mass weighted age
-                temp = atomicAdd(C_de(9,Ploc(1),Ploc(2),Ploc(3)),P_T(ii,7)*P_l(1))  ! mass weighted contribution
+                temp = atomicAdd(C_de(8,Ploc(1),Ploc(2),Ploc(3)),P_de(ii,4)*P_l(1))  ! mass weighted age
+                temp = atomicAdd(C_de(9,Ploc(1),Ploc(2),Ploc(3)),P_de(ii,7)*P_l(1))  ! mass weighted contribution
             end if
 
-            temp = atomicAdd(C_de(1,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,11)*P_l(1))
-            temp = atomicAdd(C_de(2,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,4)*P_l(1))
-            temp = atomicAdd(C_de(4,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,5)*P_l(1))
+            temp = atomicAdd(C_de(1,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,11)*P_l(1))
+            temp = atomicAdd(C_de(2,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,4)*P_l(1))
+            temp = atomicAdd(C_de(4,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,5)*P_l(1))
             temp = atomicAdd(C_de(3,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_l(1))
-            temp = atomicAdd(C_de(5,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_T(ii,12)*P_l(1))
+            temp = atomicAdd(C_de(5,Ploc(1),Ploc(2),Ploc(3)),P_l(2)*P_de(ii,12)*P_l(1))
 
             !--------------------------------------
             ! increment mean age, composition and mass
-            temp = atomicAdd(mean_age_de,   P_l(2)*P_T(ii,4)*P_l(1))
-            temp = atomicAdd(mean_comp_de,  P_l(2)*P_T(ii,7)*P_l(1))
+            temp = atomicAdd(mean_age_de,   P_l(2)*P_de(ii,4)*P_l(1))
+            temp = atomicAdd(mean_comp_de,  P_l(2)*P_de(ii,7)*P_l(1))
             temp = atomicAdd(total_mass_de, P_l(2)*P_l(1))
 
         end if

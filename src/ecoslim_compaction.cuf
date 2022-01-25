@@ -1,7 +1,7 @@
 module eco_compact_util
     use cudafor
     use variable_list, only: P_de, ix1, iy1, dx, dy
-    use variable_list, only: d_indices_T, d_isValid_T, P_T
+    use variable_list, only: d_indices_T, d_isValid_T
     use variable_list, only: nattri, d_isValid
 
 contains
@@ -52,7 +52,7 @@ contains
             temp1 = (sumsend + ii - 1)*nattri + 1
             temp2 = (sumsend + ii)*nattri
             temp3 = offset + holes(ii)
-            d_out(temp1:temp2) = P_T(temp3,:)
+            d_out(temp1:temp2) = P_de(temp3,:)
         end if
 
     end subroutine select2send
@@ -93,7 +93,7 @@ contains
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         if(ii <= hole_size) then
-            d_out(ii,:) = P_T(holes(ii),:)
+            d_out(ii,:) = P_de(holes(ii),:)
         end if
 
     end subroutine select2exit

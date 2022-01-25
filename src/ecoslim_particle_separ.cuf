@@ -140,8 +140,8 @@ contains
 
         if (ii <= np_active_m) then
 
-            P_s(1:2) = P_T(ii,1:2)
-            ! P_T is in eco_compact_util
+            P_s(1:2) = P_de(ii,1:2)
+            ! P_de is in eco_compact_util
 
             if(P_s(1) <  xmin3 .or. P_s(2) <  ymin3 .or. &
             P_s(1) >= xmax3 .or. P_s(2) >= ymax3) then
