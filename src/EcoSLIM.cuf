@@ -327,6 +327,12 @@ program EcoSLIM
             out_np_cpu  = out_np_de
         end if
 
+        if(LB > 0) then
+            if(mod(kk,LB) == 0) then
+                call load_balance(Porosity_cpu)
+            end if
+        end if
+
         write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk), &
 
         mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
@@ -348,16 +354,10 @@ program EcoSLIM
         ! 20,     21,        22,        23,        24,        25
         tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
         ! 26,      27,        28,        29,        30,       31
-        C_time,exit_time,tran_time11,tran_time12,tran_time13,tran_time14,tran_time15
+        C_time,exit_time,tran_time11,tran_time12,tran_time13,tran_time14,tran_time15,LB_time
         ! 32,  33        34,         35,         36,         37,         38
 
         flush(17);flush(20)
-
-        if(LB > 0) then
-            if(mod(kk,LB) == 0) then
-                call load_balance(Porosity_cpu)
-            end if
-        end if
 
         call MPI_Barrier(MPI_COMM_WORLD,ierr)
 

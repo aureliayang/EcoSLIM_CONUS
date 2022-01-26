@@ -30,20 +30,25 @@ module variable_list
     use mrand, only: handle
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
-
     integer:: world_group, work_group, work_comm, max_rank, rq2
-
     integer,allocatable:: rq1(:), work_ranks(:)
-
     character(len=MPI_MAX_PROCESSOR_NAME):: hostname
-
     integer:: deviceID, namelength
-
     integer(MPI_OFFSET_KIND):: offset
 
     character(300):: message
-
     character(200):: runname, pname, DEMname, vtk_file, Indname
+    character(200) filenum, filenumout, fname, ranknum, restartf
+    character(20),allocatable:: conc_header(:)
+    ! name for variables written in the C array above.  Dimensioned as l above.
+    character(9), parameter:: dsetname = 'hdf5_data'
+    ! runname = SLIM runname
+    ! filenum = ParFlow file number
+    ! filenumout = File number for Ecoslim writing
+    ! pname = ParFlow output runname
+    ! fname = Full name of a ParFlow's output
+    ! vtk_file = concentration file
+    ! DEMname = DEM file name
 
     integer:: nx_c, ny_c, nz_c, nzclm, nCLMsoil
     ! number of cells in the domain and cells+1 in x, y, and z directions
@@ -51,13 +56,10 @@ module variable_list
     integer:: ppx, qqy ! split in x and y directions
     ! limit to 2^n in this code
 
-    integer:: np_ic, np
-
-    integer:: n_constituents
+    integer:: np_ic, np, n_constituents
     ! number of timesteps ParFlow; numer of C vectors written for VTK output
-
-    character(20),allocatable:: conc_header(:)
-    ! name for variables written in the C array above.  Dimensioned as l above.
+    integer:: iflux_p_res, np_active, i_added_particles
+    ! number of particles for intial pulse IC, total, and running active
 
     real(8),constant:: dx, dy, pfdt, dtfrac, denh2o, moldiff
     real(8):: dx_c, dy_c, pfdt_c, dtfrac_c, denh2o_c, moldiff_c
@@ -65,14 +67,10 @@ module variable_list
     integer,constant:: nattri, nind, nx, ny, nz
     integer:: nattri_c, nind_c
 
-    integer:: pft1, pft2, tout1, pfnt, n_cycle
+    integer:: pft1, pft2, tout1, pfnt, n_cycle, kk, pfkk, outkk
     ! parflow start and stop file numbers number of ParFlow timesteps
     ! flag specifying the number for the first output write (0= start with pft1)
     ! number of timestep cycles
-
-    integer:: kk, pfkk, outkk
-    ! Counter for the file numbers starts at pft1
-    ! Counter for the output writing
 
     integer:: ipwrite, ibinpntswrite, etwrite, icwrite
 
@@ -82,25 +80,10 @@ module variable_list
     real(8):: Time_first
     ! initial timestep for Parflow ((pft1-1)*pfdt)
 
-    integer:: iflux_p_res, np_active, i_added_particles
-    ! number of particles for intial pulse IC, total, and running active
-
     real(8),allocatable:: DEM(:,:) ! DEM and grid points for concentration output
     real(8),allocatable:: Pnts(:,:) ! use in vtk
 
-    integer:: pid
-
-    integer:: i, j, k, l, ik, ji, ij, ii
-
-    character(200) filenum, filenumout, fname, ranknum
-    character(9), parameter:: dsetname = 'hdf5_data'
-    ! runname = SLIM runname
-    ! filenum = ParFlow file number
-    ! filenumout = File number for Ecoslim writing
-    ! pname = ParFlow output runname
-    ! fname = Full name of a ParFlow's output
-    ! vtk_file = concentration file
-    ! DEMname = DEM file name
+    integer:: pid, i, j, k, l, ik, ji, ij, ii
 
     real(8):: V_mult
     ! Multiplier for forward/backward particle tracking
@@ -117,7 +100,6 @@ module variable_list
     real(8):: xmin2_c, xmax2_c, ymin2_c, ymax2_c, zmin2_c, zmax2_c
     real(8):: xmin3_c, xmax3_c, ymin3_c, ymax3_c, zmin3_c, zmax3_c
     real(8):: xgmin_c, xgmax_c, ygmin_c, ygmax_c, zgmin_c, zgmax_c
-
     real(8),constant:: xmin1, xmax1, ymin1, ymax1, zmin1, zmax1
     real(8),constant:: xmin2, xmax2, ymin2, ymax2, zmin2, zmax2
     real(8),constant:: xmin3, xmax3, ymin3, ymax3, zmin3, zmax3
@@ -125,7 +107,7 @@ module variable_list
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time
-    real:: peri_time, inte_time, exit_time, C_time
+    real:: peri_time, inte_time, exit_time, C_time, LB_time
     real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
     real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
     real:: tran_time11=0., tran_time12=0., tran_time13=0., tran_time14=0., tran_time15=0.
@@ -136,9 +118,7 @@ module variable_list
     ! integers for writing C or point based output
 
     integer,parameter:: tPB = 256 ! block size, is it the larger the better?
-    integer:: fh0, fh1, fh2, fh3, fh4
-    character(200):: restartf
-    integer:: np_active_log, add_f
+    integer:: fh0, fh1, fh2, fh3, fh4, add_f
 
     real(8),allocatable,pinned:: P(:,:)
     integer,allocatable,managed:: N_send(:)
@@ -153,30 +133,21 @@ module variable_list
     real(8),allocatable,pinned:: ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
     real(8),allocatable,pinned:: PET_balance(:),PET_balance_da(:)
     real(8),allocatable,pinned:: mean_age(:), mean_comp(:), mean_mass(:), total_mass(:)
-
     real(8),allocatable,pinned:: Saturation(:,:,:)    ! Saturation (read from ParFlow)
     real(8),allocatable,pinned:: Porosity(:,:,:)      ! Porosity (read from ParFlow)
     real(8),allocatable,pinned:: EvapTrans(:,:,:)     ! CLM EvapTrans (read from ParFlow, [1/T] units)
     real(8),allocatable,pinned:: EvapTrans_da(:,:,:)
     real(8),allocatable,pinned:: CLMvars(:,:,:)     ! CLM Output (read from ParFlow, following single file
                                                   ! CLM output as specified in the manual)
-    real(8),allocatable,pinned:: Ind(:,:,:)
+    real(8),allocatable,pinned:: Ind(:,:,:),dz(:),C(:,:,:,:)
     real(8),allocatable,pinned:: Vx(:,:,:), Vy(:,:,:), Vz(:,:,:)
-    ! Vx = Velocity x-direction [nx+1,ny,nz] -- ParFlow output
-    ! Vy = Velocity y-direction [nx,ny+1,nz] -- ParFlow output
-    ! Vz = Velocity z-direction [nx,ny,nz+1] -- ParFlow output
-
-    real(8),allocatable,pinned:: C(:,:,:,:)
-    ! Concentration array, in i,j,k with l (first index) as consituent or
-    ! property. These are set by user at runtime using input
-    real(8),allocatable,pinned:: dz(:)
 
     integer,parameter:: buff = 1  ! Buffer can be specified by user, for GW 1km or 2km is enough
     integer:: nnx1_c,nny1_c,nnx2_c,nny2_c,ix1_c,iy1_c,ix2_c,iy2_c
     integer,constant:: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
     integer,allocatable:: nump(:) ! gather active particles to jusdge if LB
-    integer:: transfer, map_sub, LB, th_value
     integer,allocatable:: l_GPUs(:,:), t_GPUs(:), c_GPU(:)
+    integer:: transfer, map_sub, LB, th_value
 
     real(8),allocatable:: Saturation_h5(:,:,:),Porosity_h5(:,:,:)
     real(8),allocatable:: EvapTrans_h5(:,:,:),CLMvars_h5(:,:,:)
@@ -188,34 +159,22 @@ module variable_list
 
 !-------------------------------------
     ! GPU variables
-    real(8),allocatable,device:: P_de(:,:)
-    ! the particle array, not sure if the one on host is necessary
-
-    real(8),allocatable,device:: C_de(:,:,:,:)
-
-    real(8),allocatable,device,target:: Vx_de(:,:,:)
-    real(8),allocatable,device,target:: Vy_de(:,:,:)
-    real(8),allocatable,device,target:: Vz_de(:,:,:)
-    real(8),allocatable,device,target:: dz_de(:)
-    real(8),allocatable,device,target:: Ind_de(:,:,:)
-    real(8),allocatable,device,target:: Saturation_de(:,:,:)
-    real(8),allocatable,device,target:: Porosity_de(:,:,:)
-    real(8),allocatable,device,target:: EvapTrans_de(:,:,:)
-    real(8),allocatable,device,target:: EvapTrans_da_de(:,:,:)
+    real(8),allocatable,device:: P_de(:,:),C_de(:,:,:,:)
+    real(8),allocatable,device,target:: Vx_de(:,:,:),Vy_de(:,:,:),Vz_de(:,:,:)
+    real(8),allocatable,device,target:: dz_de(:),Ind_de(:,:,:)
+    real(8),allocatable,device,target:: Saturation_de(:,:,:),Porosity_de(:,:,:)
+    real(8),allocatable,device,target:: EvapTrans_de(:,:,:),EvapTrans_da_de(:,:,:)
     real(8),allocatable,device,target:: CLMvars_de(:,:)
 
     real(8),texture,pointer:: EvapTrans_T(:,:,:),Saturation_T(:,:,:),Porosity_T(:,:,:)
     real(8),texture,pointer:: Vx_T(:,:,:),Vy_T(:,:,:),Vz_T(:,:,:),Ind_T(:,:,:),dz_T(:)
     real(8),texture,pointer:: EvapTrans_da_T(:,:,:),CLMvars_T(:,:)
 
-    real(8),allocatable,device:: PET_balance_de(:),PET_balance_da_de(:)
-    ! initialization of PET_balance
-
     integer,allocatable,device:: out_np_de(:),ET_np_de(:)
     real(8),allocatable,device:: out_age_de(:),out_mass_de(:),out_comp_de(:)
     real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
     real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),total_mass_de(:)
-
+    real(8),allocatable,device:: PET_balance_de(:),PET_balance_da_de(:) ! initialization of PET_balance
     real(8),allocatable,device:: P_send(:),P_recv(:)
     real(8),allocatable,managed:: P_exit(:,:)
 
@@ -224,25 +183,22 @@ module variable_list
 
     integer,allocatable,managed,target:: Zone_de(:,:)
     integer,texture,pointer:: Zone_T(:,:)
+    integer,allocatable,managed:: neigh_list(:)
+    ! ppx*qqy, and should be initilized at the very beginning
+    ! its dimension depends on the initial number of GPUs
 
     integer(8),allocatable,device:: p_num(:,:), c_sum(:)
     ! it should use integer(8) for CONUS !!!
     ! p_sum on workers needs to be deallocated
     ! c_sum is only on manager
 
-    integer,allocatable,device:: Zonet_new(:,:)
+    integer,allocatable,device:: Zonet_new(:,:), grid(:,:)
     ! only on rank ppx*qqy. Zonet_new is written into restart files.
-
-    integer,allocatable,device:: grid(:,:)
     ! grid is on GPU, and should be initialized each time doing DDC as
     ! grid = 0
     ! grid(1,1) = 0;  grid(1,2) = 0
     ! grid(1,3) = nx; grid(1,4) = ny
     ! it is also written into restart files.
-
-    integer,allocatable,managed:: neigh_list(:)
-    ! ppx*qqy, and should be initilized at the very beginning
-    ! its dimension depends on the initial number of GPUs
 !-------------------------------------
 contains
     subroutine alloc_arrays_const()

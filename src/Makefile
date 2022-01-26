@@ -69,7 +69,7 @@ ecoslim_updatec_sortp.o: ecoslim_updatec_sortp.cuf ecoslim_variable_list.o
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
 ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
-	mpif90 -c $< -o $@
+	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_separ.o: ecoslim_particle_separ.cuf ecoslim_compaction.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_pme.o: ecoslim_particle_pme.cuf ecoslim_particle_add.o ecoslim_variable_list.o
@@ -91,7 +91,6 @@ clean:
 	slurm* \
 	Device_Utility.txt \
 	SLIM*.txt \
-	Zone_de_after.* \
 	Load* \
 	Exited_particles.* \
 	Log_particles.* \

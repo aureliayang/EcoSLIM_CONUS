@@ -12,11 +12,15 @@ contains
 
         implicit none
         real(8),intent(out):: Porosity_cpu(:,:,:)
-        integer:: max_rank_o, temp
+        integer:: max_rank_o, temp, istat
         logical:: flag
 
         ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
         ! setting LB > 0 also works, but extra time will be consumed.
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
 
         max_rank_o = max_rank
         call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
@@ -81,5 +85,10 @@ contains
                 end if
             end if
         end if
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(LB_time,startEvent,stopEvent)
+            #endif
     end subroutine load_balance
 end module eco_particle_lb
