@@ -1,0 +1,74 @@
+module hdf5_file_read
+    use HDF5
+    use variable_list, only: fname, dsetname
+    use variable_list, only: ix2_c, iy2_c
+contains
+    subroutine read_h5_file(data,nx,ny,nz)
+        implicit none
+
+        integer(hid_t):: file_id, dset_id
+        integer(hid_t):: dataspace, memspace
+        integer:: nx, ny, nz
+
+        integer(hsize_t):: count(3)  ! Size of hyperslab
+        integer(hsize_t):: offset(3) ! Hyperslab offset
+        integer(hsize_t):: stride(3) ! Hyperslab stride
+        integer(hsize_t):: block(3)  ! Hyperslab block size
+        integer(hsize_t):: chunk_dims(3)
+
+        real(8),intent(out):: data(:,:,:) ! attention, pinned???
+        integer:: error, rank_hdf5 = 3
+
+        count  = [nx, ny, nz]
+        chunk_dims = [nx, ny, nz]
+
+        offset = [ix2_c, iy2_c, 0]
+        stride = [1, 1, 1]
+        block  = [1, 1, 1]
+
+        ! Open the file.
+        call h5fopen_f (fname, H5F_ACC_RDONLY_F, file_id, error)
+        ! file name, then we get the file_id
+
+        ! Open the dataset.
+        call h5dopen_f(file_id, dsetname, dset_id, error)
+        ! dsetname, then we get the dset_id
+
+        ! Get dataset's dataspace identifier and select subset.
+        call h5dget_space_f(dset_id, dataspace, error)
+        ! dset_id, we get the dataspace. only the file dataspace?
+        call h5sselect_hyperslab_f(dataspace, H5S_SELECT_SET_F, &
+                                   offset, count, error, stride, block)
+        ! set the block
+
+        call h5screate_simple_f(rank_hdf5, chunk_dims, memspace, error)
+        ! memspace doesn't have the location information.
+
+        call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, &
+        data, chunk_dims, error, memspace, dataspace)
+
+        ! Close everything opened.
+        call h5sclose_f(dataspace, error)
+        call h5sclose_f(memspace, error)
+        call h5dclose_f(dset_id, error)
+        call h5fclose_f(file_id, error)
+
+    end subroutine read_h5_file
+
+    subroutine open_hdf5_interface()
+
+        implicit none
+        integer:: error
+        call h5open_f(error)
+
+    end subroutine open_hdf5_interface
+
+    subroutine close_hdf5_interface()
+
+        implicit none
+        integer:: error
+        call h5close_f(error)
+
+    end subroutine close_hdf5_interface
+
+end module hdf5_file_read

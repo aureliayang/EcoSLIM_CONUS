@@ -11,9 +11,9 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_loop.o \
     ecoslim_particle_exch1.o \
     ecoslim_particle_exch2.o \
-    ecoslim_updatec_sortp.o \
+    ecoslim_particle_sort.o \
     ecoslim_pfb_read.o \
-    ecoslim_load_balance.o \
+    ecoslim_particle_LB.o \
     ecoslim_particle_separ.o \
     ecoslim_particle_pme.o \
     ecoslim_read_input.o \
@@ -30,7 +30,7 @@ HDF5FLAGS = -I$(HDF5DIR)/include -L$(HDF5DIR)/lib64 -rpath $(HDF5DIR)/lib64 -lhd
 ifneq ($(HDF5),1)
     HDF5FLAGS = ''
 else
-    CUF += ecoslim_hdf5_read.o
+    CUF += ecoslim_read_hdf5.o
 endif
 
 all: EcoSLIM
@@ -64,11 +64,11 @@ ecoslim_particle_exch1.o: ecoslim_particle_exch1.cuf ecoslim_particle_loop.o eco
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_exch2.o: ecoslim_particle_exch2.cuf ecoslim_particle_loop.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
-ecoslim_updatec_sortp.o: ecoslim_updatec_sortp.cuf ecoslim_variable_list.o
+ecoslim_particle_sort.o: ecoslim_particle_sort.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
-ecoslim_load_balance.o: ecoslim_load_balance.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
+ecoslim_particle_LB.o: ecoslim_particle_LB.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_separ.o: ecoslim_particle_separ.cuf ecoslim_compaction.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
@@ -81,7 +81,7 @@ ecoslim_working_comm.o: ecoslim_working_comm.cuf ecoslim_variable_list.o
 ecoslim_particle_init.o: ecoslim_particle_init.cuf ecoslim_particle_add.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@
 ifeq ($(HDF5),1)
-ecoslim_hdf5_read.o: ecoslim_hdf5_read.cuf ecoslim_variable_list.o
+ecoslim_read_hdf5.o: ecoslim_read_hdf5.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(HDF5FLAGS)
 endif
 

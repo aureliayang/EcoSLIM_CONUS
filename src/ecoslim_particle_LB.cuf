@@ -1,0 +1,94 @@
+module eco_particle_lb
+
+    use cudafor
+    use variable_list
+    use subdomain_bound
+    use utilities
+
+contains
+    subroutine load_balance(Porosity_cpu)
+
+        use mpi
+
+        implicit none
+        real(8),intent(out):: Porosity_cpu(:,:,:)
+        integer:: max_rank_o, temp, istat
+        logical:: flag
+
+        ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
+        ! setting LB > 0 also works, but extra time will be consumed.
+
+            #if _TIMING == 1
+            istat = cudaEventRecord(startEvent,0)
+            #endif
+
+        max_rank_o = max_rank
+        call MPI_ALLGather(np_active,1,MPI_INTEGER,nump,1,MPI_INTEGER,MPI_COMM_WORLD,ierr)
+        ! gather np_active on the maximum rank
+
+        if(rank == t_rank - 1) then
+            do i = 1, ppx*qqy
+
+                temp = nump(l_GPUs(i,1) + 1)
+                c_GPU(i) = l_GPUs(i,1)
+                if(t_GPUs(i) > 1) then
+                    do j = 2, t_GPUs(i)
+                        if(nump(l_GPUs(i,j) + 1) < temp) then
+                            ! l_GPUs store the ranks of the GPUs, so plus one
+                            temp = nump(l_GPUs(i,j) + 1)
+                            c_GPU(i) = l_GPUs(i,j)
+                        end if
+                    end do
+                end if
+
+                if(temp > th_value .and. (max_rank+1) < t_rank) then
+                    max_rank = max_rank + 1
+                    t_GPUs(i) = t_GPUs(i) + 1
+                    l_GPUs(i,t_GPUs(i)) = max_rank
+                    c_GPU(i) = max_rank
+                    call MPI_ISEND(l_GPUs(i,1),1,MPI_INTEGER,max_rank,40,MPI_COMM_WORLD,rq1(max_rank),ierr)
+                end if
+
+            end do
+        end if
+
+        if(max_rank_o + 1 < t_rank) then
+            call MPI_BCAST(max_rank,1,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+            call MPI_BCAST(t_GPUs,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+            call MPI_BCAST(l_GPUs,ppx*qqy*t_rank,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+        end if
+        call MPI_BCAST(c_GPU,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
+
+        if (max_rank > max_rank_o) then
+
+            if(work_comm /= MPI_COMM_NULL) call MPI_COMM_FREE(work_comm,ierr)
+            call MPI_GROUP_FREE(work_group,ierr)
+            call MPI_GROUP_INCL(world_group,max_rank+1,work_ranks(1:max_rank+1),work_group,ierr)
+            call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)
+
+            if(rank >= max_rank_o+1 .and. rank <= max_rank) then
+
+                call MPI_TEST(rq2,flag,status,ierr)
+
+                if(flag == .true. .or. map_sub >= 0) then
+
+                    call copy_grid(map_sub)
+                    ! make sure grid is on all ranks by bcast
+
+                    call alloc_arrays_temp(Porosity_cpu)
+
+                    call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
+                    tPB >>> (buff,neigh_list,map_sub,ppx*qqy)
+
+                    call local_xyz()
+
+                end if
+            end if
+        end if
+            #if _TIMING == 1
+            istat = cudaEventRecord(stopEvent,0)
+            istat = cudaEventSynchronize(stopEvent)
+            istat = cudaEventElapsedTime(LB_time,startEvent,stopEvent)
+            #endif
+    end subroutine load_balance
+end module eco_particle_lb
