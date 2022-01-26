@@ -9,7 +9,6 @@ module create_subdomain
 
     use cudafor
     use thrust
-
     use variable_list, only: p_num, c_sum
     ! p_num and c_sum are device attribute
     use variable_list, only: d_indices

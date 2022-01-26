@@ -16,256 +16,251 @@ module eco_particle_add
 
 contains
 
-attributes(global) subroutine scan_init_particles()
+    attributes(global) subroutine scan_init_particles()
 
-    implicit none
-    integer:: i, j, k, ii, temp, ii_s
-    integer,shared:: d_isValid_s(256)
+        implicit none
+        integer:: i, j, k, ii, temp
 
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-    ii_s = threadIdx%x
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-    ! get i, j, k from ii
-    if(ii <= nnx1*nny1*nz) then
+        ! get i, j, k from ii
+        if(ii <= nnx1*nny1*nz) then
 
-        temp = mod(ii,nnx1*nny1)
-        if(temp == 0) then
-            k = ii/(nnx1*nny1)
-            j = nny1
-            i = nnx1
-        else
-            k = ii/(nnx1*nny1) + 1
-            if(mod(temp,nnx1) == 0) then
-                j = temp/nnx1
+            temp = mod(ii,nnx1*nny1)
+            if(temp == 0) then
+                k = ii/(nnx1*nny1)
+                j = nny1
                 i = nnx1
             else
-                j = temp/nnx1 + 1
-                i = mod(temp,nnx1)
+                k = ii/(nnx1*nny1) + 1
+                if(mod(temp,nnx1) == 0) then
+                    j = temp/nnx1
+                    i = nnx1
+                else
+                    j = temp/nnx1 + 1
+                    i = mod(temp,nnx1)
+                end if
             end if
+
+            if(Saturation_T(i,j,k) > 0.d0) then !active area
+                d_isValid(ii) = 1
+            else
+                d_isValid(ii) = 0
+            end if
+
         end if
 
-        if(Saturation_T(i,j,k) > 0.d0) then !active area
-            d_isValid_s(ii_s) = 1
-        else
-            d_isValid_s(ii_s) = 0
-        end if
+    end subroutine scan_init_particles
 
-        d_isValid(ii) = d_isValid_s(ii_s)
-    end if
+    attributes(global) subroutine add_init_particles(np_ic,tout1)
 
-end subroutine scan_init_particles
+        implicit none
+        integer,value:: np_ic, tout1
+        integer:: i, j, k, index, ij, ik, ii, temp
+        real(8):: Z
+        type(curandStateXORWOW):: hh
 
-attributes(global) subroutine add_init_particles(np_ic,tout1)
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
-    implicit none
-    integer,value:: np_ic, tout1
-    integer:: i, j, k, index, ij, ik, ii, temp
-    real(8):: Z
-    type(curandStateXORWOW):: hh
-
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-
-    ! get i, j, k from ii
-    if(ii <= nnx1*nny1*nz) then
-        temp = mod(ii,nnx1*nny1)
-        if(temp == 0) then
-            k = ii/(nnx1*nny1)
-            j = nny1
-            i = nnx1
-        else
-            k = ii/(nnx1*nny1) + 1
-            if(mod(temp,nnx1) == 0) then
-                j = temp/nnx1
+        ! get i, j, k from ii
+        if(ii <= nnx1*nny1*nz) then
+            temp = mod(ii,nnx1*nny1)
+            if(temp == 0) then
+                k = ii/(nnx1*nny1)
+                j = nny1
                 i = nnx1
             else
-                j = temp/nnx1 + 1
-                i = mod(temp,nnx1)
+                k = ii/(nnx1*nny1) + 1
+                if(mod(temp,nnx1) == 0) then
+                    j = temp/nnx1
+                    i = nnx1
+                else
+                    j = temp/nnx1 + 1
+                    i = mod(temp,nnx1)
+                end if
             end if
-        end if
 
-        if(Saturation_T(i,j,k) > 0.d0) then
-            do ij = 1, np_ic
+            if(Saturation_T(i,j,k) > 0.d0) then
+                do ij = 1, np_ic
 
-                index = d_indices_T(ii)*np_ic - (ij - 1)
+                    index = d_indices_T(ii)*np_ic - (ij - 1)
 
-                hh = handle(index)
+                    hh = handle(index)
 
-                P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
-                P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
-                ! P_de(index,13+2*nind) = dble(index)
-                P_de(index,14+2*nind) = P_de(index,1)
-                P_de(index,15+2*nind) = P_de(index,2)
-                P_de(index,17+2*nind) = tout1
+                    P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
+                    P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
+                    ! P_de(index,13+2*nind) = dble(index)
+                    P_de(index,14+2*nind) = P_de(index,1)
+                    P_de(index,15+2*nind) = P_de(index,2)
+                    P_de(index,17+2*nind) = tout1
 
-                Z = 0.0d0
-                do ik = 1, k
-                    Z = Z + dz_T(ik)
-                end do
-                P_de(index,3) = Z - dz_T(k)*curand_uniform(hh)
-                P_de(index,16+2*nind) = P_de(index,3)
+                    Z = 0.0d0
+                    do ik = 1, k
+                        Z = Z + dz_T(ik)
+                    end do
+                    P_de(index,3) = Z - dz_T(k)*curand_uniform(hh)
+                    P_de(index,16+2*nind) = P_de(index,3)
 
-                P_de(index,6) = dx*dy*dz_T(k)*(Porosity_T(i,j,k) &
-                             *Saturation_T(i,j,k))*denh2o*(1.0d0/dble(np_ic))
-                P_de(index,7) = 1.0d0
-                P_de(index,8) = 1.0d0  ! make particle active
+                    P_de(index,6) = dx*dy*dz_T(k)*(Porosity_T(i,j,k) &
+                                *Saturation_T(i,j,k))*denh2o*(1.0d0/dble(np_ic))
+                    P_de(index,7) = 1.0d0
+                    P_de(index,8) = 1.0d0  ! make particle active
 
-                ! C_de(1,i,j,k) = 0.d0
-                C_de(1,i,j,k) = C_de(1,i,j,k) + P_de(index,8)*P_de(index,6) / &
-                (dx*dy*dz_T(k)*(Porosity_T(i,j,k)*Saturation_T(i,j,k)))
+                    ! C_de(1,i,j,k) = 0.d0
+                    C_de(1,i,j,k) = C_de(1,i,j,k) + P_de(index,8)*P_de(index,6) / &
+                    (dx*dy*dz_T(k)*(Porosity_T(i,j,k)*Saturation_T(i,j,k)))
 
-                ! C_de(2,i,j,k) = 0.d0
-                C_de(2,i,j,k) = C_de(2,i,j,k) + P_de(index,8)*P_de(index,4)*P_de(index,6)
+                    ! C_de(2,i,j,k) = 0.d0
+                    C_de(2,i,j,k) = C_de(2,i,j,k) + P_de(index,8)*P_de(index,4)*P_de(index,6)
 
-                ! C_de(4,i,j,k) = 0.d0
-                C_de(4,i,j,k) = C_de(4,i,j,k) + P_de(index,8)*P_de(index,7)*P_de(index,6)
+                    ! C_de(4,i,j,k) = 0.d0
+                    C_de(4,i,j,k) = C_de(4,i,j,k) + P_de(index,8)*P_de(index,7)*P_de(index,6)
 
-                ! C_de(3,i,j,k) = 0.d0
-                C_de(3,i,j,k) = C_de(3,i,j,k) + P_de(index,8)*P_de(index,6)
+                    ! C_de(3,i,j,k) = 0.d0
+                    C_de(3,i,j,k) = C_de(3,i,j,k) + P_de(index,8)*P_de(index,6)
 
-                handle(index) = hh
+                    handle(index) = hh
 
-            enddo
-        endif
-
-        if(C_de(3,i,j,k) > 0.d0)  C_de(2,i,j,k) = C_de(2,i,j,k) / C_de(3,i,j,k)
-        if(C_de(3,i,j,k) > 0.d0)  C_de(4,i,j,k) = C_de(4,i,j,k) / C_de(3,i,j,k)
-
-    end if
-end subroutine add_init_particles
-
-attributes(global) subroutine scan_new_particles()
-
-    implicit none
-    ! real(8),intent(out):: PET_balance(:)
-    integer:: i, j, k, ii, tempmod, tempxy
-    real(8):: temp
-
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-    tempxy = nnx1*nny1
-    ! get i, j, k from ii
-    if(ii <= tempxy*nz) then
-
-        tempmod = mod(ii,tempxy)
-
-        if(tempmod == 0) then
-            k = ii/tempxy
-            j = nny1
-            i = nnx1
-        else
-            k = ii/tempxy + 1
-            if(mod(tempmod,nnx1) == 0) then
-                j = tempmod/nnx1
-                i = nnx1
-            else
-                j = tempmod/nnx1 + 1
-                i = mod(tempmod,nnx1)
-            end if
-        end if
-
-        ! if(Saturation_de(i,j,k) > 0.d0) then !active area
-        ! there is no PME > 0 in the inactive area
-            if(EvapTrans_T(i,j,k) > 0.d0) then
-                temp = atomicAdd(PET_balance_de(1),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
-            else
-                temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
+                enddo
             endif
 
-            if(k == nz) then
-                ! tempmod = ii - tempxy*(nz-1)
-                if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                    d_isValid(ii - tempxy*(nz-1)) = 1
-                    ! only the top layer (k = nz) will introduce new particles
-                    ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
-                    ! it must be in the top layer.
+            if(C_de(3,i,j,k) > 0.d0)  C_de(2,i,j,k) = C_de(2,i,j,k) / C_de(3,i,j,k)
+            if(C_de(3,i,j,k) > 0.d0)  C_de(4,i,j,k) = C_de(4,i,j,k) / C_de(3,i,j,k)
+
+        end if
+    end subroutine add_init_particles
+
+    attributes(global) subroutine scan_new_particles()
+
+        implicit none
+        integer:: i, j, k, ii, tempmod, tempxy
+        real(8):: temp
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        tempxy = nnx1*nny1
+        ! get i, j, k from ii
+        if(ii <= tempxy*nz) then
+
+            tempmod = mod(ii,tempxy)
+
+            if(tempmod == 0) then
+                k = ii/tempxy
+                j = nny1
+                i = nnx1
+            else
+                k = ii/tempxy + 1
+                if(mod(tempmod,nnx1) == 0) then
+                    j = tempmod/nnx1
+                    i = nnx1
                 else
-                    d_isValid(ii - tempxy*(nz-1)) = 0
+                    j = tempmod/nnx1 + 1
+                    i = mod(tempmod,nnx1)
+                end if
+            end if
+
+            ! if(Saturation_de(i,j,k) > 0.d0) then !active area
+            ! there is no PME > 0 in the inactive area
+                if(EvapTrans_T(i,j,k) > 0.d0) then
+                    temp = atomicAdd(PET_balance_de(1),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
+                else
+                    temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
                 endif
-            endif
-            ! pass add_f and kk in, use if condition.
-            ! but I feel too much extra work. Probably just let it calculate and we never use it,
-        ! end if
-    end if
 
-end subroutine scan_new_particles
-
-attributes(global) subroutine add_new_particles( &
-    iflux_p_res,np_active,pid,kk)
-    ! CLMvars is only CLMvars(i,j,11)
-
-    implicit none
-    integer,value:: iflux_p_res, np_active, pid, kk
-    integer:: i, j, k, ij, ii, ii_l
-    integer:: index, itemp, temp, Ploc(2)
-    real(8),shared:: P_s(256,2)
-    type(curandStateXORWOW):: hh
-
-    ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-    ii_l = threadIdx%x
-
-    if(ii <= nnx1*nny1) then
-        ! get i, j from ii
-        temp = mod(ii,nnx1)
-        if(temp == 0) then
-            j = ii/nnx1
-            i = nnx1
-        else
-            j = ii/nnx1 + 1
-            i = temp
+                if(k == nz) then
+                    if(EvapTrans_da_T(i,j,k) > 0.d0) then
+                        d_isValid(ii - tempxy*(nz-1)) = 1
+                        ! only the top layer (k = nz) will introduce new particles
+                        ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
+                        ! it must be in the top layer.
+                    else
+                        d_isValid(ii - tempxy*(nz-1)) = 0
+                    endif
+                endif
+                ! pass add_f and kk in, use if condition.
+                ! but I feel too much extra work. Probably just let it calculate and we never use it,
+            ! end if
         end if
-        k = nz
 
-        if(EvapTrans_da_T(i,j,k) > 0.d0) then
-            do ij = 1, iflux_p_res
+    end subroutine scan_new_particles
 
-                index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
+    attributes(global) subroutine add_new_particles( &
+        iflux_p_res,np_active,pid,kk)
+        ! CLMvars is only CLMvars(i,j,11)
 
-                hh = handle(index)
+        implicit none
+        integer,value:: iflux_p_res, np_active, pid, kk
+        integer:: i, j, k, ij, ii, ii_l
+        integer:: index, itemp, temp, Ploc(2)
+        real(8),shared:: P_s(256,2)
+        type(curandStateXORWOW):: hh
 
-                P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
-                P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
-                ! P_de(index,13+2*nind) = dble(pid + index - np_active)
-                P_de(index,14+2*nind) = P_s(ii_l,1)
-                P_de(index,15+2*nind) = P_s(ii_l,2)
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii_l = threadIdx%x
 
-                P_de(index,3) = sum(dz_T) - dz_T(nz)*0.5d0
-                P_de(index,16+2*nind) = P_de(index,3)
+        if(ii <= nnx1*nny1) then
+            ! get i, j from ii
+            temp = mod(ii,nnx1)
+            if(temp == 0) then
+                j = ii/nnx1
+                i = nnx1
+            else
+                j = ii/nnx1 + 1
+                i = temp
+            end if
+            k = nz
 
-                P_de(index,4) = 0.0d0 + curand_uniform(hh)*pfdt
+            if(EvapTrans_da_T(i,j,k) > 0.d0) then
+                do ij = 1, iflux_p_res
 
-                if (nind > 0) then
-                    Ploc(1) = floor(P_s(ii_l,1) / dx)
-                    Ploc(2) = floor(P_s(ii_l,2) / dy)
+                    index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
 
-                    itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,nz))
-                    if(itemp > 0 .and. itemp <= nind) then
-                    P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_de(index,4)
+                    hh = handle(index)
+
+                    P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
+                    P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
+                    ! P_de(index,13+2*nind) = dble(pid + index - np_active)
+                    P_de(index,14+2*nind) = P_s(ii_l,1)
+                    P_de(index,15+2*nind) = P_s(ii_l,2)
+
+                    P_de(index,3) = sum(dz_T) - dz_T(nz)*0.5d0
+                    P_de(index,16+2*nind) = P_de(index,3)
+
+                    P_de(index,4) = 0.0d0 + curand_uniform(hh)*pfdt
+
+                    if (nind > 0) then
+                        Ploc(1) = floor(P_s(ii_l,1) / dx)
+                        Ploc(2) = floor(P_s(ii_l,2) / dy)
+
+                        itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,nz))
+                        if(itemp > 0 .and. itemp <= nind) then
+                        P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_de(index,4)
+                        end if
                     end if
-                end if
 
-                P_de(index,5) = 0.0d0
-                P_de(index,17+2*nind) = dble(kk-1)*pfdt + P_de(index,4)
-                P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
-                            EvapTrans_da_T(i,j,k)*dx*dy*dz_T(k)*denh2o
+                    P_de(index,5) = 0.0d0
+                    P_de(index,17+2*nind) = dble(kk-1)*pfdt + P_de(index,4)
+                    P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
+                                EvapTrans_da_T(i,j,k)*dx*dy*dz_T(k)*denh2o
 
-                if(CLMvars_T(i,j) > 0.d0) then ! this is snowmelt
-                    P_de(index,7) = 3.d0 ! Snow composition
-                else
-                    P_de(index,7) = 2.d0 ! Rainfall composition
-                end if
+                    if(CLMvars_T(i,j) > 0.d0) then ! this is snowmelt
+                        P_de(index,7) = 3.d0 ! Snow composition
+                    else
+                        P_de(index,7) = 2.d0 ! Rainfall composition
+                    end if
 
-                P_de(index,8)  = 1.0d0  ! make particle active
-                P_de(index,9)  = 1.0d0
-                P_de(index,10) = 0.0d0  ! Particle hasn't exited domain
+                    P_de(index,8)  = 1.0d0  ! make particle active
+                    P_de(index,9)  = 1.0d0
+                    P_de(index,10) = 0.0d0  ! Particle hasn't exited domain
 
-                P_de(index,1) = P_s(ii_l,1)
-                P_de(index,2) = P_s(ii_l,2)
+                    P_de(index,1) = P_s(ii_l,1)
+                    P_de(index,2) = P_s(ii_l,2)
 
-                handle(index) = hh
-            enddo
+                    handle(index) = hh
+                enddo
+            endif
         endif
-    endif
 
-end subroutine add_new_particles
+    end subroutine add_new_particles
 
 end module eco_particle_add
 

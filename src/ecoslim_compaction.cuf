@@ -23,8 +23,8 @@ contains
         !dimension is determined by np_active - d_indices(np_active)
         !np_active is numElements
         !holes is a temporary array that just needs dynamic allocation on cpu
-        integer:: ii   !global index in the array
         integer,value:: numElements
+        integer:: ii   !global index in the array
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         if(ii <= numElements .and. d_isValid_T(ii) == 0) then
@@ -41,10 +41,9 @@ contains
 
         implicit none
         real(8),intent(out):: d_out(:)
-        ! real(8),intent(in):: d_in(:,:)
         integer,intent(in):: holes(:)
-        integer:: ii, temp1, temp2, temp3
         integer,value:: offset, hole_size, sumsend
+        integer:: ii, temp1, temp2, temp3
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
@@ -67,8 +66,8 @@ contains
         real(8),intent(in):: d_in(:)
         ! real(8),intent(out):: d_out(:,:)
         ! integer,intent(in):: holes(:)
-        integer:: ii, temp1, temp2, temp3
         integer,value:: offset, sumrecv
+        integer:: ii, temp1, temp2, temp3
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
@@ -87,8 +86,8 @@ contains
         ! real(8),intent(in):: d_in(:,:)
         real(8),intent(out):: d_out(:,:)
         integer,intent(in):: holes(:)
-        integer:: ii   !global index in the array
         integer,value:: hole_size
+        integer:: ii   !global index in the array
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
@@ -101,7 +100,6 @@ contains
     attributes(global) subroutine select2np_active(holes,numElements,hole_size)
 
         implicit none
-        ! real(8),intent(inout):: d_in(:,:)
         integer,intent(in):: holes(:)
         integer,value:: numElements,hole_size
         integer:: ii, temp1, temp2
@@ -128,21 +126,15 @@ contains
         !holes index:     1 2 3 4
 
         implicit none
-        ! real(8),intent(inout):: d_in(:,:)
         integer,intent(in):: holes(:) !,d_indices(:),d_isValid(:)
         !dimension is determined by np_active - d_indices(np_active)
         !np_active is numElements
         !holes is a temporary array that just needs dynamic allocation on cpu
-        integer:: ii, ii2, temp1, temp2, tempi   !global index in the array
         integer,value:: offset, numElements
+        integer:: ii, ii2, temp1, temp2, tempi   !global index in the array
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
         tempi = d_indices_T(numElements)
-
-        !if(ii <= numElements) &
-        !ii2 = d_indices(numElements) - d_indices(ii) + 1
-        !if(ii == 1) print *, 'rank',rank,'ii',ii,'ii2',ii2
-        !if(ii == numElements) print *, 'rank',rank,'ii',ii,'ii2',ii2
 
         if(ii <= numElements .and. d_isValid_T(ii) > 0) then
             ii2 = tempi - d_indices_T(ii) + 1
@@ -186,8 +178,7 @@ contains
         real(8),intent(in):: d_in(:)
         ! the 8th attribution of P array
         ! integer,intent(out):: d_isValid(:)
-        integer,value:: numElements
-        integer,value:: neighbor
+        integer,value:: numElements, neighbor
         ! numElements is the length to scan
         ! neighbor is the rank of neighbor
         integer:: ii   !global index in the array
@@ -208,7 +199,6 @@ contains
         ! update P(:,8) of the received particles
 
         implicit none
-        ! real(8),intent(inout):: d_in(:,:)
         integer,value:: numElements, N_recv
         integer:: ii   !global index in the array
 
@@ -218,7 +208,7 @@ contains
             P_de(numElements+ii,:) = P_de(numElements+N_recv+ii,:)
         end if
     end subroutine connect_recv
-
+!10--------------------------------------------------------------------
     attributes(global) subroutine local2global(N_inte,N_peri)
 
         implicit none
@@ -233,7 +223,7 @@ contains
         end if
 
     end subroutine local2global
-
+!11--------------------------------------------------------------------
     attributes(global) subroutine global2local(N_inte,N_peri)
 
         implicit none

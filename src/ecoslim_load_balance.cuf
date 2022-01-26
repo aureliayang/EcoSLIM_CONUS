@@ -11,9 +11,9 @@ contains
         use mpi
 
         implicit none
+        real(8),intent(out):: Porosity_cpu(:,:,:)
         integer:: max_rank_o, temp
         logical:: flag
-        real(8),intent(out):: Porosity_cpu(:,:,:)
 
         ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
         ! setting LB > 0 also works, but extra time will be consumed.
@@ -73,10 +73,10 @@ contains
 
                     call alloc_arrays_temp(Porosity_cpu)
 
-                    call local_xyz()
-
                     call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
                     tPB >>> (buff,neigh_list,map_sub,ppx*qqy)
+
+                    call local_xyz()
 
                 end if
             end if

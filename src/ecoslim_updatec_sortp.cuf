@@ -17,7 +17,7 @@ module eco_updateC_sortP
 contains
     subroutine UpdateC_SortP()
         implicit none
-        integer:: istat, temp
+        integer:: istat, temp, temp1, temp2
         integer:: i, j
 
                 #if _TIMING == 1
@@ -26,10 +26,16 @@ contains
 
             if(.not. spinup) then
                 call Update_C_Array<<< ceiling(dble(np_active)/tPB),tPB >>>(np_active)
-                temp = ceiling(dble(np_active)/1024)
-                allocate(par_sort(temp,3))
-                call partial_sum_sort<<< temp,1024 >>>(np_active)
-                call final_sum_sort<<< 1,1024 >>>(temp)
+                temp1 = ceiling(dble(np_active)/1024)
+                allocate(par_sort(temp1,3))
+                call partial_sum_sort<<< temp1,1024 >>>(np_active)
+                if (temp1 > 1024) then
+                    temp2 = ceiling(dble(temp1)/1024)
+                    call partial_sum_sort2<<< temp2,1024 >>>(temp1)
+                else
+                    temp2 = temp1
+                endif
+                call final_sum_sort<<< 1,1024 >>>(temp2)
                 deallocate(par_sort)
             end if
 
@@ -171,6 +177,36 @@ contains
         if(ii_l == 1) par_sort(blockIdx%x,:) = p_sum(1,:)
 
     end subroutine partial_sum_sort
+
+    attributes(global) subroutine partial_sum_sort2(np_active_m)
+        implicit none
+        real(8),shared:: p_sum(1024,3)
+        integer,value:: np_active_m
+        integer:: ii, ii_l, inext
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        ii_l = threadIdx%x
+
+        if(ii <= np_active_m) then
+            p_sum(ii_l,:) = par_sort(ii,:)
+        else
+            p_sum(ii_l,:) = 0.d0
+        endif
+
+        call syncthreads()
+
+        inext = blockDim%x/2
+
+        do while (inext >= 1)
+            if(ii_l <= inext) &
+            p_sum(ii_l,:) = p_sum(ii_l,:) + p_sum(ii_l+inext,:)
+            inext = inext/2
+            call syncthreads()
+        end do
+
+        if(ii_l == 1) par_sort(blockIdx%x,:) = p_sum(1,:)
+
+    end subroutine partial_sum_sort2
 
     attributes(global) subroutine final_sum_sort(size)
         implicit none
