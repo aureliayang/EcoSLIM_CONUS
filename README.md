@@ -1,4 +1,5 @@
 # EcoSLIM_CONUS  
+Welcome collaborations from experts good at parallelization of Lagrangian method and its load balancing! Please contact with me through cy15@princeton.edu 
 ## A lagrangian particle tracking code
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/demo.png)                                 
 A particle tracking code simulates water ages and source-water mixing, working seamlessly with the integrated hydrologic model ParFlow-CLM ***(Maxwell et al., Ecohydrology, 2019)***.                                                               
