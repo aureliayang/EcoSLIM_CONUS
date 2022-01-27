@@ -8,7 +8,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * Halo cells are used around each subdomain to store particles out of boundary and then transfer them to neighbors. 
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
 * It can be applied to real cases now. Irregular boundaries are supported. HDF5 is supported.      
-* Optimization continues. **Technical support will be provided about October 2022 after we release the first steady version.**  
+* Optimization continues. **Technical support will be provided in about October 2022 after we release the first steady version.**  
 * Users are welcome to download and use per interests at current time. Please refer to ***README.md*** in ***src*** folder for details. Enjoy! 
 ## Parallel performance
 Currently, optimization continues, so **only the particle loop kernel** got tested on the Della-GPU cluster at Princeton University. Each GPU node is equipped with **2 NVIDIA A100 GPUs** and **2 2.60-GHz AMD EPYC 7H12 sockets**. Each socket has 64 cores without hyperthreading.  
