@@ -323,8 +323,7 @@ program EcoSLIM
             if(total_mass(1) > 0.d0) mean_age(1)  = mean_age(1)/total_mass(1)
             if(total_mass(1) > 0.d0) mean_comp(1) = mean_comp(1)/total_mass(1)
             mean_mass = total_mass/dble(np_active)
-            ET_np_cpu   = ET_np_de
-            out_np_cpu  = out_np_de
+            sum_np_cpu   = sum_np_de
         end if
 
         if(LB > 0) then
@@ -333,13 +332,13 @@ program EcoSLIM
             end if
         end if
 
-        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),6(i12))') kk,pfkk,outkk,Time_Next(kk), &
+        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),7(i12))') kk,pfkk,outkk,Time_Next(kk), &
 
         mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
         !
-        PET_balance(2),i_added_particles,ET_np_cpu(1),Out_np_cpu(1), &
+        PET_balance(2),i_added_particles,sum_np_cpu(2),sum_np_cpu(1), &
         !
-        np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv)
+        np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv),sum_np_cpu(3)
         !
 
         write(17,'(3(i8,1x),35(1x,e12.5,1x))') kk,pfkk,np_active, &

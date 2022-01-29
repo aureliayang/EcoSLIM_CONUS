@@ -263,9 +263,3 @@ contains
     end subroutine add_new_particles
 
 end module eco_particle_add
-
-!!! pme_add
-! use texture EvapTrans_da_T, CLMvars_T
-! use register to save ii - nnx1*nny1*(nz-1)
-! use shared memory for x and y coordinates
-! random number state saved in register ! most significant improvement

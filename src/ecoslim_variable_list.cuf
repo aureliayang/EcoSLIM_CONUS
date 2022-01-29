@@ -128,7 +128,7 @@ module variable_list
     integer:: N_exit, N_peri, N_inte ! a scalar variable.
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.
-    integer,allocatable,pinned:: out_np_cpu(:),ET_np_cpu(:)
+    integer,allocatable,pinned:: sum_np_cpu(:)
     real(8),allocatable,pinned:: out_age_cpu(:),out_mass_cpu(:),out_comp_cpu(:)
     real(8),allocatable,pinned:: ET_age_cpu(:),ET_mass_cpu(:),ET_comp_cpu(:)
     real(8),allocatable,pinned:: PET_balance(:),PET_balance_da(:)
@@ -174,7 +174,7 @@ module variable_list
     real(8),texture,pointer:: EvapTrans_da_T(:,:,:),CLMvars_T(:,:)
     integer,texture,pointer:: Ind_T(:,:,:)
 
-    integer,allocatable,device:: out_np_de(:),ET_np_de(:)
+    integer,allocatable,device:: sum_np_de(:)
     real(8),allocatable,device:: out_age_de(:),out_mass_de(:),out_comp_de(:)
     real(8),allocatable,device:: ET_age_de(:),ET_mass_de(:),ET_comp_de(:)
     real(8),allocatable,device:: mean_age_de(:),mean_comp_de(:),total_mass_de(:)
@@ -224,12 +224,12 @@ contains
         ! However, N_recv has no use on secondary ranks/GPUs.
         allocate(d_isValid(np),d_indices(np),handle(np))
 
-        allocate(out_np_cpu(1),ET_np_cpu(1))
+        allocate(sum_np_cpu(3))
         allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
         allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
         allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
 
-        allocate(out_np_de(1),ET_np_de(1))
+        allocate(sum_np_de(3))
         allocate(out_age_de(1),out_mass_de(1),out_comp_de(3))
         allocate(ET_age_de(1),ET_mass_de(1),ET_comp_de(3))
         allocate(mean_age_de(1),mean_comp_de(1),total_mass_de(1))
@@ -411,12 +411,11 @@ contains
         out_age_de  = 0.d0
         out_mass_de = 0.d0
         out_comp_de = 0.d0
-        out_np_de   = 0
 
         et_age_de  = 0.d0
         et_mass_de = 0.d0
         et_comp_de = 0.d0
-        et_np_de   = 0
+        sum_np_de   = 0
 
         mean_age_de    = 0.d0
         mean_comp_de   = 0.d0
