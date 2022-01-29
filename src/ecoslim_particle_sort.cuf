@@ -52,7 +52,7 @@ contains
 
             ! then separate inactive particles
             call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
-                P_de(:,8),np_active,0)
+                P_de(:,8),np_active,0.d0)
             call thrustscan(d_isValid,np_active,d_indices)
             ! active and ET-inactive particles in overlap zone are sent
             ! out of domain, all outfolw-inactive, received ET-inactive are scanned here
@@ -121,14 +121,14 @@ contains
                     exit
                 end if
             end do
-            Z = 1.0
+            !Z = 1.0
 
             Ploc(1) = Ploc(1) + 1
             Ploc(2) = Ploc(2) + 1
             Ploc(3) = Ploc(3) + 1
 
             if(P_l(2) == 0. .and. P_de(ii,10) == 2.) then
-                temp = atomicAdd(C_de(6,Ploc(1),Ploc(2),Ploc(3)),Z)
+                temp = atomicAdd(C_de(6,Ploc(1),Ploc(2),Ploc(3)),1.d0)
                 temp = atomicAdd(C_de(7,Ploc(1),Ploc(2),Ploc(3)),P_l(1))  ! particle mass added to ET
                 temp = atomicAdd(C_de(8,Ploc(1),Ploc(2),Ploc(3)),P_l(3)*P_l(1))  ! mass weighted age
                 temp = atomicAdd(C_de(9,Ploc(1),Ploc(2),Ploc(3)),P_l(4)*P_l(1))  ! mass weighted contribution

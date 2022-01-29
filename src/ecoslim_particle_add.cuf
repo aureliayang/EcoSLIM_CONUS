@@ -231,7 +231,7 @@ contains
                         Ploc(1) = floor(P_s(ii_l,1) / dx)
                         Ploc(2) = floor(P_s(ii_l,2) / dy)
 
-                        itemp=idnint(Ind_T(Ploc(1)+1,Ploc(2)+1,nz))
+                        itemp=Ind_T(Ploc(1)+1,Ploc(2)+1,nz)
                         if(itemp > 0 .and. itemp <= nind) then
                         P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_de(index,4)
                         end if

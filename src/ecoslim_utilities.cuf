@@ -52,7 +52,7 @@ contains
         implicit none
         integer,intent(out):: neigh_list_m(:)
         integer,value:: buff_m,rank_m,t_rank_m
-        integer:: ii,i,j,temp,one,length
+        integer:: ii,i,j,temp,length
         integer:: nx, ny, mod_temp
 
         ! 1  2  3  4  5  6
@@ -67,7 +67,6 @@ contains
         ! the (i,j) is that in Zone_de
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
-        one = 1
         nx = nnx1 + 2*buff_m
         ny = nny1 + 2*buff_m
         mod_temp = mod(ii,nx)
@@ -92,7 +91,7 @@ contains
         if(ii <= length) then
             if(Zone_T(i,j) >= 0 .and. Zone_T(i,j) /= rank_m) then
             ! since there is -1 for halo
-                temp = atomicAdd(neigh_list_m(Zone_T(i,j)+1),one)
+                temp = atomicAdd(neigh_list_m(Zone_T(i,j)+1),1)
             end if
         end if
 

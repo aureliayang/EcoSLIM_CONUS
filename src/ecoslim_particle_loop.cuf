@@ -29,14 +29,13 @@ contains
 
         integer:: ii,k,Ploc(3),ii_l
         real(8):: Vpx,Vpy,Vpz,Z,particledt,delta_time, &
-        advdt(3),z1,z2,z3,temp,one
+        advdt(3),z1,z2,z3,temp
 
         real(8),shared:: gl(256,2)
 
         type(curandStateXORWOW):: hh
 
         !--------------------------------------
-        one = 1.d0
         ii = offset + (blockIdx%x - 1) * blockDim%x + threadIdx%x
         ii_l = threadIdx%x
 
@@ -111,7 +110,7 @@ contains
                         temp = atomicAdd(Out_comp_de(3), P_de(ii,6))
                     end if
 
-                    temp = atomicAdd(Out_np_de(1), idnint(one))
+                    temp = atomicAdd(Out_np_de(1), 1)
 
                     ! flag particle as inactive
                     P_de(ii,8) = 0.d0
@@ -188,7 +187,7 @@ contains
                         temp = atomicAdd(ET_comp_de(3), P_de(ii,6))
                     end if
 
-                    temp = atomicAdd(ET_np_de(1), idnint(one))
+                    temp = atomicAdd(ET_np_de(1), 1)
 
                     ! outputting spatially distributed ET information
                     ! here it is a problem, probably have to be done after transfer.
@@ -245,7 +244,7 @@ contains
                 end if
 
                 if (nind > 0) then
-                    k=idnint(Ind_T(Ploc(1),Ploc(2),Ploc(3)))
+                    k=Ind_T(Ploc(1),Ploc(2),Ploc(3))
                     if(k > 0 .and. k <= nind) then
                         P_de(ii,12+k) = P_de(ii,12+k) + particledt
                         P_de(ii,12+nind+k) = P_de(ii,12+nind+k) + temp
@@ -297,7 +296,7 @@ contains
                     if(k /= rank) then
                         if(P_de(ii,8) == 1. .or. (P_de(ii,8) == 0. .and. P_de(ii,10) == 2.)) then
                             P_de(ii,13+2*nind) = k
-                            temp = atomicAdd(N_send(k+1),idnint(one))
+                            temp = atomicAdd(N_send(k+1),1)
                         endif
                     endif
                 endif

@@ -155,7 +155,8 @@ contains
         real(8),intent(in):: d_in(:)
         ! the 8th attribution of P array
         ! integer,intent(out):: d_isValid(:)
-        integer,value:: numElements, neighbor
+        integer,value:: numElements
+        real(8),value:: neighbor
         ! numElements is the length to scan
         ! neighbor is the rank of neighbor
         integer:: ii   !global index in the array
@@ -163,7 +164,7 @@ contains
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         if(ii <= numElements) then
-            if(idnint(d_in(ii)) == neighbor) then
+            if(d_in(ii) == neighbor) then
                 d_isValid(ii) = 0
             else
                 d_isValid(ii) = 1

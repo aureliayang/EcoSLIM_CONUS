@@ -67,7 +67,7 @@ contains
                             istat = cudaEventRecord(startEvent,0)
                             #endif
                         call prepare_neighbor<<<ceiling(dble(N_peri)/tPB),tPB>>>( &
-                            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),N_peri,i)
+                            P_de(N_inte+1:N_inte+N_peri,13+2*nind_c),N_peri,dble(i))
                             ! get d_isValid, set it 0 where the particle will be sent to neighbor i
                             #if _TIMING == 1
                             istat = cudaEventRecord(stopEvent,0)
