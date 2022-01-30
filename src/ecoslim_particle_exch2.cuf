@@ -34,7 +34,7 @@ contains
         real:: tran_t1, tran_t2, tran_t3, tran_t4, tran_t5
         real:: tran_t6, tran_t7, tran_t8, tran_t9, tran_t10
         real:: tran_t11, tran_t12, tran_t13, tran_t14, tran_t15
-        real(8):: P_send_cpu(tPB*nattri_c)
+        real(8):: P_send_cpu(tPB*nattri_c),ix1_m,iy1_m
 
             #if _TIMING == 1
         tran_time1=0.; tran_time2=0.; tran_time3=0.; tran_time4=0.; tran_time5=0.
@@ -42,7 +42,8 @@ contains
         tran_time11=0.; tran_time12=0.; tran_time13=0.; tran_time14=0.; tran_time15=0.
             #endif
 
-        call local2global<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
+        ix1_m = dble(ix1_c); iy1_m = dble(iy1_c)
+        call local2global<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri,ix1_m,iy1_m)
 
         sum_send = sum(N_send)
 
@@ -155,7 +156,7 @@ contains
                 #endif
         end if
 
-        call global2local<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri)
+        call global2local<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte,N_peri,ix1_m,iy1_m)
 
     end subroutine particle_exchange2
 

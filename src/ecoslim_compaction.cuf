@@ -211,32 +211,34 @@ contains
         end if
     end subroutine connect_recv
 !10--------------------------------------------------------------------
-    attributes(global) subroutine local2global(N_inte,N_peri)
+    attributes(global) subroutine local2global(N_inte,N_peri,ix1_m,iy1_m)
 
         implicit none
         integer,value:: N_inte,N_peri
         integer:: ii
+        real(8),value:: ix1_m,iy1_m
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         if(ii <= N_peri) then
-            P_de(N_inte+ii,1) = P_de(N_inte+ii,1) + dble(ix1)*dx
-            P_de(N_inte+ii,2) = P_de(N_inte+ii,2) + dble(iy1)*dy
+            P_de(N_inte+ii,1) = P_de(N_inte+ii,1) + ix1_m*dx
+            P_de(N_inte+ii,2) = P_de(N_inte+ii,2) + iy1_m*dy
         end if
 
     end subroutine local2global
 !11--------------------------------------------------------------------
-    attributes(global) subroutine global2local(N_inte,N_peri)
+    attributes(global) subroutine global2local(N_inte,N_peri,ix1_m,iy1_m)
 
         implicit none
         integer,value:: N_inte,N_peri
         integer:: ii
+        real(8),value:: ix1_m,iy1_m
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         if(ii <= N_peri) then
-            P_de(N_inte+ii,1) = P_de(N_inte+ii,1) - dble(ix1)*dx
-            P_de(N_inte+ii,2) = P_de(N_inte+ii,2) - dble(iy1)*dy
+            P_de(N_inte+ii,1) = P_de(N_inte+ii,1) - ix1_m*dx
+            P_de(N_inte+ii,2) = P_de(N_inte+ii,2) - iy1_m*dy
         end if
 
     end subroutine global2local
