@@ -19,28 +19,18 @@ contains
     attributes(global) subroutine scan_init_particles()
 
         implicit none
-        integer:: i, j, k, ii, temp
+        integer:: i, j, k, ii, tempxy, tempmod
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         ! get i, j, k from ii
-        if(ii <= nnx1*nny1*nz) then
+        tempxy = nnx1*nny1
+        if(ii <= tempxy*nz) then
 
-            temp = mod(ii,nnx1*nny1)
-            if(temp == 0) then
-                k = ii/(nnx1*nny1)
-                j = nny1
-                i = nnx1
-            else
-                k = ii/(nnx1*nny1) + 1
-                if(mod(temp,nnx1) == 0) then
-                    j = temp/nnx1
-                    i = nnx1
-                else
-                    j = temp/nnx1 + 1
-                    i = mod(temp,nnx1)
-                end if
-            end if
+            k = (ii-1)/tempxy + 1
+            tempmod = ii - 1 - (k-1)*tempxy
+            j = tempmod/nnx1 + 1
+            i = tempmod - (j-1)*nnx1 + 1
 
             if(Saturation_T(i,j,k) > 0.d0) then !active area
                 d_isValid(ii) = 1
@@ -56,29 +46,21 @@ contains
 
         implicit none
         integer,value:: np_ic, tout1
-        integer:: i, j, k, index, ij, ik, ii, temp
+        integer:: i, j, k, index, ij, ik, ii
+        integer:: tempmod, tempxy
         real(8):: Z
         type(curandStateXORWOW):: hh
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
         ! get i, j, k from ii
-        if(ii <= nnx1*nny1*nz) then
-            temp = mod(ii,nnx1*nny1)
-            if(temp == 0) then
-                k = ii/(nnx1*nny1)
-                j = nny1
-                i = nnx1
-            else
-                k = ii/(nnx1*nny1) + 1
-                if(mod(temp,nnx1) == 0) then
-                    j = temp/nnx1
-                    i = nnx1
-                else
-                    j = temp/nnx1 + 1
-                    i = mod(temp,nnx1)
-                end if
-            end if
+        tempxy = nnx1*nny1
+        if(ii <= tempxy*nz) then
+
+            k = (ii-1)/tempxy + 1
+            tempmod = ii - 1 - (k-1)*tempxy
+            j = tempmod/nnx1 + 1
+            i = tempmod - (j-1)*nnx1 + 1
 
             if(Saturation_T(i,j,k) > 0.d0) then
                 do ij = 1, np_ic
@@ -137,26 +119,15 @@ contains
         real(8):: temp
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
         tempxy = nnx1*nny1
         ! get i, j, k from ii
         if(ii <= tempxy*nz) then
 
-            tempmod = mod(ii,tempxy)
-
-            if(tempmod == 0) then
-                k = ii/tempxy
-                j = nny1
-                i = nnx1
-            else
-                k = ii/tempxy + 1
-                if(mod(tempmod,nnx1) == 0) then
-                    j = tempmod/nnx1
-                    i = nnx1
-                else
-                    j = tempmod/nnx1 + 1
-                    i = mod(tempmod,nnx1)
-                end if
-            end if
+            k = (ii-1)/tempxy + 1
+            tempmod = ii - 1 - (k-1)*tempxy
+            j = tempmod/nnx1 + 1
+            i = tempmod - (j-1)*nnx1 + 1
 
             ! if(Saturation_de(i,j,k) > 0.d0) then !active area
             ! there is no PME > 0 in the inactive area
@@ -166,16 +137,15 @@ contains
                     temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
                 endif
 
-                if(k == nz) then
-                    if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                        d_isValid(ii - tempxy*(nz-1)) = 1
-                        ! only the top layer (k = nz) will introduce new particles
-                        ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
-                        ! it must be in the top layer.
-                    else
-                        d_isValid(ii - tempxy*(nz-1)) = 0
-                    endif
+                if(EvapTrans_da_T(i,j,k) > 0.d0) then
+                    d_isValid(ii - tempxy*(nz-1)) = 1
+                    ! only the top layer (k = nz) will introduce new particles
+                    ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
+                    ! it must be in the top layer.
+                else
+                    if(k == nz) d_isValid(ii - tempxy*(nz-1)) = 0
                 endif
+
                 ! pass add_f and kk in, use if condition.
                 ! but I feel too much extra work. Probably just let it calculate and we never use it,
             ! end if
@@ -190,7 +160,8 @@ contains
         implicit none
         integer,value:: iflux_p_res, np_active, pid, kk
         integer:: i, j, k, ij, ii, ii_l
-        integer:: index, itemp, temp, Ploc(2)
+        integer:: index, itemp, Ploc(2)
+        real(8):: ET_da
         real(8),shared:: P_s(256,2)
         type(curandStateXORWOW):: hh
 
@@ -198,34 +169,31 @@ contains
         ii_l = threadIdx%x
 
         if(ii <= nnx1*nny1) then
-            ! get i, j from ii
-            temp = mod(ii,nnx1)
-            if(temp == 0) then
-                j = ii/nnx1
-                i = nnx1
-            else
-                j = ii/nnx1 + 1
-                i = temp
-            end if
+
+            j = (ii-1)/nnx1 + 1
+            i = ii - (j-1)*nnx1
             k = nz
 
-            if(EvapTrans_da_T(i,j,k) > 0.d0) then
+            ET_da = EvapTrans_da_T(i,j,k)
+            if(ET_da > 0.d0) then
                 do ij = 1, iflux_p_res
 
-                    index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
+                    !index = np_active + d_indices_T(ii)*iflux_p_res - (ij - 1)
+                    index = np_active + d_indices_T(nnx1*nny1)*(ij - 1) + d_indices_T(ii)
 
                     hh = handle(index)
 
                     P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
+                    P_de(index,14+2*nind) = P_s(ii_l,1)
                     P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                     ! P_de(index,13+2*nind) = dble(pid + index - np_active)
-                    P_de(index,14+2*nind) = P_s(ii_l,1)
                     P_de(index,15+2*nind) = P_s(ii_l,2)
 
                     P_de(index,3) = sum(dz_T) - dz_T(nz)*0.5d0
                     P_de(index,16+2*nind) = P_de(index,3)
 
                     P_de(index,4) = 0.0d0 + curand_uniform(hh)*pfdt
+                    P_de(index,17+2*nind) = dble(kk-1)*pfdt + P_de(index,4)
 
                     if (nind > 0) then
                         Ploc(1) = floor(P_s(ii_l,1) / dx)
@@ -233,14 +201,13 @@ contains
 
                         itemp=Ind_T(Ploc(1)+1,Ploc(2)+1,nz)
                         if(itemp > 0 .and. itemp <= nind) then
-                        P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_de(index,4)
+                            P_de(index,(12+itemp)) = P_de(index,(12+itemp)) + P_de(index,4)
                         end if
                     end if
 
                     P_de(index,5) = 0.0d0
-                    P_de(index,17+2*nind) = dble(kk-1)*pfdt + P_de(index,4)
                     P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
-                                EvapTrans_da_T(i,j,k)*dx*dy*dz_T(k)*denh2o
+                                    ET_da*dx*dy*dz_T(k)*denh2o
 
                     if(CLMvars_T(i,j) > 0.d0) then ! this is snowmelt
                         P_de(index,7) = 3.d0 ! Snow composition
