@@ -5,6 +5,7 @@ module eco_particle_pme
     use variable_list, only: rank, c_GPU, map_sub, ierr, work_comm
     use variable_list, only: startEvent, stopEvent
     use variable_list, only: nnx1_c, nny1_c, ix1_c, iy1_c, nz_c, tPB
+    use variable_list, only: pfdt_c, dx_c, dy_c, denh2o_c
     use variable_list, only: d_isValid, d_indices
     use variable_list, only: kk, add_f, i_added_particles
     use variable_list, only: np_active, np, iflux_p_res, pid
@@ -18,14 +19,15 @@ contains
         implicit none
         integer:: istat, temp
         logical,intent(out):: pme_flag
+        real(8):: mvalue
 
         if (rank == c_GPU(map_sub+1)) then
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(startEvent,0)
                 #endif
-
-            call scan_new_particles<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> ()
+            mvalue = pfdt_c*dx_c*dy_c*denh2o_c
+            call scan_new_particles<<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>> (mvalue)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -82,7 +84,7 @@ contains
                         #endif
 
                     call add_new_particles<<< ceiling(dble(nnx1_c*nny1_c)/tPB), &
-                        tPB >>> (iflux_p_res,np_active,pid,kk)
+                        tPB >>> (iflux_p_res,np_active,pid,kk,mvalue)
 
                         #if _TIMING == 1
                         istat = cudaEventRecord(stopEvent,0)

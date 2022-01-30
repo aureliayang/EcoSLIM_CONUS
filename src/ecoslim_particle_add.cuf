@@ -112,11 +112,12 @@ contains
         end if
     end subroutine add_init_particles
 
-    attributes(global) subroutine scan_new_particles()
+    attributes(global) subroutine scan_new_particles(mvalue)
 
         implicit none
         integer:: i, j, k, ii, tempmod, tempxy
         real(8):: temp
+        real(8),value:: mvalue
 
         ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
 
@@ -132,19 +133,21 @@ contains
             ! if(Saturation_de(i,j,k) > 0.d0) then !active area
             ! there is no PME > 0 in the inactive area
                 if(EvapTrans_T(i,j,k) > 0.d0) then
-                    temp = atomicAdd(PET_balance_de(1),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
+                    temp = atomicAdd(PET_balance_de(1),mvalue*EvapTrans_T(i,j,k)*dz_T(k))
                 else
-                    temp = atomicAdd(PET_balance_de(2),pfdt*EvapTrans_T(i,j,k)*dx*dy*dz_T(k)*denh2o)
+                    temp = atomicAdd(PET_balance_de(2),mvalue*EvapTrans_T(i,j,k)*dz_T(k))
                 endif
 
-                if(EvapTrans_da_T(i,j,k) > 0.d0) then
-                    d_isValid(ii - tempxy*(nz-1)) = 1
-                    ! only the top layer (k = nz) will introduce new particles
-                    ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
-                    ! it must be in the top layer.
-                else
-                    if(k == nz) d_isValid(ii - tempxy*(nz-1)) = 0
-                endif
+                if(k == nz) then
+                    if(EvapTrans_da_T(i,j,k) > 0.d0) then
+                        d_isValid(ii - tempxy*(nz-1)) = 1
+                        ! only the top layer (k = nz) will introduce new particles
+                        ! in fact, the if(k == nz) is not necessary since if EvapTrans_T(i,j,k) > 0.d0
+                        ! it must be in the top layer.
+                    else
+                        d_isValid(ii - tempxy*(nz-1)) = 0
+                    endif
+                end if
 
                 ! pass add_f and kk in, use if condition.
                 ! but I feel too much extra work. Probably just let it calculate and we never use it,
@@ -154,7 +157,7 @@ contains
     end subroutine scan_new_particles
 
     attributes(global) subroutine add_new_particles( &
-        iflux_p_res,np_active,pid,kk)
+        iflux_p_res,np_active,pid,kk,mvalue)
         ! CLMvars is only CLMvars(i,j,11)
 
         implicit none
@@ -162,6 +165,7 @@ contains
         integer:: i, j, k, ij, ii, ii_l
         integer:: index, itemp, Ploc(2)
         real(8):: ET_da
+        real(8),value:: mvalue
         real(8),shared:: P_s(256,2)
         type(curandStateXORWOW):: hh
 
@@ -206,8 +210,7 @@ contains
                     end if
 
                     P_de(index,5) = 0.0d0
-                    P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*pfdt* &
-                                    ET_da*dx*dy*dz_T(k)*denh2o
+                    P_de(index,6) = (1.0d0/dble(abs(iflux_p_res)))*ET_da*dz_T(k)*mvalue
 
                     if(CLMvars_T(i,j) > 0.d0) then ! this is snowmelt
                         P_de(index,7) = 3.d0 ! Snow composition
