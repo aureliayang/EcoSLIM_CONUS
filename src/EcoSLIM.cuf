@@ -341,7 +341,7 @@ program EcoSLIM
         np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv),sum_np_cpu(3)
         !
 
-        write(17,'(3(i8,1x),35(1x,e12.5,1x))') kk,pfkk,np_active, &
+        write(17,'(3(i8,1x),36(1x,e12.5,1x))') kk,pfkk,np_active, &
 
         IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
         ! 4,         5,       6,        7,          8,        9,        10
@@ -354,7 +354,7 @@ program EcoSLIM
         tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
         ! 26,      27,        28,        29,        30,       31
         C_time,exit_time,tran_time11,tran_time12,tran_time13,tran_time14,tran_time15,LB_time
-        ! 32,  33        34,         35,         36,         37,         38
+        ! 32,  33        34,         35,         36,         37,         38          39
 
         flush(17);flush(20)
 
