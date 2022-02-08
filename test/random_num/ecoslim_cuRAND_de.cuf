@@ -48,7 +48,7 @@ contains
         ii = threadIdx%x
         seed = 123_8
         seq = 0_8
-        offset = ii*2
+        offset = (ii-1)*500
         call curand_init(seed, seq, offset, h(ii))
     end subroutine createRand_test
 

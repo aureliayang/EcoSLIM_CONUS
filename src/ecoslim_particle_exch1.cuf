@@ -286,6 +286,7 @@ contains
 
             call global2local<<<ceiling(dble(N_peri)/tPB),tPB>>>(N_inte, &
             N_peri,dble(ix1_c),dble(iy1_c))
+
     end subroutine particle_exchange1
 
 end module eco_particle_exch1
