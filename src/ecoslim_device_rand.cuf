@@ -20,6 +20,17 @@ contains
 
         ! 3_8*abs(np_ic) slots are reserved for each grid cell
         ! 3_8*abs(np_ic)*nx*ny*nz slots are reserved for each rank
+        ! abs(np_ic) is not necessary actually
+        ! this is called with a size of <<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>>
+        ! initial add is also called with the same size <<< ceiling(dble(nnx1_c*nny1_c*nz_c)/tPB),tPB >>>
+        ! offset decides the interval between each thread while size of kernel decides how &
+        ! many threads/states are initialized. Hence for current setup, only one particle
+        ! can be added into each grid-cell.
+        ! the state is used based on the index of particle rather than the thread index
+        ! random number is used triple in add while forth in loop. but in loop there is do-while
+        ! we don't need to care about if the state is for the same particle all the time. We just need to
+        ! make sure the interval is enough for one timestep use.
+        ! the maximum slots of a state needed for one timestep is 3(add)+4*n_while_loop, so I reserve 40 slots
 
     end subroutine createRand_init
 
