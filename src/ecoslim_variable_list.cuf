@@ -423,8 +423,8 @@ contains
         PET_balance_de = 0.d0
 
         C_de = 0.d0
-        ! We can think about asyn transfer of data to GPU here to hide the time cost when doing
-        ! the following adding of particles.
+        ! We can think about async transfer of data to GPU here to hide
+        ! the time cost when doing the following adding of particles.
 
         N_send = 0
         N_recv = 0

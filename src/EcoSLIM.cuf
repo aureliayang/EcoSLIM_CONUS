@@ -311,7 +311,6 @@ program EcoSLIM
             if(transfer < 0) then
                 if(mod(kk,transfer) == 0) then
                     call particle_exchange2()
-                    ! currently, LB not supported
                 end if
             end if
 
