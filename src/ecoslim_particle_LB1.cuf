@@ -1,4 +1,4 @@
-module eco_particle_lb
+module eco_particle_lb1
 
     use cudafor
     use variable_list
@@ -6,12 +6,12 @@ module eco_particle_lb
     use utilities
 
 contains
-    subroutine load_balance(Porosity_cpu)
+    subroutine load_balance1()
 
         use mpi
 
         implicit none
-        real(8),intent(out):: Porosity_cpu(:,:,:)
+        ! real(8),intent(out):: Porosity_cpu(:,:,:)
         integer:: max_rank_o, temp, istat
         logical:: flag
 
@@ -75,7 +75,7 @@ contains
                     call copy_grid(map_sub)
                     ! make sure grid is on all ranks by bcast
 
-                    call alloc_arrays_temp(Porosity_cpu)
+                    call alloc_arrays_temp()
 
                     call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
                     tPB >>> (buff,neigh_list,map_sub,ppx*qqy)
@@ -90,5 +90,5 @@ contains
             istat = cudaEventSynchronize(stopEvent)
             istat = cudaEventElapsedTime(LB_time,startEvent,stopEvent)
             #endif
-    end subroutine load_balance
-end module eco_particle_lb
+    end subroutine load_balance1
+end module eco_particle_lb1

@@ -38,7 +38,8 @@ program EcoSLIM
     use eco_particle_init
     use eco_particle_exch1
     use eco_particle_exch2
-    use eco_particle_lb
+    use eco_particle_lb1
+    use eco_particle_lb2
     use eco_particle_separ
 
 !--------------------------------------------------------------------
@@ -103,7 +104,7 @@ program EcoSLIM
 
         call copy_grid(map_sub) ! doing this on workers
 
-        call alloc_arrays_temp(Porosity_cpu) ! doing this on workers
+        call alloc_arrays_temp() ! doing this on workers
 
         call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
             tPB >>> (buff,neigh_list,rank,ppx*qqy)
@@ -325,9 +326,17 @@ program EcoSLIM
             sum_np_cpu   = sum_np_de
         end if
 
+        call MPI_Barrier(MPI_COMM_WORLD,ierr)
+
         if(LB > 0) then
             if(mod(kk,LB) == 0) then
-                call load_balance(Porosity_cpu)
+                call load_balance1()
+            end if
+        end if
+
+        if(LB < 0) then
+            if(mod(kk,LB) == 0) then
+                call load_balance2()
             end if
         end if
 

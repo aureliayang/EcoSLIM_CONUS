@@ -13,12 +13,13 @@ CUF=ecoslim_thrustscan.o \
     ecoslim_particle_exch2.o \
     ecoslim_particle_sort.o \
     ecoslim_pfb_read.o \
-    ecoslim_particle_LB.o \
+    ecoslim_particle_LB1.o \
     ecoslim_particle_separ.o \
     ecoslim_particle_pme.o \
     ecoslim_read_input.o \
     ecoslim_working_comm.o \
     ecoslim_particle_init.o \
+    ecoslim_particle_LB2.o \
     EcoSLIM.cuf
 
 HDF5 = 0
@@ -68,7 +69,7 @@ ecoslim_particle_sort.o: ecoslim_particle_sort.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_pfb_read.o: ecoslim_pfb_read.f90
 	mpif90 -c $^ -o $@
-ecoslim_particle_LB.o: ecoslim_particle_LB.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
+ecoslim_particle_LB1.o: ecoslim_particle_LB1.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
 ecoslim_particle_separ.o: ecoslim_particle_separ.cuf ecoslim_compaction.o ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(FFLAGS)
@@ -84,6 +85,8 @@ ifeq ($(HDF5),1)
 ecoslim_read_hdf5.o: ecoslim_read_hdf5.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(HDF5FLAGS)
 endif
+ecoslim_particle_LB2.o: ecoslim_particle_LB2.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o ecoslim_dynamic_DDC.o
+	mpif90 -c $< -o $@
 
 .PHONY: clean
 clean:

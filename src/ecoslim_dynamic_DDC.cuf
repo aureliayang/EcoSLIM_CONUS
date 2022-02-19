@@ -12,9 +12,8 @@ module create_subdomain
     use variable_list, only: p_num, c_sum
     ! p_num and c_sum are device attribute
     use variable_list, only: d_indices
-    use variable_list, only: nx_c, ny_c, ppx, qqy, tPB ! , rank, t_rank !,ierr, buff
-    use variable_list, only: grid
-    use variable_list, only: Zonet_new
+    use variable_list, only: nx_c, ny_c, ppx, qqy, tPB, buff ! , rank, t_rank !,ierr, buff
+    use variable_list, only: Zonet_new, Zonet_old, grid
 
 contains
     subroutine gridinfo()
@@ -32,13 +31,16 @@ contains
         integer:: i, j, dir, nlev, n !,k,ii,jj
         integer:: max_dim, ndim1, ndim2 !, ierr
         !integer(8):: c_sum_cpu(9)
-        !integer:: indices_cpu(9)
+        integer:: Zonet_inter(-buff+1:nx_c+buff,-buff+1:ny_c+buff)
 
         grid = 0   ! this is legal
         grid(1,1) = 0
         grid(1,2) = 0
         grid(1,3) = nx_c
         grid(1,4) = ny_c
+
+        Zonet_inter = Zonet_new
+        Zonet_old = Zonet_inter
         Zonet_new = -1
         Zonet_new(1:nx_c,1:ny_c) = 0
 

@@ -1,0 +1,268 @@
+module eco_particle_lb2
+
+    use thrust
+    use cudafor
+    use utilities
+    use variable_list
+    use eco_compact_util
+    use create_subdomain
+    use subdomain_bound
+
+contains
+    subroutine load_balance2()
+        use mpi
+        implicit none
+        integer:: ix1t, iy1t, nnx1t, nny1t !t means temp
+        integer:: temp, nc1, nc2, nc3, nc4
+        integer:: r1(t_rank), r2(t_rank), r3(t_rank), r4(t_rank)
+        integer:: left, right, sum_send, sum_recv
+        integer:: status2(MPI_STATUS_SIZE,t_rank)
+        integer:: neigh_lists2(t_rank), neigh_listr2(t_rank)
+        integer:: p_num_cpu(nx_c,ny_c)
+
+        N_send = 0; N_recv = 0
+
+        ! gather p_num
+        p_num_cpu = 0; p_num = 0
+        call prepare_p_sum<<<ceiling(dble(np_active)/tPB),tPB>>>(np_active)
+        p_num_cpu(ix1_c+1:ix1_c+nnx1_c,iy1_c+1:iy1_c+nny1_c) = p_num(1:nnx1_c,1:nny1_c)
+        call MPI_ALLReduce(MPI_IN_PLACE,p_num_cpu,nx_c*ny_c,MPI_INTEGER,MPI_SUM,MPI_COMM_WORLD,ierr)
+        p_num = p_num_cpu
+
+        ! update grid
+        call gridinfo()
+
+        ! ! don't update ix1, iy1, nnx1, nny1, etc.
+        ! ! but Zone_de has been updated
+        ! ! for sending
+        Zone_de = -1
+        Zone_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff) = &
+        Zonet_new(-buff+ix1_c+1:ix1_c+nnx1_c+buff,-buff+iy1_c+1:iy1_c+nny1_c+buff)
+
+        ! need to know the new ix1.... which we use temporary variables
+        ! for receiving
+        ix1t  = grid(rank+1,1)
+        nnx1t = grid(rank+1,3)
+        iy1t  = grid(rank+1,2)
+        nny1t = grid(rank+1,4)
+
+        allocate(Zone_temp_de(-buff+1:nnx1t+buff,-buff+1:nny1t+buff))
+        Zone_temp_de = -1
+        Zone_temp_de(-buff+1:nnx1t+buff,-buff+1:nny1t+buff) = &
+        Zonet_old(-buff+ix1t+1:ix1t+nnx1t+buff,-buff+iy1t+1:iy1t+nny1t+buff)
+
+        ! transfer
+        call scan_zones<<< ceiling(dble(nnx1_c*nny1_c)/tPB),tPB >>>(rank,t_rank)
+            neigh_lists2 = neigh_lists
+        call scan_zoner<<< ceiling(dble(nnx1t*nny1t)/tPB),tPB >>>(nnx1t,nny1t,rank,t_rank)
+            neigh_listr2 = neigh_listr
+        ! a kernel to label the particle to be sent
+        call label_send<<<ceiling(dble(np_active)/tPB),tPB>>>(np_active,rank)
+
+        do i = 0,t_rank-1
+            call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+            if(i == rank)then
+                write(30,*) ix1t,nnx1t,iy1t,nny1t
+                write(30,*) ix1_c,nnx1_c,iy1_c,nny1_c
+                write(30,*) neigh_lists2
+                write(30,*) neigh_listr2
+                flush(30)
+            endif
+        enddo
+
+        call local2global<<<ceiling(dble(np_active)/tPB),tPB>>>(0, &
+            np_active,dble(ix1_c),dble(iy1_c))
+
+        nc1 = 0
+        do i = 0, t_rank-1
+            if(neigh_lists2(i+1) > 0) then
+                nc1 = nc1 + 1
+                call prepare_neighbor<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                    P_de(1:np_active,13+2*nind_c),np_active,dble(i))
+                call thrustscan(d_isValid,np_active,d_indices)
+                temp = d_indices(np_active)
+                N_send(i+1) = np_active - temp
+                write(30,*) N_send(i+1),i,'send'
+                flush(30)
+
+                call MPI_ISEND(N_send(i+1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,r1(nc1),ierr)
+                allocate(holes(N_send(i+1)))
+                call prepare_holes<<<ceiling(dble(np_active)/tPB),tPB>>>(holes,np_active)
+                sum_send = sum(N_send(1:i))
+                call select2send<<<ceiling(dble(N_send(i+1))/tPB),tPB>>>(holes, &
+                    P_send,0,N_send(i+1),sum_send)
+                left  = sum_send*nattri_c + 1
+                right = sum(N_send(1:i+1))*nattri_c
+                call MPI_ISEND(P_send(left:right),N_send(i+1)*nattri_c, &
+                    MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,r3(nc1),ierr)
+                call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
+                    holes,0,np_active)
+                np_active = temp; deallocate(holes)
+            end if
+        end do
+
+        nc2 = 0
+        do i = 0, t_rank-1
+            if(neigh_listr2(i+1) > 0) then
+                nc2 = nc2 + 1
+                call MPI_IRECV(N_recv(i+1),1,MPI_INTEGER,i,40,MPI_COMM_WORLD,r2(nc2),ierr)
+            end if
+        end do
+        if(nc2 > 0) call MPI_WAITALL(nc2,r2(1:nc2),status2(:,1:nc2),ierr)
+        write(30,*) N_recv,'recv'
+        flush(30)
+
+        nc4 = 0
+        do i = 0, t_rank-1
+            if(neigh_listr2(i+1) > 0) then
+                nc4 = nc4 + 1
+                left  = sum(N_recv(1:i))*nattri_c + 1
+                right = sum(N_recv(1:i+1))*nattri_c
+                call MPI_IRECV(P_recv(left:right),N_recv(i+1)*nattri_c, &
+                    MPI_DOUBLE_PRECISION,i,41,MPI_COMM_WORLD,r4(nc4),ierr)
+            end if
+        end do
+
+        if(nc4 > 0) then
+            sum_recv = sum(N_recv)
+            call MPI_WAITALL(nc4,r4(1:nc4),status2(:,1:nc4),ierr)
+            call unpack_recv<<<ceiling(dble(sum_recv)/tPB),tPB>>>( &
+                P_recv,np_active,sum_recv)
+            np_active = np_active + sum_recv
+        endif
+
+        ! deallocate all
+        deallocate(Zone_temp_de)
+        call dealloc_arrays_temp()
+
+        ! copy
+        call copy_grid(rank)
+        call alloc_arrays_temp()
+        call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
+            tPB >>> (buff,neigh_list,rank,ppx*qqy)
+        call global_xyz()
+        call local_xyz()
+
+        call global2local<<<ceiling(dble(np_active)/tPB),tPB>>>(0, &
+            np_active,dble(ix1_c),dble(iy1_c))
+
+    end subroutine load_balance2
+
+    attributes(global) subroutine prepare_p_sum(np_active_m)
+        implicit none
+        integer,value:: np_active_m
+        integer:: ii, Ploc(2), temp
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        if(ii <= np_active_m) then
+            Ploc(1) = floor(P_de(ii,1) / dx)
+            Ploc(2) = floor(P_de(ii,2) / dy)
+            temp = atomicAdd(p_num(Ploc(1)+1,Ploc(2)+1),1)
+        end if
+    end subroutine prepare_p_sum
+
+    attributes(global) subroutine label_send(np_active_m,rank_m)
+        implicit none
+
+        integer,value:: np_active_m,rank_m
+        integer:: ii, Ploc(2)
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        if(ii <= np_active_m) then
+            Ploc(1) = floor(P_de(ii,1) / dx)
+            Ploc(2) = floor(P_de(ii,2) / dy)
+
+            P_de(ii,13+2*nind) = -1.
+
+            if(Zone_T(Ploc(1)+1,Ploc(2)+1) /= rank_m) &
+            P_de(ii,13+2*nind) = Zone_T(Ploc(1)+1,Ploc(2)+1)
+
+        end if
+    end subroutine label_send
+
+    attributes(global) subroutine scan_zones(rank_m,t_rank_m)
+
+        implicit none
+        integer,value:: rank_m, t_rank_m
+        integer:: ii,i,j,temp,length
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        length = nnx1*nny1
+
+        if(ii <= length) then
+            j = (ii-1)/nnx1 + 1
+            i = ii - (j-1)*nnx1
+        end if
+
+        if(ii <= t_rank_m) neigh_lists(ii) = 0
+        ! we assume length must be larger than t_rank_m
+
+        if(ii <= length) then
+            if(Zone_de(i,j) >= 0 .and. Zone_de(i,j) /= rank_m) then
+                temp = atomicAdd(neigh_lists(Zone_de(i,j)+1),1)
+            end if
+        end if
+
+        if(ii <= t_rank_m .and. neigh_lists(ii) > 0) neigh_lists(ii) = 1
+    end subroutine scan_zones
+
+    attributes(global) subroutine scan_zoner(nx_m,ny_m,rank_m,t_rank_m)
+
+        implicit none
+        integer,value:: nx_m, ny_m, rank_m, t_rank_m
+        integer:: ii,i,j,temp,length
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+        length = nx_m * ny_m
+
+        if(ii <= length) then
+            j = (ii-1)/nx_m + 1
+            i = ii - (j-1)*nx_m
+        end if
+
+        if(ii <= t_rank_m) neigh_listr(ii) = 0
+        ! we assume length must be larger than t_rank_m
+
+        if(ii <= length) then
+            if(Zone_temp_de(i,j) >= 0 .and. Zone_temp_de(i,j) /= rank_m) then
+                temp = atomicAdd(neigh_listr(Zone_temp_de(i,j)+1),1)
+            end if
+        end if
+
+        if(ii <= t_rank_m .and. neigh_listr(ii) > 0) neigh_listr(ii) = 1
+    end subroutine scan_zoner
+
+end module eco_particle_lb2
+
+        ! do i = 0,t_rank-1
+        !     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        !     if(i == rank) then
+        !         write(30,*) 'p_num1'
+        !         write(30,'(41(41(i5,1x),/))') ((p_num_cpu(j,k),j=1,nx_c),k=1,ny_c)
+        !     endif
+        ! enddo
+
+        ! do i = 0,t_rank-1
+        !     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        !     if(i == rank) then
+        !         write(30,*) 'Zone_de'
+        !         if(rank == 0) write(30,'(22(22(i5,1x),/))') ((Zone_de(j,k),j=0,21),k=0,21)
+        !         if(rank == 1) write(30,'(23(22(i5,1x),/))') ((Zone_de(j,k),j=0,21),k=0,22)
+        !         if(rank == 2) write(30,'(22(23(i5,1x),/))') ((Zone_de(j,k),j=0,22),k=0,21)
+        !         if(rank == 3) write(30,'(23(23(i5,1x),/))') ((Zone_de(j,k),j=0,22),k=0,22)
+        !         ! write(30,*) Zone_de
+        !     endif
+        ! enddo
+
+        ! do i = 0,t_rank-1
+        !     call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        !     if(i == rank) then
+        !         write(30,*) 'Zone_temp_de'
+        !         if(rank == 0) write(30,'(25(20(i5,1x),/))') ((Zone_temp_de(j,k),j=0,19),k=0,24)
+        !         if(rank == 1) write(30,'(20(20(i5,1x),/))') ((Zone_temp_de(j,k),j=0,19),k=0,19)
+        !         if(rank == 2) write(30,'(22(25(i5,1x),/))') ((Zone_temp_de(j,k),j=0,24),k=0,21)
+        !         if(rank == 3) write(30,'(23(25(i5,1x),/))') ((Zone_temp_de(j,k),j=0,24),k=0,22)
+        !         ! write(30,*) Zone_temp_de
+        !     endif
+        ! enddo
