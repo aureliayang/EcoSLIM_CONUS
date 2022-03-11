@@ -86,7 +86,7 @@ ecoslim_read_hdf5.o: ecoslim_read_hdf5.cuf ecoslim_variable_list.o
 	mpif90 -c $< -o $@ $(HDF5FLAGS)
 endif
 ecoslim_particle_LB2.o: ecoslim_particle_LB2.cuf ecoslim_utilities.o ecoslim_subdomain_bc.o ecoslim_variable_list.o ecoslim_dynamic_DDC.o
-	mpif90 -c $< -o $@
+	mpif90 -c $< -o $@ $(FFLAGS)
 
 .PHONY: clean
 clean:

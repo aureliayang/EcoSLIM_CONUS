@@ -46,6 +46,7 @@ program EcoSLIM
     implicit none
 
     integer:: istat
+    integer:: count1=0,count2=0,count3=0,count4=0,count5=0
     logical:: separ_flag, pme_flag, fore_flag
 
 !--------------------------------------------------------------------
@@ -140,7 +141,7 @@ program EcoSLIM
         end if
 
     else
-        call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
+        ! call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
     end if
     ! if the initial number of GPUs equals the total number, this will be skipped.
 
@@ -175,10 +176,13 @@ program EcoSLIM
             call read_h5_file(Vx_h5,nnx2_c+1,nny2_c,nz_c)
             Vx(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c+1,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c)=Vx_h5
                 #else
+                    if(count1 == 0) then
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
             Vx(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c+1,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c) = &
             Vx_cpu(ix2_c+1:ix2_c+nnx2_c+1,iy2_c+1:iy2_c+nny2_c,1:nz_c)
+                    count1 = 1
+                    endif
                 #endif
 
                 #if _HDF5 == 1
@@ -186,10 +190,13 @@ program EcoSLIM
             call read_h5_file(Vy_h5,nnx2_c,nny2_c+1,nz_c)
             Vy(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c+1,1:nz_c)=Vy_h5
                 #else
+                    if(count2 == 0) then
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
             Vy(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c+1,1:nz_c) = &
             Vy_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c+1,1:nz_c)
+                    count2 = 1
+                    endif
                 #endif
 
                 #if _HDF5 == 1
@@ -197,10 +204,13 @@ program EcoSLIM
             call read_h5_file(Vz_h5,nnx2_c,nny2_c,nz_c+1)
             Vz(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c+1)=Vz_h5
                 #else
+                    if(count3 == 0) then
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
             Vz(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c+1) = &
             Vz_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,1:nz_c+1)
+                    count3 = 1
+                    endif
                 #endif
 
                 #if _HDF5 == 1
@@ -208,10 +218,13 @@ program EcoSLIM
             call read_h5_file(Saturation_h5,nnx2_c,nny2_c,nz_c)
             Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=Saturation_h5
                 #else
+                    if(count4 == 0) then
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
             Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
             Saturation_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
+                    count4 = 1
+                    endif
                 #endif
 
             if (clmtrans) then
@@ -221,10 +234,13 @@ program EcoSLIM
                 call read_h5_file(EvapTrans_h5,nnx2_c,nny2_c,nz_c)
                 EvapTrans(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=EvapTrans_h5
                     #else
+                        if(count5 == 0) then
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
                 call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
                 EvapTrans(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
                 EvapTrans_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
+                        count5 = 1
+                        endif
                     #endif
 
                 if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
@@ -326,7 +342,7 @@ program EcoSLIM
             sum_np_cpu   = sum_np_de
         end if
 
-        call MPI_Barrier(MPI_COMM_WORLD,ierr)
+        ! call MPI_Barrier(MPI_COMM_WORLD,ierr)
 
         if(LB > 0) then
             if(mod(kk,LB) == 0) then
@@ -340,16 +356,16 @@ program EcoSLIM
             end if
         end if
 
-        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),7(i12))') kk,pfkk,outkk,Time_Next(kk), &
+        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),9(i12))') kk,pfkk,outkk,Time_Next(kk), &
 
         mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
         !
         PET_balance(2),i_added_particles,sum_np_cpu(2),sum_np_cpu(1), &
         !
-        np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv),sum_np_cpu(3)
+        np_active,N_peri,N_inte,N_exit,sum(N_send),sum(N_recv),sum(N_send2),sum(N_recv2),sum_np_cpu(3)
         !
 
-        write(17,'(3(i8,1x),36(1x,e12.5,1x))') kk,pfkk,np_active, &
+        write(17,'(3(i8,1x),37(1x,e12.5,1x))') kk,pfkk,np_active, &
 
         IO_time_read,h2d_time,scan_time,thrust_time,copy_time,add2_time,reduce_time, &
         ! 4,         5,       6,        7,          8,        9,        10
@@ -361,7 +377,7 @@ program EcoSLIM
         ! 20,     21,        22,        23,        24,        25
         tran_time6,tran_time7,tran_time8,tran_time9,inte_time,tran_time10, &
         ! 26,      27,        28,        29,        30,       31
-        C_time,exit_time,tran_time11,tran_time12,tran_time13,tran_time14,tran_time15,LB_time
+        C_time,exit_time,tran_time11,tran_time12,tran_time13,tran_time14,tran_time15,LB1_time,LB2_time
         ! 32,  33        34,         35,         36,         37,         38          39
 
         flush(17);flush(20)

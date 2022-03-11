@@ -107,7 +107,7 @@ module variable_list
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time
-    real:: peri_time, inte_time, exit_time, C_time, LB_time
+    real:: peri_time, inte_time, exit_time, C_time, LB1_time, LB2_time
     real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
     real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
     real:: tran_time11=0., tran_time12=0., tran_time13=0., tran_time14=0., tran_time15=0.
@@ -121,10 +121,10 @@ module variable_list
     integer:: fh0, fh1, fh2, fh3, fh4, add_f
 
     real(8),allocatable,pinned:: P(:,:)
-    integer,allocatable,managed:: N_send(:)
+    integer,allocatable,managed:: N_send(:),N_send2(:)
     ! the same length as neigh_list, i.e., the total number of subdomains.
     ! it is assembled on GPU in particle loop and used in exchange on CPU.
-    integer,allocatable,pinned:: N_recv(:) ! for each subdomain, it has the number of neighbors
+    integer,allocatable,pinned:: N_recv(:),N_recv2(:) ! for each subdomain, it has the number of neighbors
     integer:: N_exit, N_peri, N_inte ! a scalar variable.
     ! It is assembled on GPU and is written into binary file each timestep.
     ! it is allocated in particle exchange.
@@ -221,7 +221,7 @@ contains
         allocate(neigh_lists(ppx*qqy),neigh_listr(ppx*qqy))
         allocate(work_ranks(t_rank),nump(t_rank),rq1(t_rank))
         allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,t_rank),c_GPU(ppx*qqy))
-        allocate(N_send(ppx*qqy),N_recv(t_rank))
+        allocate(N_send(ppx*qqy),N_recv(t_rank),N_send2(ppx*qqy),N_recv2(t_rank))
         ! N_send means, on each rank, it only sends particles to the initial GPUs
         ! N_recv means, on each rank, it receives particles from all rank.
         ! However, N_recv has no use on secondary ranks/GPUs.
@@ -271,7 +271,7 @@ contains
         d_isValid_T => d_isValid
         d_indices_T => d_indices
 
-        allocate(P_send(tPB*nattri_c*10000),P_recv(tPB*nattri_c*10000))
+        allocate(P_send(tPB*nattri_c*100000),P_recv(tPB*nattri_c*100000))
         ! if send and recv larger than 256??? add some if condition
 
         allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))

@@ -21,6 +21,10 @@ contains
         logical,intent(out):: pme_flag
         real(8):: mvalue
 
+        #if _TIMING == 1
+        scan_time=0.; thrust_time=0.; copy_time=0.; add2_time=0.; reduce_time=0.
+        #endif
+
         if (rank == c_GPU(map_sub+1)) then
 
                 #if _TIMING == 1
@@ -98,7 +102,7 @@ contains
             end if
         end if
 
-        call MPI_Barrier(work_comm,ierr)
+        ! call MPI_Barrier(work_comm,ierr)
 
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)

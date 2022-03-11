@@ -21,6 +21,11 @@ contains
         integer:: istat
         logical,intent(out):: separ_flag
 
+        #if _TIMING == 1
+        sort_time1=0.;sort_time2=0.;sort_time3=0.;sort_time4=0.;sort_time5=0.
+        sort_time6=0.;sort_time7=0.;sort_time9=0.;sort_time10=0.
+        #endif
+
             #if _TIMING == 1
             istat = cudaEventRecord(startEvent,0)
             #endif

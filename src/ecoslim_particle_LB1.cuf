@@ -19,6 +19,7 @@ contains
         ! setting LB > 0 also works, but extra time will be consumed.
 
             #if _TIMING == 1
+            LB1_time = 0.
             istat = cudaEventRecord(startEvent,0)
             #endif
 
@@ -57,6 +58,7 @@ contains
             call MPI_BCAST(t_GPUs,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
             call MPI_BCAST(l_GPUs,ppx*qqy*t_rank,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
         end if
+
         call MPI_BCAST(c_GPU,ppx*qqy,MPI_INTEGER,t_rank-1,MPI_COMM_WORLD,ierr)
 
         if (max_rank > max_rank_o) then
@@ -68,7 +70,9 @@ contains
 
             if(rank >= max_rank_o+1 .and. rank <= max_rank) then
 
-                call MPI_TEST(rq2,flag,status,ierr)
+                ! call MPI_TEST(rq2,flag,status,ierr)
+                call MPI_IRECV(map_sub,1,MPI_INTEGER,t_rank-1,40,MPI_COMM_WORLD,rq2,ierr)
+                call MPI_WAIT(rq2,status,ierr)
 
                 if(flag == .true. .or. map_sub >= 0) then
 
@@ -88,7 +92,7 @@ contains
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
             istat = cudaEventSynchronize(stopEvent)
-            istat = cudaEventElapsedTime(LB_time,startEvent,stopEvent)
+            istat = cudaEventElapsedTime(LB1_time,startEvent,stopEvent)
             #endif
     end subroutine load_balance1
 end module eco_particle_lb1
