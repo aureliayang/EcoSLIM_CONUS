@@ -1,0 +1,38 @@
+SLIM_CONUS_sp      ! SLIM run name, path to PF-CLM next, followed by DEM
+"/scratch/gpfs/cy15/CONUS2_sp/CONUS2_spinup_all_seepage"
+" "
+4442                !nx
+3256                !ny
+10                !nz
+4                 !nCLMsoil
+4                 !ppx
+4                 !qqy
+1                 !transfer scheme
+True              !separate or not
+-240
+1e7
+False
+1                 !particles per cell at start of simulation
+100000000          !np Total
+1000.             !dx
+1000.             !dy, dz follows
+1000.,100.,50.,25.,10.,5.,1.,0.6,0.3,0.1
+1.0             !ParFlow DT
+1               !Parflow t1: ParFlow file number to start from (initial condition is pft1-1)
+2               !Parflow t2: (last year of a 5y run)
+0               !EcoSLIM output start counter 0=pft1-1
+5000            !Time Sequence Repeat [n_cycle*(pft2-pft1)] 20 year EcoSLIM run
+24              !add_f, either 1 or 24
+0               !ipwrite frequency, controls an ASCII, .3D particle file not recommended due to poor performance
+0               !ibinpntswrite frequency, controls VTK, binary output of particle locations and attributes
+0               !etwrite frequency, controls ASCII ET output
+0               !icwrite frequency,controls VTK, binary grid based output where particle masses, concentrations
+1.d0            !velocity multiplier 1.0=forward, -1.0=backward
+True            !CLM Evap Trans
+True            !CLM Evap Trans
+1               !number of particles per Evap Trans IC
+1000.0          !density H2O
+0.00000001      !Molecular Diffusivity
+0.250d0         !fraction of Dx/Vx for numerical stability
+1
+""
