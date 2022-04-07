@@ -84,10 +84,10 @@
   make HDF5=1 
   ```
 # Load Balancing (LB)
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/3LB.png)  
 * The idea of GPU Help (LB1) in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***). Code is started with a number of GPUs (subdomains) fewer than the total scheduled GPUs. Manager rank periodically checks the number of particles on each GPU. If the number of particles on a GPU is larger than a given number, one more GPU will be started to help that GPU/subdomain. For a subdomain with more than one GPU, source particles from positive PME will be added into the GPU with the fewest number of particles.  
 * **Test results of Little Washita watershed. In test with LB1, simulation started using 2 GPUs while 4 GPUs were scheduled.**
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/LBs.png)  
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/3LB.png)  
 # Transfer schemes (for dev)
 * **neigh_list** uses *managed memory* and has the length of total number of GPUs. This is because the do loop using it can skip the non-neighbor quickly. However, if we compact it with pure neighbors, there should be extra work. We can think carefully about this to choose the best way.  
 * Label the destination of particles which will be transferred by P(ii,13+2\*nind), where ii is the number of particle. It saves the rank of the destination. It is the original pid attribute, but after using mpi and transfer, there is no sense for this attribute anymore. We can try to rebuild *pid* attribute later.  
