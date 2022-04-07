@@ -84,7 +84,7 @@
   make HDF5=1 
   ```
 # Load Balancing (LB)
-![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/LB.png)  
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/2LB.png)  
 * The idea of LB in EcoSLIM is borrowed from ***OhHelp: A Scalable Domain-Decomposing Dynamic Load Balancing for Particle-in-Cell Simulations*** and then modified based on the characteristics of EcoSLIM (***Nakashima et al., 2009, Ics'09: Proceedings of the 2009 Acm Sigarch International Conference on Supercomputing***).  
 * Code is started with a number of GPUs (subdomains) fewer than the total scheduled GPUs. Manager rank periodically checks the number of particles on each GPU. If the number of particles on a GPU is larger than a given number, one more GPU will be started to help that GPU/subdomain.  
 * For a subdomain with more than one GPU, source particles from positive PME will be added into the GPU with the fewest number of particles.  
