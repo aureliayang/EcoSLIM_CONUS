@@ -25,7 +25,7 @@ Currently, optimization continues, so **only the particle loop kernel** got test
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
 * Thanks so much to ***the CONUS2.0 team*** for offering the CONUS2.0 ParFlow model for code tests 
 * Thanks so much to ***Prof. Reed Maxwell*** at Princeton University and ***Prof. Laura Condon*** at the University of Arizona for their support in the application of computational resources: We won the **NACR Accelerated Scientific Discovery program** 2021 fall. We will run particle tracking based on the CONUS2.0 ParFlow model on the coming NCAR supercomputer ***Derecho*** using ***100 NVIDIA A100 GPUs***
-## Tests across three scales
+## Tests across three spatial scales
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/3tests.jpeg)
 ## Test on CONUS2.0 without LB (particle distribution)
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/NLB.png)  
