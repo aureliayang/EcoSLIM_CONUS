@@ -19,8 +19,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 ## Presentations
 * **Yang C.**, **MODFLOW and More 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at the continental-scale 
 * **Yang C.**, **EGU General Assembly 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at continental-scale 
-* **Yang C.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation: https://wiki.ucar.edu/pages/viewpage.action?pageId=484344890
-* **Maxwell R.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation: https://wiki.ucar.edu/pages/viewpage.action?pageId=475760826
+* **Yang C.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrology to continental-scale: https://wiki.ucar.edu/pages/viewpage.action?pageId=484344890
+* **Maxwell R.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation, University ASD preparation: High-resolution integrated hydrologic modeling of the Continental US: a community resource to accelerate hydrologic discovery in changing systems: https://wiki.ucar.edu/pages/viewpage.action?pageId=475760826
 * **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06). https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
 * **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms (H53F-08). https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/871082
 ## Acknowledgments
