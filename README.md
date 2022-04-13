@@ -17,6 +17,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * **Yang C.**, Maxwell R., Valent R., 2022. Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, moderate revision.
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., 2021. Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
 ## Presentations
+* **Yang C.**, MODFLOW and More 2022, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at the continental-scale 
+* **Yang C.**, EGU General Assembly 2022, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at continental-scale 
 * **Yang C.**, NCAR HPC User Group (NHUG) monthly meeting, 2022, oral presentation: https://wiki.ucar.edu/pages/viewpage.action?pageId=484344890
 * **Maxwell R.**, NCAR HPC User Group (NHUG) monthly meeting, 2022, oral presentation: https://wiki.ucar.edu/pages/viewpage.action?pageId=475760826
 * **Yang C.**, American Geophysical Union Fall meeting, 2021, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06), oral presentation. https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
