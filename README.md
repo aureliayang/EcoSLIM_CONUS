@@ -22,6 +22,7 @@ Currently, optimization continues, so **only the particle loop kernel** got test
 * **Latest parallel performance tests based on the whole code show as good performance as this single kernel tests. This part will be updated soon.** 
 ## Publications 
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
+* **Yang C.**, Maxwell R., Valent R., Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, moderate revision.
 ## Acknowledgements
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
