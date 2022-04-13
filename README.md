@@ -19,11 +19,11 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * **Yang C.**, Li H.-Y., Fang Y., Cui C., Wang T., Zheng C., Leung L. R., Maxwell R., Zhang Y.-K., Yang X., 2020. Effects of Groundwater Pumping on Ground Surface Temperature: A Regional Modeling Study in the North China Plain. ***Journal of Geophysical Research: Atmospheres***, https://doi.org/10.1029/2019jd031764
 ## Presentations
 * **Yang C.**, **MODFLOW and More 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at the continental-scale 
-* **Yang C.**, **EGU General Assembly 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at continental-scale 
+* **Yang C.**, **EGU General Assembly 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at continental-scale: https://meetingorganizer.copernicus.org/EGU22/EGU22-3285.html 
 * **Yang C.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrology to continental-scale: https://wiki.ucar.edu/pages/viewpage.action?pageId=484344890
 * **Maxwell R.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation, University ASD preparation: High-resolution integrated hydrologic modeling of the Continental US: a community resource to accelerate hydrologic discovery in changing systems: https://wiki.ucar.edu/pages/viewpage.action?pageId=475760826
-* **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06). https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
-* **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms (H53F-08). https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/871082
+* **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06): https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
+* **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms (H53F-08): https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/871082
 ## Acknowledgments
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
