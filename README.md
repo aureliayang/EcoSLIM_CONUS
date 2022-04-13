@@ -9,7 +9,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * This development aims to handle the particle tracking at the continental US scale with long timescale.
 * It can be applied to real cases now. Irregular boundaries are supported. HDF5 is supported.      
 * Optimization continues. **Technical support will be provided in about October 2022 after we release the first steady version.**  
-* Users are welcome to download and use per interests at current time. Please refer to ***README.md*** in ***src*** folder for details. Enjoy! 
+* Users are welcome to download and use per interests at current time. Please refer to ***README.md*** in ***src*** folder for details. 
+* Enjoy! 
 ## Publications 
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., 2021. Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
 * **Yang C.**, Maxwell R., Valent R., 2022. Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, moderate revision.
