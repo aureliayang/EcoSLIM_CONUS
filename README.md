@@ -21,8 +21,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * **Yang C.**, **EGU General Assembly 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at continental-scale 
 * **Yang C.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation: https://wiki.ucar.edu/pages/viewpage.action?pageId=484344890
 * **Maxwell R.**, **NCAR HPC User Group (NHUG) monthly meeting 2022**, oral presentation: https://wiki.ucar.edu/pages/viewpage.action?pageId=475760826
-* **Yang C.**, **American Geophysical Union Fall meeting 2021**, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06), oral presentation. https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
-* **Yang C.**, **American Geophysical Union Fall meeting 2021**, Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms (H53F-08), oral presentation. https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/871082
+* **Yang C.**, **American Geophysical Union Fall meeting 2021**, oral presentation, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06). https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
+* **Yang C.**, **American Geophysical Union Fall meeting 2021**, oral presentation, Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms (H53F-08). https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/871082
 ## Acknowledgments
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
