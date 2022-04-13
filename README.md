@@ -15,7 +15,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * **Yang C.**, Maxwell R., Valent R., 2022. Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, moderate revision.
 * **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2022. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. Submitted to ***Journal of Advances in Modeling Earth Systems***. 
 * **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2022. The role of topography in controlling evapotranspiration age. Submitted to ***Geophysical Research Letters***. 
-## Acknowledgements
+## Acknowledgments
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
 * Thanks so much to ***the CONUS2.0 team*** for offering the CONUS2.0 ParFlow model for code tests 
