@@ -13,8 +13,8 @@ A particle tracking code simulates water ages and source-water mixing, working s
 ## Publications 
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., 2021. Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
 * **Yang C.**, Maxwell R., Valent R., 2022. Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, moderate revision.
-* **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2022. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. Submitted to ***Journal of Advances in Modeling Earth Systems***. 
-* **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2022. The role of topography in controlling evapotranspiration age. Submitted to ***Geophysical Research Letters***. 
+* **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2022. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. Submitted to ***Journal of Advances in Modeling Earth Systems***, under review. 
+* **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2022. The role of topography in controlling evapotranspiration age. Submitted to ***Geophysical Research Letters***, under review. 
 ## Acknowledgments
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
