@@ -23,6 +23,7 @@ Currently, optimization continues, so **only the particle loop kernel** got test
 ## Publications 
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
 * **Yang C.**, Maxwell R., Valent R., Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, moderate revision.
+* **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., Accelerating the particle tracking in hydrology to continental-scale. Submitted to ***Journal of Advances in Modeling Earth Systems***. 
 ## Acknowledgements
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
