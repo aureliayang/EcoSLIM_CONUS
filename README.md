@@ -25,7 +25,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Topography-driven flow paths control spatiotemporal variabilities of ET age: A perspective from particle tracking at the regional scale (H11A-06): https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/870631
 * **Yang C.**, **AGU Fall meeting 2021**, oral presentation, Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms (H53F-08): https://agu.confex.com/agu/fm21/meetingapp.cgi/Paper/871082
 ## Activities
-* Princeton GPU Hackathon 2021, https://gpuhackathons.org/event/princeton-gpu-hackathon-2021 https://github.com/aureliayang/EcoSLIM_Compaction
+* Princeton GPU Hackathon 2021, official website: https://gpuhackathons.org/event/princeton-gpu-hackathon-2021, team outcome: https://github.com/aureliayang/EcoSLIM_Compaction
 ## Acknowledgments
 * Thanks so much to the following software engineers for their guidance in the code development:  
 ***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
