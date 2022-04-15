@@ -28,7 +28,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 * Princeton GPU Hackathon 2021, official website: https://gpuhackathons.org/event/princeton-gpu-hackathon-2021, team outcome: https://github.com/aureliayang/EcoSLIM_Compaction
 ## Acknowledgments
 * Thanks so much to the following software engineers for their guidance in the code development:  
-***NVIDIA, Carl Ponder; Princeton University, Bei Wang***
+***NVIDIA, Carl Ponder; Princeton University/NVIDIA, Bei Wang***
 * Thanks so much to ***the CONUS2.0 team*** for offering the CONUS2.0 ParFlow model for code tests 
 * Thanks so much to ***Prof. Reed Maxwell*** at Princeton University and ***Prof. Laura Condon*** at the University of Arizona for their support in the application of computational resources: We won the **NACR Accelerated Scientific Discovery program** 2021 fall. We will run particle tracking based on the CONUS2.0 ParFlow model on the coming NCAR supercomputer ***Derecho*** using ***100 NVIDIA A100 GPUs***
 ## Tests across three spatial scales
