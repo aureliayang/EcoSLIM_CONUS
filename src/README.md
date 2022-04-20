@@ -36,6 +36,7 @@
 * **denh2o,** density of water
 * **moldiff,** Molecular diffusivity
 * **dtfrac,** Numerical stability information
+* **nfactor,** It should be a large number, if you use LB2. For example, it is 100,000 for CONUS2.0.
 * **nind,** Number of subsurface indicator
 * **Indname,** pfb file of indicator
 # Build 
