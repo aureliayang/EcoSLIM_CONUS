@@ -13,7 +13,7 @@
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **th_value,** The threshold to start a new GPU
 * **spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
-* **np_ic,** Number of particles per cell at the start of simulation. This can only be 1 due to the random number generator set in the current code. Otherwise, unknown behavior will happen.
+* **np_ic,** If np_ic /= -1, abs(np_ic) is the number of particles per cell at the start of simulation. If np_if = -1, the simulation is restarted.
 * **np,** Maximum number permitted during run time 
 * **dx,** grid-cell size in x direction
 * **dy,** grid-cell size in y direction
