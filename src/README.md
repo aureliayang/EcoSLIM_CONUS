@@ -24,6 +24,7 @@
 * **tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep for hot start
 * **n_cycle,** The cycles to use ParFlow files
 * **add_f,** The time interval to add particles
+* **restart_f,** The time interval to restart
 * **ipwrite,** Not supported now
 * **ibinpntswrite,** Not supported now
 * **etwrite,** Not supported now
