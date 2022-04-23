@@ -4,7 +4,7 @@ module subdomain_bound
     ! subroutine read_restarts
     use cudafor
 
-    use variable_list, only: ppx, qqy, rank, buff
+    use variable_list, only: ppx, qqy, rank, buff, ranknum, kk, tout1
     use variable_list, only: nx_c, ny_c, nz_c
     use variable_list, only: dx_c, dy_c, dz
     use variable_list, only: xgmin_c, xgmax_c, ygmin_c, ygmax_c, zgmin_c, zgmax_c
@@ -15,19 +15,19 @@ module subdomain_bound
     use variable_list, only: xmin1, xmax1, ymin1, ymax1, zmin1, zmax1
     use variable_list, only: xmin2, xmax2, ymin2, ymax2, zmin2, zmax2
     use variable_list, only: xmin3, xmax3, ymin3, ymax3, zmin3, zmax3
-    use variable_list, only: restartf, ranknum
-    use variable_list, only: fh1, fh2
-    use variable_list, only: ix1_c, iy1_c, nnx1_c, nny1_c, ix2_c, iy2_c, nnx2_c, nny2_c
-    use variable_list, only: DEM, DEMname, fname, Pnts
+    use variable_list, only: ix1_c, iy1_c, nnx1_c, nny1_c
+    use variable_list, only: ix2_c, iy2_c, nnx2_c, nny2_c
+    use variable_list, only: DEM, DEMname, Pnts
     use variable_list, only: np, nind_c, np_active, pid
-    use variable_list, only: P, grid, Zone_de, Zonet_new
+    use variable_list, only: P, P_de, grid, Zonet_new
 
 contains
     subroutine global_xyz()
-        ! get the boundary of the whole domain.
-        ! Only effective here for output purpose, after the call of local_xyz
-        ! this group of data are updated to local data
+        ! get the boundary of the whole domain, only effective here for log purpose
+        ! after the call of local_xyz, this group of data are updated to local data
         ! for extra GPU, this group of data will be updated when it is activated
+        ! so for GPU help, this will not be invoked after new GPU is activated
+        ! for DDC, this should be invoked again once the topology of subdomains changed
 
         implicit none
 
@@ -98,58 +98,59 @@ contains
 
     end subroutine local_xyz
 
-    subroutine read_restarts ()
-        use mpi
+    subroutine write_restarts ()
+
         implicit none
+        character(200) writenum
 
-        integer:: ierr
-        character(200):: message
+        write(writenum,'(i5.5)') kk
 
-        if (rank /= ppx*qqy) then
+        P(1:np_active,:) = P_de(1:np_active,:)
 
-            write(message,'(a,a,i3.3,a,a)') 'Reading particle restart File:', &
-            'Particle_restart.',rank,'.bin',new_line(' ')
-            call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                                MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
+        open(116,file='Particle_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(writenum))//'.bin', &
+        form='unformatted',access='stream')
 
-            call MPI_FILE_OPEN(MPI_COMM_SELF,restartf,MPI_MODE_RDONLY, &
-                                MPI_INFO_NULL,fh2,ierr)
+        write(116) np_active
+        write(116) pid
+        write(116) P(1:np_active,1:nind_c*2+17)
 
-            call MPI_FILE_READ(fh2,np_active,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
-            call MPI_FILE_READ(fh2,pid,1,MPI_INTEGER,MPI_STATUS_IGNORE,ierr)
+        close(116)
 
-            if (np_active < np) then   ! check if we have particles left
-                call MPI_FILE_READ(fh2,P(1:np_active,1:nind_c*2+17),np_active*(nind_c*2+17), &
-                                    MPI_DOUBLE_PRECISION,MPI_STATUS_IGNORE,ierr)
-                call MPI_FILE_CLOSE(fh2, ierr)
+    end subroutine write_restarts
 
-                write(message,'(a,i10.10,a)') 'RESTART np_active:',np_active,new_line(' ')
-                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                                    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-                write(message,'(a,i10.10,a)') 'RESTART pid:',pid,new_line(' ')
-                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                                    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-            else
-                call MPI_FILE_CLOSE(fh2, ierr)
-                write(message,'(A,A)') ' **Warning restart IC input but no paricles left',new_line(' ')
-                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                                    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-                write(message,'(A,A)') ' **Exiting code *not* (over)writing restart',new_line(' ')
-                call MPI_FILE_WRITE(fh1, trim(message), len(trim(message)), &
-                                    MPI_CHARACTER, MPI_STATUS_IGNORE, ierr)
-                stop
-            end if
+    subroutine read_restarts ()
 
-            ! read topology
-            open(17,file='topology_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
-                read(17) ix1_c, iy1_c, nnx1_c, nny1_c, ix2_c, iy2_c, nnx2_c, nny2_c
-            close(17)  ! Topology
+        implicit none
+        character(200) restartnum
+
+        write(restartnum,'(i5.5)') tout1
+
+        write(11,*) 'Reading particle restart File: &
+        Particle_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(restartnum))//'.bin'
+
+        open(116,file='Particle_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(restartnum))//'.bin', &
+        form='unformatted',access='stream')
+
+        read(116) np_active
+        read(116) pid
+
+        if (np_active < np) then   ! check if we have particles left
+
+            read(116) P(1:np_active,1:nind_c*2+17)
+            close(116)
+
+            write(11,*) 'RESTART np_active:', np_active
+            write(11,*) 'RESTART pid:', pid
+
         else
-            !open(19,file='manager_grid_zonet_new', FORM='unformatted',access='stream')
-            !    read(19) grid
-            !    read(19) Zonet_new
-            !close(19)  ! manager
+            close(116)
+            write(11,*) ' **Warning restart IC input but no paricles left'
+            write(11,*) ' **Exiting code *not* (over)writing restart'
+            stop
         end if
+
+        P_de(1:np_active,:) = P(1:np_active,:)
+
     end subroutine read_restarts
 
 end module subdomain_bound

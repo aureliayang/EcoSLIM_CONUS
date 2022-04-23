@@ -10,7 +10,7 @@ module eco_read_input
     use variable_list,only: pfnt,Time_Next,Time_first,outkk
     use variable_list,only: V_mult,clmtrans,clmfile,iflux_p_res
     use variable_list,only: denh2o,denh2o_c,moldiff,moldiff_c,dtfrac,dtfrac_c
-    use variable_list,only: nind,nind_c,Indname
+    use variable_list,only: nind,nind_c,Indname,restart_f,nfactor
 
 
 contains
@@ -112,6 +112,7 @@ contains
         read(10,*) tout1
         read(10,*) n_cycle
         read(10,*) add_f
+        read(10,*) restart_f
     !--------------------------------------------------------------------
         pfnt = n_cycle*(pft2-pft1+1)
         outkk = tout1 + 1
@@ -150,6 +151,7 @@ contains
         ! fraction of dx/Vx
         read(10,*) dtfrac_c
         dtfrac = dtfrac_c
+        read(10,*) nfactor
     !--------------------------------------------------------------------
         ! wite out log file
         write(11,*)

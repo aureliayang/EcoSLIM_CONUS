@@ -14,6 +14,7 @@ contains
         ! real(8),intent(out):: Porosity_cpu(:,:,:)
         integer:: max_rank_o, temp, istat
         logical:: flag
+        integer:: rq1(t_rank), rq2
 
         ! when initial number of GPUs is larger than zero, you'd better set LB as 0, though
         ! setting LB > 0 also works, but extra time will be consumed.

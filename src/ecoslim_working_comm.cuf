@@ -1,39 +1,41 @@
 module eco_working_comm
     use variable_list,only: ppx, qqy, rank, t_rank, max_rank
-    use variable_list,only: work_ranks, work_comm, ierr
+    use variable_list,only: work_ranks, work_comm
     use variable_list,only: world_group, work_group, map_sub
-    use variable_list,only: t_GPUs, l_GPUs, c_GPU
+    use variable_list,only: t_GPUs, l_GPUs, c_GPU, np_ic
 contains
     subroutine working_comm()
         use mpi
         implicit none
-        integer:: i
+        integer:: i, ierr
 
         ! define the dynamic working group
 
-        ! restart ???
         do i = 1, t_rank
             work_ranks(i) = i - 1
         end do
 
-        max_rank = ppx*qqy - 1  ! the maximum rank number of current work group
+        if(np_ic /= -1) then    ! restart
+            do i = 1, ppx*qqy
+                t_GPUs(i) = 1
+                l_GPUs(i,t_GPUs(i)) = i-1
+                c_GPU(i) = l_GPUs(i,t_GPUs(i))
+            end do
+            ! all GPUs have this information
+
+            if(rank < ppx*qqy) then
+                map_sub = rank
+            else
+                map_sub = -1
+                ! to make sure the new GPU started correctly
+            end if
+
+            max_rank = ppx*qqy - 1  ! the maximum rank number of current work group
+        end if
 
         call MPI_COMM_GROUP(MPI_COMM_WORLD,world_group,ierr)
         call MPI_GROUP_INCL(world_group,max_rank+1,work_ranks(1:max_rank+1),work_group,ierr)
         call MPI_COMM_CREATE(MPI_COMM_WORLD,work_group,work_comm,ierr)
 
-        do i = 1, ppx*qqy
-            t_GPUs(i) = 1
-            l_GPUs(i,t_GPUs(i)) = i-1
-            c_GPU(i) = l_GPUs(i,t_GPUs(i))
-        end do
-        ! all GPUs have this information
-
-        if(rank < ppx*qqy) then
-            map_sub = rank
-        else
-            map_sub = -1
-            ! to make sure the new GPU started correctly
-        end if
     end subroutine working_comm
 end module eco_working_comm

@@ -3,8 +3,8 @@ module eco_particle_init
     use thrust
     use eco_particle_add
     use variable_list,only: np_active, pid, np, np_ic
-    use variable_list,only: nnx1_c, nny1_c
-    use variable_list,only: tout1, nz_c, tPB
+    use variable_list,only: nnx1_c, nny1_c, nz_c
+    use variable_list,only: tout1, tPB
     use variable_list,only: d_isValid, d_indices
 contains
     subroutine initial_forward (fore_flag)
@@ -35,4 +35,32 @@ contains
         (np_ic,tout1)
 
     end subroutine initial_forward
+
+    subroutine initial_backward (back_flag)
+        implicit none
+        logical,intent(out):: back_flag
+
+        np_active = 0
+        pid = 0
+
+        call scan_init_particles_b<<< ceiling(dble(nnx1_c*nny1_c)/tPB),tPB >>>()
+
+        call thrustscan(d_isValid,nnx1_c*nny1_c,d_indices)
+
+        np_active = d_indices(nnx1_c*nny1_c)
+        np_active = abs(np_ic)*np_active
+        pid = np_active
+
+        if (np_active >= np) then
+            write(11,*) ' **Warning IC input but no paricles left'
+            write(11,*) ' **Exiting code gracefully writing restart'
+            back_flag = .true.
+            return
+        endif
+
+        C_de = 0.d0
+        call add_init_particles_b<<< ceiling(dble(nnx1_c*nny1_c)/tPB),tPB >>> &
+        (np_ic,tout1)
+
+    end subroutine initial_backward
 end module eco_particle_init

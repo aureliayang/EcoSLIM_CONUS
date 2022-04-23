@@ -47,7 +47,8 @@ program EcoSLIM
 
     integer:: istat
     integer:: count1=0,count2=0,count3=0,count4=0,count5=0
-    logical:: separ_flag, pme_flag, fore_flag
+    logical:: separ_flag, pme_flag, fore_flag, back_flag
+    character(300):: message
 
 !--------------------------------------------------------------------
     call MPI_INIT(ierr)
@@ -91,15 +92,19 @@ program EcoSLIM
     ! now we know the total dimension
 
     call global_xyz()
+    ! in ecoslim_subdomain_bc.cuf
 
-    call working_comm()
 !--------------------------------------------------------------------
     if(np_ic /= -1) call gridinfo()
+
     if(np_ic == -1) call read_grid_Zone()
     ! if not restart, we do decompostion and build topology
     ! gridinfo is to get grid and Zonet_new
     ! if restart, read grid and Zonet_new in
     ! we want to restart at n*add_f, and also 8760/m since we need results of a complete year
+
+    call working_comm()
+    ! we have to move working_comm here due to the max_rank
 
     if (work_comm /= MPI_COMM_NULL) then
 
@@ -115,8 +120,10 @@ program EcoSLIM
         if(np_ic /= -1) then
             ! Saturation = 0.8d0
             write(filenum,'(i5.5)') pft1-1
+            ! so if it is cold start, we need to read the saturation before your start time countnumber.
             fname = trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
+
             Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
             Saturation_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
 
@@ -135,9 +142,14 @@ program EcoSLIM
         end if
 
         if(np_ic == -1) then
+            call read_restarts ()
         end if
 
         if(np_ic < -1) then
+            write(11,*) 'River IC activated'
+            back_flag = .false.
+            call initial_backward(back_flag)
+            if(back_flag) goto 9090
         end if
 
     else
@@ -176,13 +188,13 @@ program EcoSLIM
             call read_h5_file(Vx_h5,nnx2_c+1,nny2_c,nz_c)
             Vx(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c+1,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c)=Vx_h5
                 #else
-                    if(count1 == 0) then
+                    ! if(count1 == 0) then
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vx_cpu,fname,nx_c+1,ny_c,nz_c)
+                    ! count1 = 1
+                    ! endif
             Vx(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c+1,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c) = &
             Vx_cpu(ix2_c+1:ix2_c+nnx2_c+1,iy2_c+1:iy2_c+nny2_c,1:nz_c)
-                    count1 = 1
-                    endif
                 #endif
 
                 #if _HDF5 == 1
@@ -190,13 +202,13 @@ program EcoSLIM
             call read_h5_file(Vy_h5,nnx2_c,nny2_c+1,nz_c)
             Vy(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c+1,1:nz_c)=Vy_h5
                 #else
-                    if(count2 == 0) then
+                    ! if(count2 == 0) then
             fname=trim(adjustl(pname))//'.out.vely.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vy_cpu,fname,nx_c,ny_c+1,nz_c)
+                    ! count2 = 1
+                    ! endif
             Vy(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c+1,1:nz_c) = &
             Vy_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c+1,1:nz_c)
-                    count2 = 1
-                    endif
                 #endif
 
                 #if _HDF5 == 1
@@ -204,13 +216,13 @@ program EcoSLIM
             call read_h5_file(Vz_h5,nnx2_c,nny2_c,nz_c+1)
             Vz(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c+1)=Vz_h5
                 #else
-                    if(count3 == 0) then
+                    ! if(count3 == 0) then
             fname=trim(adjustl(pname))//'.out.velz.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Vz_cpu,fname,nx_c,ny_c,nz_c+1)
+                    ! count3 = 1
+                    ! endif
             Vz(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,1:nz_c+1) = &
             Vz_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,1:nz_c+1)
-                    count3 = 1
-                    endif
                 #endif
 
                 #if _HDF5 == 1
@@ -218,13 +230,13 @@ program EcoSLIM
             call read_h5_file(Saturation_h5,nnx2_c,nny2_c,nz_c)
             Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=Saturation_h5
                 #else
-                    if(count4 == 0) then
+                    ! if(count4 == 0) then
             fname=trim(adjustl(pname))//'.out.satur.'//trim(adjustl(filenum))//'.pfb'
             call pfb_read(Saturation_cpu,fname,nx_c,ny_c,nz_c)
+                    ! count4 = 1
+                    ! endif
             Saturation(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
             Saturation_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
-                    count4 = 1
-                    endif
                 #endif
 
             if (clmtrans) then
@@ -234,13 +246,13 @@ program EcoSLIM
                 call read_h5_file(EvapTrans_h5,nnx2_c,nny2_c,nz_c)
                 EvapTrans(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=EvapTrans_h5
                     #else
-                        if(count5 == 0) then
+                        ! if(count5 == 0) then
                 fname=trim(adjustl(pname))//'.out.evaptrans.'//trim(adjustl(filenum))//'.pfb'
                 call pfb_read(EvapTrans_cpu,fname,nx_c,ny_c,nz_c)
+                        ! count5 = 1
+                        ! endif
                 EvapTrans(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
                 EvapTrans_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
-                        count5 = 1
-                        endif
                     #endif
 
                 if (mod((kk-1),add_f) == 0) EvapTrans_da = 0.d0
@@ -249,14 +261,16 @@ program EcoSLIM
 
                 if (clmfile) then
                     ! Read in CLM output file @RMM to do make this input
-                    ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
-                    ! call read_h5_file(CLMvars,5)
-                    CLMvars = 0.d0
-                    ! fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
-                    ! call pfb_read(CLMvars_cpu,fname,nx,ny,nzclm)
-                    ! CLMvars(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
-                    ! CLMvars_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
-
+                        #if _HDF5 == 1
+                    fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.h5'
+                    call read_h5_file(CLMvars_h5,nnx2_c,nny2_c,nzclm)
+                    CLMvars(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:)=CLMvars_h5
+                        #else
+                    fname=trim(adjustl(pname))//'.out.clm_output.'//trim(adjustl(filenum))//'.C.pfb'
+                    call pfb_read(CLMvars_cpu,fname,nx_c,ny_c,nzclm)
+                    CLMvars(ix2_c-ix1_c+1:ix2_c-ix1_c+nnx2_c,iy2_c-iy1_c+1:iy2_c-iy1_c+nny2_c,:) = &
+                    CLMvars_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
+                        #endif
                 end if
             end if
 
@@ -291,7 +305,7 @@ program EcoSLIM
             !!!!! ****there are no particles on this new GPU, so we need if condition for the following work.
 
             if(separate .and. mod(kk,transfer) == 0) then
-                ! do separation when we do transfer. Otherwise, the interior part will not be calculated.
+                ! do separation we need do transfer??? Otherwise, the interior part will not be calculated.
                 if(np_active > 0) then
                     separ_flag = .false.
                     call separ_particles(separ_flag)
@@ -311,7 +325,7 @@ program EcoSLIM
             ! peripheric particles
             call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
                 xmin2_c,ymin2_c,zmin2_c,xmax2_c,ymax2_c,zmax2_c, &
-                N_inte,N_peri,reflect,map_sub,kk,transfer)
+                N_inte,N_peri,reflect,map_sub,kk,transfer,clmtrans)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
@@ -351,12 +365,12 @@ program EcoSLIM
         end if
 
         if(LB < 0) then
-            if(mod(kk,LB) == 0) then
+            if(mod(kk,LB) == 0 .or. kk == 24) then
                 call load_balance2()
             end if
         end if
 
-        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),9(i12))') kk,pfkk,outkk,Time_Next(kk), &
+        write(20,'(3(i8),7(1x,e12.5,1x),3(i8),9(i12))') kk,pfkk,outkk,Time_Next(kk-tout1), &
 
         mean_age,mean_comp,mean_mass,total_mass,PET_balance(1), &
         !
@@ -382,6 +396,13 @@ program EcoSLIM
 
         flush(17);flush(20)
 
+        if(restart_f > 0) then
+            if(mod(kk, restart_f) == 0) then
+                call write_grid_Zone()
+                call write_restarts()
+            end if
+        end if
+
         call MPI_Barrier(MPI_COMM_WORLD,ierr)
 
     end do
@@ -401,6 +422,7 @@ program EcoSLIM
     write(11,'("Total Execution Time (s):",e12.5)') Total_time2 - Total_time1
 
     call file_close()
+    ! in ecoslim_utilities.cuf
 
         #if _HDF5 == 1
     call close_hdf5_interface()

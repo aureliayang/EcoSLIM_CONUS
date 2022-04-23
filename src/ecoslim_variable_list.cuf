@@ -15,8 +15,8 @@ module variable_list
 
     ! P(np,11) = Length of flow path [L]
     ! P(np,12) = Length of saturated flow path [L]
-    ! P(np,13:(12+nind)) = Length of flow path in indicator i [L]
-    ! P(np,(13+nind):(12+nind*2)) = particle age in indicator i [T]
+    ! P(np,13:(12+nind)) = particle age in indicator i [T]
+    ! P(np,(13+nind):(12+nind*2)) = Length of flow path in indicator i [L]
 
     ! P(np,13+nind*2) = Particle Number (This is a unique integer identifier for the particle)
     ! P(np,14+nind*2) = Partical Initial X coordinate [L]
@@ -30,15 +30,14 @@ module variable_list
     use mrand, only: handle
 !--------------------------------------------------------------------
     integer:: rank, t_rank, ierr, status(MPI_STATUS_SIZE) ! used for MPI
-    integer:: world_group, work_group, work_comm, max_rank, rq2
-    integer,allocatable:: rq1(:), work_ranks(:)
+    integer:: world_group, work_group, work_comm, max_rank
+    integer,allocatable:: work_ranks(:)  ! historical problem, can be moved to LB subroutine with rq2
     character(len=MPI_MAX_PROCESSOR_NAME):: hostname
     integer:: deviceID, namelength
     integer(MPI_OFFSET_KIND):: offset
 
-    character(300):: message
     character(200):: runname, pname, DEMname, vtk_file, Indname
-    character(200) filenum, filenumout, fname, ranknum, restartf
+    character(200) filenum, filenumout, fname, ranknum
     character(20),allocatable:: conc_header(:)
     ! name for variables written in the C array above.  Dimensioned as l above.
     character(9), parameter:: dsetname = 'hdf5_data'
@@ -65,7 +64,7 @@ module variable_list
     real(8):: dx_c, dy_c, pfdt_c, dtfrac_c, denh2o_c, moldiff_c
 
     integer,constant:: nattri, nind, nx, ny, nz
-    integer:: nattri_c, nind_c
+    integer:: nattri_c, nind_c, nfactor
 
     integer:: pft1, pft2, tout1, pfnt, n_cycle, kk, pfkk, outkk
     ! parflow start and stop file numbers number of ParFlow timesteps
@@ -107,18 +106,18 @@ module variable_list
 
     real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
     real:: IO_time_read, h2d_time, d2h_time
+    real:: scan_time, thrust_time, copy_time, add2_time, reduce_time = 0.
     real:: peri_time, inte_time, exit_time, C_time, LB1_time, LB2_time
     real:: tran_time1=0., tran_time2=0., tran_time3=0., tran_time4=0., tran_time5=0.
     real:: tran_time6=0., tran_time7=0., tran_time8=0., tran_time9=0., tran_time10=0.
     real:: tran_time11=0., tran_time12=0., tran_time13=0., tran_time14=0., tran_time15=0.
-    real:: scan_time, thrust_time, copy_time, add2_time, reduce_time = 0.
     real:: sort_time1 = 0., sort_time2 = 0.,sort_time3 = 0.,sort_time4 = 0.,sort_time5 = 0.
     real:: sort_time6 = 0., sort_time7 = 0.,sort_time8 = 0.,sort_time9 = 0.,sort_time10 = 0.
     type(cudaEvent):: startEvent, stopEvent
     ! integers for writing C or point based output
 
     integer,parameter:: tPB = 256 ! block size, is it the larger the better?
-    integer:: fh0, fh1, fh2, fh3, fh4, add_f
+    integer:: fh0, add_f, restart_f
 
     real(8),allocatable,pinned:: P(:,:)
     integer,allocatable,managed:: N_send(:),N_send2(:)
@@ -156,7 +155,7 @@ module variable_list
     real(8),allocatable:: Vx_h5(:,:,:),Vy_h5(:,:,:),Vz_h5(:,:,:)
 
     real(8),allocatable:: Saturation_cpu(:,:,:),Porosity_cpu(:,:,:)
-    real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:)
+    real(8),allocatable:: EvapTrans_cpu(:,:,:),CLMvars_cpu(:,:,:),Ind_cpu(:,:,:)
     real(8),allocatable:: Vx_cpu(:,:,:),Vy_cpu(:,:,:),Vz_cpu(:,:,:)
 
 !-------------------------------------
@@ -219,7 +218,7 @@ contains
 
         allocate(grid(ppx*qqy,4),neigh_list(ppx*qqy))
         allocate(neigh_lists(ppx*qqy),neigh_listr(ppx*qqy))
-        allocate(work_ranks(t_rank),nump(t_rank),rq1(t_rank))
+        allocate(work_ranks(t_rank),nump(t_rank))
         allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,t_rank),c_GPU(ppx*qqy))
         allocate(N_send(ppx*qqy),N_recv(t_rank),N_send2(ppx*qqy),N_recv2(t_rank))
         ! N_send means, on each rank, it only sends particles to the initial GPUs
@@ -228,6 +227,7 @@ contains
         allocate(d_isValid(np),d_indices(np),handle(np))
 
         allocate(sum_np_cpu(3))
+        ! 1 is outflow, 2 is ET, 3 is out of boundary
         allocate(out_age_cpu(1),out_mass_cpu(1),out_comp_cpu(3))
         allocate(ET_age_cpu(1),ET_mass_cpu(1),ET_comp_cpu(3))
         allocate(mean_age(1),mean_comp(1),mean_mass(1),total_mass(1))
@@ -271,7 +271,8 @@ contains
         d_isValid_T => d_isValid
         d_indices_T => d_indices
 
-        allocate(P_send(tPB*nattri_c*100000),P_recv(tPB*nattri_c*100000))
+        ! allocate(P_send(tPB*nattri_c*100000),P_recv(tPB*nattri_c*100000))
+        allocate(P_send(tPB*nattri_c*nfactor),P_recv(tPB*nattri_c*nfactor))
         ! if send and recv larger than 256??? add some if condition
 
         allocate(Zonet_new(-buff+1:nx_c+buff,-buff+1:ny_c+buff))
@@ -283,14 +284,13 @@ contains
         p_num = 1
 
         allocate(Saturation_cpu(nx_c,ny_c,nz_c),Porosity_cpu(nx_c,ny_c,nz_c))
-        allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm))
+        allocate(EvapTrans_cpu(nx_c,ny_c,nz_c),CLMvars_cpu(nx_c,ny_c,nzclm),Ind_cpu(nx_c,ny_c,nz_c))
         allocate(Vx_cpu(nx_c+1,ny_c,nz_c),Vy_cpu(nx_c,ny_c+1,nz_c),Vz_cpu(nx_c,ny_c,nz_c+1))
 
     end subroutine alloc_arrays_const
 
     subroutine alloc_arrays_temp()
         implicit none
-        ! real(8),intent(out):: Porosity_cpu(:,:,:)
         !--------------------------------------------------------------------
         ! allocate arrays
             allocate(DEM(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff))
@@ -319,6 +319,7 @@ contains
             EvapTrans_da = 0.0d0
             C = 0.0d0
             Ind0 = 1.0d0
+            CLMvars = 0.d0
             ! Ind is initialized when reading it.
             ! CLMvars is initialized when reading it.
             ! DEM is initialized when reading it.
@@ -337,11 +338,23 @@ contains
                      Zone_de(-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff))
             allocate(C_de(n_constituents,-buff+1:nnx1_c+buff,-buff+1:nny1_c+buff,nz_c))
 
-            ! Porosity = 0.3d0
             fname = trim(adjustl(pname))//'.out.porosity.pfb'
             call pfb_read(Porosity_cpu,fname,nx_c,ny_c,nz_c)
             Porosity(1+ix2_c-ix1_c:nnx2_c+ix2_c-ix1_c,1+iy2_c-iy1_c:nny2_c+iy2_c-iy1_c,:) = &
             Porosity_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
+
+            if(nind_c > 1) then
+                fname = trim(adjustl(Indname))
+                call pfb_read(Ind_cpu,fname,nx_c,ny_c,nz_c)
+                Ind0(1+ix2_c-ix1_c:nnx2_c+ix2_c-ix1_c,1+iy2_c-iy1_c:nny2_c+iy2_c-iy1_c,:) = &
+                Ind_cpu(ix2_c+1:ix2_c+nnx2_c,iy2_c+1:iy2_c+nny2_c,:)
+            end if
+            ! we use Ind0 (integer) as an intermediate variable to save GPU memory.
+            ! if nind_c = 0, we will not read Ind value, Ind_cpu, Ind, Ind0, Ind_de equal 1, but will not be used.
+            ! if nind_c = 1, we will not read Ind value, Ind will be 1, related calculation will be performed,
+            ! but it is not necessary since it is the same as the whole domain
+            ! so when nind_c < 1, the Indname can be empty.
+
             Ind = idnint(Ind0)
             Ind_de = Ind
             Porosity_de   = Porosity

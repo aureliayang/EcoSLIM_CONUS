@@ -66,6 +66,7 @@ contains
                 do ij = 1, np_ic
 
                     index = d_indices_T(ii)*np_ic - (ij - 1)
+                    ! index = d_indices_T(nnx1*nny1*nz)*(ij - 1) + d_indices_T(ii)
 
                     hh = handle(index)
 
@@ -231,5 +232,96 @@ contains
         endif
 
     end subroutine add_new_particles
+
+    attributes(global) subroutine scan_init_particles_b()
+
+        implicit none
+        integer:: i, j, k, ii
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        ! get i, j from ii
+        if(ii <= nnx1*nny1) then
+
+            j = (ii-1)/nnx1 + 1
+            i = ii - (j-1)*nnx1
+            k = nz
+
+            if(Saturation_T(i,j,k) > 0.d0) then !active area
+                d_isValid(ii) = 1
+            else
+                d_isValid(ii) = 0
+            end if
+
+        end if
+
+    end subroutine scan_init_particles_b
+
+    attributes(global) subroutine add_init_particles_b(np_ic,tout1)
+
+        implicit none
+        integer,value:: np_ic, tout1
+        integer:: i, j, k, index, ij, ik, ii
+        type(curandStateXORWOW):: hh
+
+        ii = (blockIdx%x - 1) * blockDim%x + threadIdx%x
+
+        ! get i, j, k from ii
+        if(ii <= nnx1*nny1) then
+
+            j = (ii-1)/nnx1 + 1
+            i = ii - (j-1)*nnx1
+            k = nz
+
+            if(Saturation_T(i,j,k) > 0.d0) then
+                do ij = 1, abs(np_ic)
+
+                    ! index = d_indices_T(ii)*np_ic - (ij - 1)
+                    index = d_indices_T(nnx1*nny1)*(ij - 1) + d_indices_T(ii)
+
+                    hh = handle(index)
+
+                    P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
+                    P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
+                    ! P_de(index,13+2*nind) = dble(index)
+                    P_de(index,14+2*nind) = P_de(index,1)
+                    P_de(index,15+2*nind) = P_de(index,2)
+                    P_de(index,17+2*nind) = tout1
+
+                    ! Z = 0.0d0
+                    ! do ik = 1, k
+                    !     Z = Z + dz_T(ik)
+                    ! end do
+                    P_de(index,3) = sum(dz_T) - dz_T(nz)
+                    P_de(index,16+2*nind) = P_de(index,3)
+
+                    P_de(index,6) = dx*dy*dz_T(k)*(Porosity_T(i,j,k) &
+                                *Saturation_T(i,j,k))*denh2o*(1.0d0/dble(-np_ic))
+                    P_de(index,7) = 1.0d0
+                    P_de(index,8) = 1.0d0  ! make particle active
+
+                    ! C_de(1,i,j,k) = 0.d0
+                    C_de(1,i,j,k) = C_de(1,i,j,k) + P_de(index,8)*P_de(index,6) / &
+                    (dx*dy*dz_T(k)*(Porosity_T(i,j,k)*Saturation_T(i,j,k)))
+
+                    ! C_de(2,i,j,k) = 0.d0
+                    C_de(2,i,j,k) = C_de(2,i,j,k) + P_de(index,8)*P_de(index,4)*P_de(index,6)
+
+                    ! C_de(4,i,j,k) = 0.d0
+                    C_de(4,i,j,k) = C_de(4,i,j,k) + P_de(index,8)*P_de(index,7)*P_de(index,6)
+
+                    ! C_de(3,i,j,k) = 0.d0
+                    C_de(3,i,j,k) = C_de(3,i,j,k) + P_de(index,8)*P_de(index,6)
+
+                    handle(index) = hh
+
+                enddo
+            endif
+
+            if(C_de(3,i,j,k) > 0.d0)  C_de(2,i,j,k) = C_de(2,i,j,k) / C_de(3,i,j,k)
+            if(C_de(3,i,j,k) > 0.d0)  C_de(4,i,j,k) = C_de(4,i,j,k) / C_de(3,i,j,k)
+
+        end if
+    end subroutine add_init_particles_b
 
 end module eco_particle_add

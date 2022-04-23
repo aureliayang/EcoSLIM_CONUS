@@ -7,18 +7,19 @@ module utilities
     use variable_list, only: nx_c, ny_c, buff, rank, runname
     use variable_list, only: nnx1_c,nny1_c,nnx2_c,nny2_c,ix1_c,iy1_c,ix2_c,iy2_c
     use variable_list, only: nnx1,nny1,nnx2,nny2,ix1,iy1,ix2,iy2
-    use variable_list, only: Zonet_new, ppx, qqy, ranknum
+    use variable_list, only: Zonet_new, ppx, qqy, ranknum, kk, tout1
+    use variable_list, only: max_rank, map_sub, t_GPUs, l_GPUs, c_GPU
 
 contains
-    subroutine copy_grid(map_sub)
+    subroutine copy_grid(map_sub_m)
 
         implicit none
-        integer,intent(in):: map_sub
+        integer,intent(in):: map_sub_m
 
-        ix1_c  = grid(map_sub+1,1)
-        nnx1_c = grid(map_sub+1,3)
-        iy1_c  = grid(map_sub+1,2)
-        nny1_c = grid(map_sub+1,4)
+        ix1_c  = grid(map_sub_m+1,1)
+        nnx1_c = grid(map_sub_m+1,3)
+        iy1_c  = grid(map_sub_m+1,2)
+        nny1_c = grid(map_sub_m+1,4)
 
         ix2_c = ix1_c - buff; nnx2_c = nnx1_c + 2*buff
         iy2_c = iy1_c - buff; nny2_c = nny1_c + 2*buff
@@ -146,10 +147,19 @@ contains
 
         integer:: Zonet_new_c(-buff+1:nx_c+buff,-buff+1:ny_c+buff)
         integer:: grid_c(ppx*qqy,4)
+        character(200) restartnum
 
-        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum)),FORM='unformatted',access='stream')
+        write(restartnum,'(i5.5)') tout1
+
+        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(restartnum))//'.bin', &
+        form='unformatted',access='stream')
             read(18) grid_c
             read(18) Zonet_new_c
+            read(18) max_rank
+            read(18) map_sub
+            read(18) t_GPUs
+            read(18) l_GPUs
+            read(18) c_GPU
         close(18)
 
         grid = grid_c
@@ -162,13 +172,24 @@ contains
 
         integer:: Zonet_new_c(-buff+1:nx_c+buff,-buff+1:ny_c+buff)
         integer:: grid_c(ppx*qqy,4)
+        character(200) writenum
+
+        write(writenum,'(i5.5)') kk
 
         grid_c = grid
         Zonet_new_c = Zonet_new
 
-        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum)),form='unformatted',access='stream')
+        open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(writenum))//'.bin', &
+        form='unformatted',access='stream')
             write(18) grid_c
             write(18) Zonet_new_c
+            write(18) max_rank
+            write(18) map_sub
+            write(18) t_GPUs
+            write(18) l_GPUs
+            write(18) c_GPU
+            write(18) ix1_c, iy1_c, nnx1_c, nny1_c
+            write(18) ix2_c, iy2_c, nnx2_c, nny2_c
         close(18)
 
     end subroutine write_grid_Zone

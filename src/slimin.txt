@@ -23,6 +23,7 @@ False             !spinup
 0               !EcoSLIM output start counter 0=pft1-1
 200             !Time Sequence Repeat [n_cycle*(pft2-pft1)] 20 year EcoSLIM run
 1               !add_f, either 1 or 24
+1752
 0               !ipwrite frequency, controls an ASCII, .3D particle file not recommended due to poor performance
 0               !ibinpntswrite frequency, controls VTK, binary output of particle locations and attributes
 0               !etwrite frequency, controls ASCII ET output
@@ -34,5 +35,6 @@ True            !CLM Evap Trans
 1000.0          !density H2O
 0.00000001      !Molecular Diffusivity
 0.250d0         !fraction of Dx/Vx for numerical stability
+1
 1
 ""

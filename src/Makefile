@@ -96,6 +96,8 @@ clean:
 	SLIM*.txt \
 	Load* \
 	Exited_particles.* \
+	Particle_restart.* \
+	EcoSLIM_restart.* \
 	Log_particles.* \
 	null \
 	Debug* \

@@ -19,13 +19,13 @@ contains
 
     attributes(global) subroutine particles_independent( &
         xmin,ymin,zmin,xmax,ymax,zmax, &
-        offset,np_active,reflect,rank,kk,transfer)
+        offset,np_active,reflect,rank,kk,transfer,clmtrans)
 
         implicit none
 
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
         integer,value:: np_active,offset,rank,kk,transfer
-        logical,value:: reflect
+        logical,value:: reflect,clmtrans
 
         integer:: ii,k,Ploc(3),ii_l
         real(8):: Vpx,Vpy,Vpz,Z,particledt,delta_time, &
@@ -94,6 +94,8 @@ contains
 
                 if ((P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
                     (gl(ii_l,1) == 1.).and.(Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
+                ! if ((P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
+                !     (Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
 
                     temp = atomicAdd(Out_age_de(1), P_de(ii,4)*P_de(ii,6))
                     temp = atomicAdd(Out_mass_de(1), P_de(ii,6))
@@ -157,6 +159,7 @@ contains
                 particledt = min(advdt(1), advdt(2), advdt(3), &
                                 pfdt*dtfrac, delta_time-P_de(ii,4))
 
+                if (clmtrans) then
                 ! calculate Flux in cell and compare it with the ET flux out of the cell
                 if (EvapTrans_T(Ploc(1),Ploc(2),Ploc(3)) < 0.d0) then
                 ! calculate ET flux volumetrically and compare to
@@ -206,6 +209,7 @@ contains
                     P_de(ii,10) = 2.d0
                     goto 999
 
+                end if
                 end if
                 end if
 

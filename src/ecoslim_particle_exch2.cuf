@@ -4,7 +4,7 @@ module eco_particle_exch2
     use eco_compact_util
     use eco_particle_loop
     use variable_list, only: N_recv, N_send, N_peri, N_inte, N_exit
-    use variable_list, only: neigh_list, nattri_c
+    use variable_list, only: neigh_list, nattri_c, clmtrans
     ! neigh_list is 1 if neighbor exists while 0 if neighbor doesn't exist.
 
     use variable_list, only: holes, P_send, P_recv
@@ -127,7 +127,7 @@ contains
         !interior particles
         call particles_independent<<<ceiling(dble(N_inte)/tPB),tPB>>> ( &
             xmin1_c,ymin1_c,zmin1_c,xmax1_c,ymax1_c,zmax1_c, &
-            0,N_inte,reflect,map_sub,kk,transfer)
+            0,N_inte,reflect,map_sub,kk,transfer,clmtrans)
 
             #if _TIMING == 1
             istat = cudaEventRecord(stopEvent,0)
