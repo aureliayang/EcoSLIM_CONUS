@@ -9,7 +9,7 @@
 * **ppx,** Split in x direction, like P in ParFlow
 * **qqy,** Split in y direction, like Q in ParFlow
 * **transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is 1-by-1 transfer, abs(transfer) is frequency. Theoretically, packed with separation is better for long time-interval transfer while 1-by-1 without separation is better for transfer every timestep.
-* **separate,** If we separate particles into interior and peripheric portions for transfer? If you do separate, you must do transfer (this is automatically).
+* **separate,** If we separate particles into interior and peripheric portions for transfer? If you do separate, you must do transfer (this is automatically set in the code).
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **th_value,** The threshold to start a new GPU
 * **spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
