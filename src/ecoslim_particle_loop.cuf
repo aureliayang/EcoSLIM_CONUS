@@ -19,17 +19,19 @@ contains
 
     attributes(global) subroutine particles_independent( &
         xmin,ymin,zmin,xmax,ymax,zmax, &
-        offset,np_active,reflect,rank,kk,transfer,clmtrans)
+        offset,np_active,reflect,rank,kk, &
+        transfer,clmtrans,np_ic)
 
         implicit none
 
         real(8),value:: xmin,ymin,zmin,xmax,ymax,zmax
-        integer,value:: np_active,offset,rank,kk,transfer
+        integer,value:: np_active,offset,rank,kk,transfer,np_ic
         logical,value:: reflect,clmtrans
 
         integer:: ii,k,Ploc(3),ii_l
         real(8):: Vpx,Vpy,Vpz,Z,particledt,delta_time, &
         advdt(3),z1,z2,z3,temp
+        logical:: select(2)
 
         real(8),shared:: gl(256,2)
 
@@ -92,11 +94,12 @@ contains
                 if ((P_de(ii,1) < Xmin).or.(P_de(ii,2) < Ymin).or.(P_de(ii,3) < Zmin).or. &
                     (P_de(ii,1) >= Xmax).or.(P_de(ii,2) >= Ymax).or.(P_de(ii,3) >= (Zmax-dz_T(nz)))) then
 
-                if ((P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
-                    (gl(ii_l,1) == 1.).and.(Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
-                ! if ((P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)).and. &
-                !     (Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)) then
+                select = [np_ic > 0  .and. (P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)) .and. &
+                          (gl(ii_l,1) == 1.) .and. (Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0), &
+                          np_ic < -1 .and. (P_de(ii,3) >= Zmax-(dz_T(nz)*0.5d0)) .and. &
+                          (Vz_T(Ploc(1),Ploc(2),Ploc(3)) > 0.d0)]
 
+                if(any(select)) then
                     temp = atomicAdd(Out_age_de(1), P_de(ii,4)*P_de(ii,6))
                     temp = atomicAdd(Out_mass_de(1), P_de(ii,6))
 

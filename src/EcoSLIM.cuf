@@ -325,7 +325,7 @@ program EcoSLIM
             ! peripheric particles
             call particles_independent<<<ceiling(dble(N_peri)/tPB),tPB>>> ( &
                 xmin2_c,ymin2_c,zmin2_c,xmax2_c,ymax2_c,zmax2_c, &
-                N_inte,N_peri,reflect,map_sub,kk,transfer,clmtrans)
+                N_inte,N_peri,reflect,map_sub,kk,transfer,clmtrans,np_ic)
 
                 #if _TIMING == 1
                 istat = cudaEventRecord(stopEvent,0)
