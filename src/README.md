@@ -13,7 +13,7 @@
 * **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **th_value,** The threshold to start a new GPU
 * **spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
-* **np_ic,** If np_ic /= -1, abs(np_ic) is the number of particles per cell at the start of simulation. If np_if = -1, the simulation is restarted.
+* **np_ic,** If np_ic /= -1, abs(np_ic) is the number of particles per cell at the start of simulation. If np_if = -1, the simulation is restarted. 
 * **np,** Maximum number permitted during run time 
 * **dx,** grid-cell size in x direction
 * **dy,** grid-cell size in y direction
@@ -24,12 +24,12 @@
 * **tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep for hot start
 * **n_cycle,** The cycles to use ParFlow files
 * **add_f,** The time interval to add particles
-* **restart_f,** The time interval to restart
+* **restart_f,** The time interval to restart. It should be n\*add_f. 
 * **ipwrite,** Not supported now
 * **ibinpntswrite,** Not supported now
 * **etwrite,** Not supported now
 * **icwrite,** Not supported now
-* **V_mult,** Velocity multiplier. Not supported now and only used for transfer test.
+* **V_mult,** Velocity multiplier. If > 0, it is the forward tracking. If < 0, it is the backward tracking.
 * **clmtrans,** clm evap trans?
 * **clmfile,** clm output file?
 * **iflux_p_res,** The number of particles added into the domain if PME > 0
@@ -37,7 +37,7 @@
 * **moldiff,** Molecular diffusivity
 * **dtfrac,** Numerical stability information
 * **nfactor,** It should be a large number, if you use LB2. For example, it is 100,000 for CONUS2.0.
-* **nind,** Number of subsurface indicator
+* **nind,** Number of subsurface indicator. If nind < 1, Indname can be empty.
 * **Indname,** pfb file of indicator
 # Build 
 **An example of environment on Della GPU cluster at Princeton University:**  
