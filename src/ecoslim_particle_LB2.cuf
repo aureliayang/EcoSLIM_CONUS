@@ -141,7 +141,7 @@ contains
         call dealloc_arrays_temp()
 
         ! copy
-        call copy_grid(rank)
+        call copy_grid()
         call alloc_arrays_temp()
         call scan_zone<<< ceiling(dble((nnx1_c+2*buff)*(nny1_c+2*buff))/tPB), &
             tPB >>> (buff,neigh_list,rank,ppx*qqy)

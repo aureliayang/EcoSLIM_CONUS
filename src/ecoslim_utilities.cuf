@@ -11,15 +11,15 @@ module utilities
     use variable_list, only: max_rank, map_sub, t_GPUs, l_GPUs, c_GPU
 
 contains
-    subroutine copy_grid(map_sub_m)
+    subroutine copy_grid()
 
         implicit none
-        integer,intent(in):: map_sub_m
+        ! integer,intent(in):: map_sub_m
 
-        ix1_c  = grid(map_sub_m+1,1)
-        nnx1_c = grid(map_sub_m+1,3)
-        iy1_c  = grid(map_sub_m+1,2)
-        nny1_c = grid(map_sub_m+1,4)
+        ix1_c  = grid(map_sub+1,1)
+        nnx1_c = grid(map_sub+1,3)
+        iy1_c  = grid(map_sub+1,2)
+        nny1_c = grid(map_sub+1,4)
 
         ix2_c = ix1_c - buff; nnx2_c = nnx1_c + 2*buff
         iy2_c = iy1_c - buff; nny2_c = nny1_c + 2*buff
@@ -149,7 +149,7 @@ contains
         integer:: grid_c(ppx*qqy,4)
         character(200) restartnum
 
-        write(restartnum,'(i5.5)') tout1
+        write(restartnum,'(i10.10)') tout1
 
         open(18,file='EcoSLIM_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(restartnum))//'.bin', &
         form='unformatted',access='stream')
@@ -174,7 +174,7 @@ contains
         integer:: grid_c(ppx*qqy,4)
         character(200) writenum
 
-        write(writenum,'(i5.5)') kk
+        write(writenum,'(i10.10)') kk
 
         grid_c = grid
         Zonet_new_c = Zonet_new

@@ -103,7 +103,7 @@ contains
         implicit none
         character(200) writenum
 
-        write(writenum,'(i5.5)') kk
+        write(writenum,'(i10.10)') kk
 
         P(1:np_active,:) = P_de(1:np_active,:)
 
@@ -123,7 +123,7 @@ contains
         implicit none
         character(200) restartnum
 
-        write(restartnum,'(i5.5)') tout1
+        write(restartnum,'(i10.10)') tout1
 
         write(11,*) 'Reading particle restart File: &
         Particle_restart.'//trim(adjustl(ranknum))//'.'//trim(adjustl(restartnum))//'.bin'

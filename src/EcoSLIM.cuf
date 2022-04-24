@@ -108,7 +108,7 @@ program EcoSLIM
 
     if (work_comm /= MPI_COMM_NULL) then
 
-        call copy_grid(map_sub) ! doing this on workers
+        call copy_grid() ! doing this on workers
 
         call alloc_arrays_temp() ! doing this on workers
 
