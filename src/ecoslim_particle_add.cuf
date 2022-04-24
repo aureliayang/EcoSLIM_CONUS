@@ -73,8 +73,8 @@ contains
                     P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
                     P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                     ! P_de(index,13+2*nind) = dble(index)
-                    P_de(index,14+2*nind) = P_de(index,1)
-                    P_de(index,15+2*nind) = P_de(index,2)
+                    P_de(index,14+2*nind) = P_de(index,1) + ix1*dx
+                    P_de(index,15+2*nind) = P_de(index,2) + iy1*dy
                     P_de(index,17+2*nind) = tout1
 
                     Z = 0.0d0
@@ -189,10 +189,10 @@ contains
                     hh = handle(index)
 
                     P_s(ii_l,1) = dble(i-1)*dx + curand_uniform(hh)*dx
-                    P_de(index,14+2*nind) = P_s(ii_l,1)
+                    P_de(index,14+2*nind) = P_s(ii_l,1) + ix1*dx
                     P_s(ii_l,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                     ! P_de(index,13+2*nind) = dble(pid + index - np_active)
-                    P_de(index,15+2*nind) = P_s(ii_l,2)
+                    P_de(index,15+2*nind) = P_s(ii_l,2) + iy1*dy
 
                     P_de(index,3) = sum(dz_T) - dz_T(nz)*0.5d0
                     P_de(index,16+2*nind) = P_de(index,3)
@@ -284,8 +284,8 @@ contains
                     P_de(index,1) = dble(i-1)*dx + curand_uniform(hh)*dx ! should use global
                     P_de(index,2) = dble(j-1)*dy + curand_uniform(hh)*dy ! update that for random number
                     ! P_de(index,13+2*nind) = dble(index)
-                    P_de(index,14+2*nind) = P_de(index,1)
-                    P_de(index,15+2*nind) = P_de(index,2)
+                    P_de(index,14+2*nind) = P_de(index,1) + ix1*dx
+                    P_de(index,15+2*nind) = P_de(index,2) + iy1*dy
                     P_de(index,17+2*nind) = tout1
 
                     ! Z = 0.0d0
