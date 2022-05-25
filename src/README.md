@@ -1,44 +1,44 @@
 # Input file 
-* **runname,** EcoSLIM run name
-* **pname,** Path of ParFlow files
-* **DEMname,** pfb file name of DEM
-* **nx,** Dimension in x direction
-* **ny,** Dimension in y direction
-* **nz,** Dimension in z direction
-* **nCLMsoil,** Layers coupled between CLM and ParFlow
-* **ppx,** Split in x direction, like P in ParFlow
-* **qqy,** Split in y direction, like Q in ParFlow
-* **transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is 1-by-1 transfer, abs(transfer) is frequency. Theoretically, packed with separation is better for long time-interval transfer while 1-by-1 without separation is better for transfer every timestep.
-* **separate,** If we separate particles into interior and peripheric portions for transfer? If you do separate, you must do transfer (this is automatically set in the code).
-* **LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
-* **th_value,** The threshold to start a new GPU
-* **spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
-* **np_ic,** If np_ic /= -1, abs(np_ic) is the number of particles per cell at the start of simulation. If np_if = -1, the simulation is restarted. 
-* **np,** Maximum number permitted during run time 
-* **dx,** grid-cell size in x direction
-* **dy,** grid-cell size in y direction
-* **dz,** grid-cell size in z direction from bottom to top, separated by comma
-* **pfdt,** ParFlow dt, need double-check in the code for mass balance
-* **pft1,** ParFlow start time
-* **pft2,** ParFlow end time
-* **tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep for hot start
-* **n_cycle,** The cycles to use ParFlow files
-* **add_f,** The time interval to add particles
-* **restart_f,** The time interval to restart. It should be n\*add_f. 
-* **ipwrite,** Not supported now
-* **ibinpntswrite,** Not supported now
-* **etwrite,** Not supported now
-* **icwrite,** Not supported now
-* **V_mult,** Velocity multiplier. If > 0, it is the forward tracking. If < 0, it is the backward tracking.
-* **clmtrans,** clm evap trans?
-* **clmfile,** clm output file?
-* **iflux_p_res,** The number of particles added into the domain if PME > 0
-* **denh2o,** density of water
-* **moldiff,** Molecular diffusivity
-* **dtfrac,** Numerical stability information
-* **nfactor,** It should be a large number, if you use LB2. For example, it is 100,000 for CONUS2.0.
-* **nind,** Number of subsurface indicator. If nind < 1, Indname can be empty.
-* **Indname,** pfb file of indicator
+* **1. runname,** EcoSLIM run name
+* **2. pname,** Path of ParFlow files
+* **3. DEMname,** pfb file name of DEM
+* **4. nx,** Dimension in x direction
+* **5. ny,** Dimension in y direction
+* **6. nz,** Dimension in z direction
+* **7. nCLMsoil,** Layers coupled between CLM and ParFlow
+* **8. ppx,** Split in x direction, like P in ParFlow
+* **9. qqy,** Split in y direction, like Q in ParFlow
+* **10. transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is 1-by-1 transfer, abs(transfer) is frequency. Theoretically, packed with separation is better for long time-interval transfer while 1-by-1 without separation is better for transfer every timestep.
+* **11. separate,** If we separate particles into interior and peripheric portions for transfer? If you do separate, you must do transfer (this is automatically set in the code).
+* **12. LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
+* **13. th_value,** The threshold to start a new GPU
+* **14. spinup,** If true, C array will not be calculated. This aims to speedup the spinup.
+* **15. np_ic,** If np_ic /= -1, abs(np_ic) is the number of particles per cell at the start of simulation. If np_if = -1, the simulation is restarted. 
+* **16. np,** Maximum number permitted during run time 
+* **17. dx,** grid-cell size in x direction
+* **18. dy,** grid-cell size in y direction
+* **19. dz,** grid-cell size in z direction from bottom to top, separated by comma
+* **20. pfdt,** ParFlow dt, need double-check in the code for mass balance
+* **21. pft1,** ParFlow start time
+* **22. pft2,** ParFlow end time
+* **23. tout1,** EcoSLIM start number; it is 0 for cold start; it is the last completed timestep for hot start
+* **24. n_cycle,** The cycles to use ParFlow files
+* **25. add_f,** The time interval to add particles
+* **26. restart_f,** The time interval to restart. It should be n\*add_f. 
+* **27. ipwrite,** Not supported now
+* **28. ibinpntswrite,** Not supported now
+* **29. etwrite,** Not supported now
+* **30. icwrite,** Not supported now
+* **31. V_mult,** Velocity multiplier. If > 0, it is the forward tracking. If < 0, it is the backward tracking.
+* **32. clmtrans,** clm evap trans?
+* **33. clmfile,** clm output file?
+* **34. iflux_p_res,** The number of particles added into the domain if PME > 0
+* **35. denh2o,** density of water
+* **36. moldiff,** Molecular diffusivity
+* **37. dtfrac,** Numerical stability information
+* **38. nfactor,** It should be a large number, if you use LB2. For example, it is 100,000 for CONUS2.0.
+* **39. nind,** Number of subsurface indicator. If nind < 1, Indname can be empty.
+* **40. Indname,** pfb file of indicator
 # Build 
 **An example of environment on Della GPU cluster at Princeton University:**  
 1. Without hdf5:  
