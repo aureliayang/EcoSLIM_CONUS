@@ -1,14 +1,14 @@
 # Input file 
-* **1. runname,** EcoSLIM run name
-* **2. pname,** Path of ParFlow files
-* **3. DEMname,** pfb file name of DEM
-* **4. nx,** Dimension in x direction
-* **5. ny,** Dimension in y direction
-* **6. nz,** Dimension in z direction
-* **7. nCLMsoil,** Layers coupled between CLM and ParFlow
-* **8. ppx,** Split in x direction, like P in ParFlow
-* **9. qqy,** Split in y direction, like Q in ParFlow
-* **10. transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is 1-by-1 transfer, abs(transfer) is frequency. Theoretically, packed with separation is better for long time-interval transfer while 1-by-1 without separation is better for transfer every timestep.
+1. **runname,** EcoSLIM run name
+2. **pname,** Path of ParFlow files
+3. **DEMname,** pfb file name of DEM
+4. **nx,** Dimension in x direction
+5. **ny,** Dimension in y direction
+6. **nz,** Dimension in z direction
+7. **nCLMsoil,** Layers coupled between CLM and ParFlow
+8. **ppx,** Split in x direction, like P in ParFlow
+9. **qqy,** Split in y direction, like Q in ParFlow
+10. **transfer,** Transfer scheme; 0 is no transfer, >0 is packed transfer, <0 is 1-by-1 transfer, abs(transfer) is frequency. Theoretically, packed with separation is better for long time-interval transfer while 1-by-1 without separation is better for transfer every timestep.
 * **11. separate,** If we separate particles into interior and peripheric portions for transfer? If you do separate, you must do transfer (this is automatically set in the code).
 * **12. LB,** LB frequency, e.g., 24 means every 24 hours. LB must be n\*add_f
 * **13. th_value,** The threshold to start a new GPU
