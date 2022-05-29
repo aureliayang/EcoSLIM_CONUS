@@ -37,6 +37,7 @@ contains
         xgmax_c = dble(nx_c)*dx_c
         ygmax_c = dble(ny_c)*dy_c
         zgmax_c = sum(dz)
+        ! dz is on cpu and dz_de is on gpu
 
             #if _TIMING == 1
         write(11,*)

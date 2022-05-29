@@ -1,12 +1,12 @@
 SLIM_LW      ! SLIM run name, path to PF-CLM next, followed by DEM
-"/GPUFS/sustc_cyang_gpu/Outputs/LW"
+"../washita/tcl_scripts/Outputs/LW"
 " "
 41                !nx
 41                !ny
 50                !nz
 10                !nCLMsoil
 2                 !ppx
-1                 !qqy
+2                 !qqy
 1                 !transfer scheme
 True              !separate or not
 20                !LB frequency, must be n*add_f
@@ -23,7 +23,7 @@ False             !spinup
 0               !EcoSLIM output start counter 0=pft1-1
 200             !Time Sequence Repeat [n_cycle*(pft2-pft1)] 20 year EcoSLIM run
 1               !add_f, either 1 or 24
-1752
+25000
 0               !ipwrite frequency, controls an ASCII, .3D particle file not recommended due to poor performance
 0               !ibinpntswrite frequency, controls VTK, binary output of particle locations and attributes
 0               !etwrite frequency, controls ASCII ET output

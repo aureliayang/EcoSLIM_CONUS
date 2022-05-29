@@ -1,7 +1,7 @@
 module restart
-    integer,parameter:: ppx = 2, qqy = 1, buff = 1
-    integer,parameter:: nx_c = 41, ny_c = 41
-    integer:: max_rank, map_sub,nind_c=1
+    integer,parameter:: ppx = 4, qqy = 2, buff = 1
+    integer,parameter:: nx_c = 4442, ny_c = 3256
+    integer:: max_rank, map_sub, nind_c=1
     integer,allocatable:: t_GPUs(:),l_GPUs(:,:),c_GPU(:)
     integer:: np_active, pid
     character(20):: ranknum
@@ -65,20 +65,20 @@ end module restart
 program test_restart
     use restart
     implicit none
-    integer:: rank = 0
+    integer:: rank = 2
 
     write(ranknum,'(i5.5)') rank
 
-    allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,4),c_GPU(ppx*qqy))
+    ! allocate(t_GPUs(ppx*qqy),l_GPUs(ppx*qqy,4),c_GPU(ppx*qqy))
     allocate(P(np,nind_c*2+17))
 
-    call read_grid_Zone()
+    ! call read_grid_Zone()
 
-    print *, max_rank
-    print *, map_sub
-    print *, t_GPUs
-    print *, l_GPUs
-    print *, c_GPU
+    ! print *, max_rank
+    ! print *, map_sub
+    ! print *, t_GPUs
+    ! print *, l_GPUs
+    ! print *, c_GPU
 
     call read_restarts()
     print *, np_active

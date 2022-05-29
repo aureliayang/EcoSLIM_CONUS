@@ -104,7 +104,7 @@ module variable_list
     real(8),constant:: xmin3, xmax3, ymin3, ymax3, zmin3, zmax3
     real(8),constant:: xgmin, xgmax, ygmin, ygmax, zgmin, zgmax
 
-    real(8):: Total_time1, Total_time2, t1, t2, parallel_time, IO_time_write
+    real(8):: Total_time1, Total_time2
     real:: IO_time_read, h2d_time, d2h_time
     real:: scan_time, thrust_time, copy_time, add2_time, reduce_time = 0.
     real:: peri_time, inte_time, exit_time, C_time, LB1_time, LB2_time
@@ -385,11 +385,6 @@ contains
         ! Set up timing
         Total_time1 = 0.d0
         Total_time2 = 0.d0
-        t1 = 0.d0
-        t2 = 0.d0
-
-        IO_time_write = 0.d0
-        parallel_time = 0.d0
 
         IO_time_read = 0.
         h2d_time = 0.

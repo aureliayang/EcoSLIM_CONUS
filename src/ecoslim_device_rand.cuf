@@ -32,6 +32,9 @@ contains
         ! make sure the interval is enough for one timestep use.
         ! the maximum slots of a state needed for one timestep is 3(add)+4*n_while_loop, so I reserve 40 slots
 
+        !!! 05/29/2022, be careful that nnx1*nny1*nz would be larger than np.
+        !!! np = 10000000, nnx1*nny1*nz = 4442*3256*10/4 (4GPUs), then nnx1*nny1*nz > np
+
     end subroutine createRand_init
 
     attributes(global) subroutine createRand_loop(np,rank,pfnt)

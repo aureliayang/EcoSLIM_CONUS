@@ -98,6 +98,7 @@ program EcoSLIM
     if(np_ic /= -1) call gridinfo()
 
     if(np_ic == -1) call read_grid_Zone()
+    ! in ecoslim_utilities.cuf
     ! if not restart, we do decompostion and build topology
     ! gridinfo is to get grid and Zonet_new
     ! if restart, read grid and Zonet_new in
@@ -183,6 +184,7 @@ program EcoSLIM
             ! Read the velocities computed by ParFlow
             write(filenum,'(i5.5)') pfkk
 
+                !if(count1 == 0) then
                 #if _HDF5 == 1
             fname=trim(adjustl(pname))//'.out.velx.'//trim(adjustl(filenum))//'.h5'
             call read_h5_file(Vx_h5,nnx2_c+1,nny2_c,nz_c)
@@ -286,7 +288,15 @@ program EcoSLIM
             Vz = Vz * V_mult
 
             call host2device()
-
+                    ! count1 = 1
+                ! else
+                !     out_age_de  = 0.d0
+                !     out_mass_de = 0.d0
+                !     out_comp_de = 0.d0
+                !     sum_np_de   = 0
+                !     N_send = 0
+                !     N_recv = 0
+                ! end if
             !----------------------------------------
 
             if (clmtrans) then

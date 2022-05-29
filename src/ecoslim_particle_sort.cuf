@@ -70,6 +70,7 @@ contains
                 ! not easy to write two parts of the attributes, so output all
                 ! P_exit(:,13+2*nind_c) = Time_Next(kk)
                 ! write(19) ((P_exit(i,j),j=1,nattri_c),i=1,N_exit)
+                ! flush(19)
 
                 call compaction_inplace<<<ceiling(dble(np_active)/tPB),tPB>>>( &
                     holes,0,np_active)

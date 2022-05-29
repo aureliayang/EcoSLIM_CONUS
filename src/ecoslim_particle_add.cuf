@@ -247,7 +247,7 @@ contains
             i = ii - (j-1)*nnx1
             k = nz
 
-            if(Saturation_T(i,j,k) > 0.d0) then !active area
+            if(Saturation_T(i,j,k) == 1.d0) then !active area
                 d_isValid(ii) = 1
             else
                 d_isValid(ii) = 0
@@ -273,7 +273,7 @@ contains
             i = ii - (j-1)*nnx1
             k = nz
 
-            if(Saturation_T(i,j,k) > 0.d0) then
+            if(Saturation_T(i,j,k) == 1.d0) then
                 do ij = 1, abs(np_ic)
 
                     ! index = d_indices_T(ii)*np_ic - (ij - 1)
