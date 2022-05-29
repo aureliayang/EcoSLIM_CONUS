@@ -36,8 +36,8 @@
 35. **denh2o,** density of water
 36. **moldiff,** Molecular diffusivity
 37. **dtfrac,** Numerical stability information
-38. **nfactor,** It should be a large number, if you use LB2. For example, it is 100,000 for CONUS2.0.
-39. **nind,** Number of subsurface indicator. If nind < 1, Indname can be empty.
+38. **nfactor,** It should be a large number, if you use LB2. For example, it is 100,000 for CONUS2.0. If you use LB1, just keep it as 1.
+39. **nind,** Number of subsurface indicator. If nind <= 1, Indname can be empty.
 40. **Indname,** pfb file of indicator
 # Build 
 **An example of environment on Della GPU cluster at Princeton University:**  
