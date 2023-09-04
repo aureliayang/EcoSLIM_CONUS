@@ -28,7 +28,9 @@ Currently, optimization continues, so **only the particle loop kernel** got test
 * The more the particles, the higher the speedup. Particle numbers for ER_Shrub and LW_Shrub are 5.6- and 17.4-million, respectively. 
 * Results show good parallel scalability across two nodes, ~10-fold to ~20-fold for ER_Shrub and ~12.5-fold to ~25-fold for LW_Shrub. 
 * LB is Load Balancing. S*n* represents LB schemes. Speedup by S3 using 4-GPU is smaller due to the uneven split in y direction (5 grid-cells).  
-* **Latest parallel performance tests based on the whole code show as good performance as this single kernel tests. This part will be updated soon.** 
+* **Latest parallel performance tests based on the whole code show as good performance as this single kernel tests. This part will be updated soon.**
+## Backward particle tracking based on ParFlow CONUS 2.0 model
+![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/backward.png)  
 ## Publications 
 * **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2023. The role of topography in controlling evapotranspiration age. ***Journal of Geophysical Research: Atmospheres***, in press. 
 * **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2023. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. ***Journal of Advances in Modeling Earth Systems***, https://doi.org/10.1029/2022MS003507 
