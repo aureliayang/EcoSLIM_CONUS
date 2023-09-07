@@ -32,7 +32,7 @@ Currently, optimization continues, so **only the particle loop kernel** got test
 ## Backward particle tracking based on ParFlow CONUS 2.0 model
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/backward.png)  
 ## Publications 
-* **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2023. The role of topography in controlling evapotranspiration age. ***Journal of Geophysical Research: Atmospheres***, in press. 
+* **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2023. The role of topography in controlling evapotranspiration age. ***Journal of Geophysical Research: Atmospheres***, https://doi.org/10.1029/2023JD039228 
 * **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2023. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. ***Journal of Advances in Modeling Earth Systems***, https://doi.org/10.1029/2022MS003507 
 * **Yang C.**, Maxwell R., Valent R., 2022. Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2022.105189
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., 2021. Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
