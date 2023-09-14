@@ -32,16 +32,16 @@ Currently, optimization continues, so **only the particle loop kernel** got test
 ## Backward particle tracking based on ParFlow CONUS 2.0 model
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/backward.png)  
 ## 10 representative publications using ParFlow and/or EcoSLIM 
-* **Yang C.**, Condon LE, Maxwell RM, 2023. Unraveling groundwater-stream connections at the continental scale. Submitted to ***Nature X***  
-* **Yang C.**, Tijerina-Kreuzer DT, Tran HV, Condon LE, Maxwell RM, 2023. A high-resolution, 3D groundwater-surface water simulation of the contiguous US: Advances in the integrated ParFlow CONUS 2.0 modeling platform. ***Journal of Hydrology***, revised. Preprint on EarthArXiv, https://doi.org/10.31223/X5D96H    
+* **Yang C.**, Condon L., Maxwell R., 2023. Unraveling groundwater-stream connections at the continental scale. Submitted to ***Nature X***  
+* **Yang C.**, Tijerina-Kreuzer D., Tran H., Condon L., Maxwell R., 2023. A high-resolution, 3D groundwater-surface water simulation of the contiguous US: Advances in the integrated ParFlow CONUS 2.0 modeling platform. ***Journal of Hydrology***, revised. Preprint on EarthArXiv, https://doi.org/10.31223/X5D96H    
 * **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina D., 2023. The role of topography in controlling evapotranspiration age. ***Journal of Geophysical Research: Atmospheres***, https://doi.org/10.1029/2023JD039228
 * **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2023. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. ***Journal of Advances in Modeling Earth Systems***, https://doi.org/10.1029/2022MS003507 
 * **Yang C.**, Maxwell R., Valent R., 2022. Accurate load balancing accelerates Lagrangian simulation of water ages on distributed, multi-GPU platforms. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2022.105189
 * **Yang C.**, Zhang Y.-K., Liang X., Olschanowsky C., Yang X., Maxwell R., 2021. Accelerating the Lagrangian particle tracking of residence time distributions and source water mixing towards large scales. ***Computers & Geosciences***, https://doi.org/10.1016/j.cageo.2021.104760
 * **Yang C.**, Li H.-Y., Fang Y., Cui C., Wang T., Zheng C., Leung L. R., Maxwell R., Zhang Y.-K., Yang X., 2020. Effects of Groundwater Pumping on Ground Surface Temperature: A Regional Modeling Study in the North China Plain. ***Journal of Geophysical Research: Atmospheres***, https://doi.org/10.1029/2019jd031764
-* Tran HV*, **Yang C***, Condon LE, Maxwell RM, 2023. The Budyko shape parameter as a descriptive index for streamflow loss. ***Frontiers in Water***, in press
-* Tijerina-Kreuzer DT, Swilley JS, Tran HV, Zhang J, West B, **Yang C.**, Condon LE, Maxwell RM, 2023. Continental scale hydrostratigraphy: basin-scale testing of alternative data-driven approaches. ***Groundwater***, revised
-* Swilley JS, Tijerina-Kreuzer DT, Tran HV, Zhang J, **Yang C.**, Condon LE, Maxwell RM, 2023. Continental scale hydrostratigraphy: comparing datasets to analytical solutions. ***Groundwater***, in press
+* Tran H.*, **Yang C.***, Condon L., Maxwell R., 2023. The Budyko shape parameter as a descriptive index for streamflow loss. ***Frontiers in Water***, in press
+* Tijerina-Kreuzer D., Swilley J., Tran H., Zhang J., West B., **Yang C.**, Condon L., Maxwell R., 2023. Continental scale hydrostratigraphy: basin-scale testing of alternative data-driven approaches. ***Groundwater***, revised
+* Swilley J., Tijerina-Kreuzer D., Tran H., Zhang J., **Yang C.**, Condon L., Maxwell R., 2023. Continental scale hydrostratigraphy: comparing datasets to analytical solutions. ***Groundwater***, in press
 
 ## Presentations
 * **Yang C.**, **MODFLOW and More 2022**, oral presentation, Accelerating the Lagrangian particle tracking in hydrologic modeling at the continental-scale 
