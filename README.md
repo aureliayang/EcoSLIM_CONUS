@@ -7,7 +7,7 @@ A particle tracking code simulates water ages and source-water mixing, working s
 ## Backward particle tracking based on ParFlow CONUS 2.0 model
 ![image](https://github.com/aureliayang/EcoSLIM_CONUS/blob/main/imgs/backward.png)  
 ## 10 representative publications using ParFlow and/or EcoSLIM 
-* **Yang C.**, Condon L., Maxwell R., 2023. Unraveling groundwater-stream connections at the continental scale. Submitted to ***Nature X***  
+* **Yang C.**, Condon L., Maxwell R., 2023. Unraveling groundwater-stream connections at the continental scale. ***Nature Water, in revision***  
 * **Yang C.**, Tijerina-Kreuzer D., Tran H., Condon L., Maxwell R., 2023. A high-resolution, 3D groundwater-surface water simulation of the contiguous US: Advances in the integrated ParFlow CONUS 2.0 modeling platform. ***Journal of Hydrology***, https://doi.org/10.1016/j.jhydrol.2023.130294
 * **Yang C.**, Maxwell R., McDonnell J., Yang X., Tijerina-Kreuzer D., 2023. The role of topography in controlling evapotranspiration age. ***Journal of Geophysical Research: Atmospheres***, https://doi.org/10.1029/2023JD039228
 * **Yang C.**, Ponder C., Wang B., Tran H., Zhang J., Swilley J., Condon L., Maxwell R., 2023. Accelerating the Lagrangian particle tracking in hydrology to continental-scale. ***Journal of Advances in Modeling Earth Systems***, https://doi.org/10.1029/2022MS003507 
